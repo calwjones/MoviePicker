@@ -1,6 +1,10 @@
 import { Router, Response } from 'express';
 import { prisma } from '../app';
+import { emit } from '../services/emitter';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { CLIENT_URL } from '../config';
+import { applyMovieFilters } from '../lib/filterMovies';
+import { resolveSessionRole } from '../lib/resolveSessionRole';
 
 const router = Router();
 
@@ -22,6 +26,12 @@ router.post('/create', authenticate, async (req: AuthRequest, res: Response) => 
       return;
     }
 
+    // Cancel any existing active sessions for this couple
+    await prisma.swipeSession.updateMany({
+      where: { coupleId: couple.id, status: { in: ['active', 'swiping'] } },
+      data: { status: 'completed' },
+    });
+
     const watchlistMovies = await prisma.userMovie.findMany({
       where: {
         userId: { in: [couple.user1Id, couple.user2Id] },
@@ -35,31 +45,12 @@ router.post('/create', authenticate, async (req: AuthRequest, res: Response) => 
       movieMap.set(um.movieId, um.movie);
     }
 
-    let moviePool = Array.from(movieMap.values());
+    const moviePool = applyMovieFilters(Array.from(movieMap.values()), filters || {});
 
-    if (filters) {
-      if (filters.genres && filters.genres.length > 0) {
-        moviePool = moviePool.filter((m) => {
-          const movieGenres = m.genres as string[];
-          return filters.genres.some((g: string) => movieGenres.includes(g));
-        });
-      }
-      if (filters.decade) {
-        const decadeStart = parseInt(filters.decade);
-        moviePool = moviePool.filter((m) => m.year && m.year >= decadeStart && m.year < decadeStart + 10);
-      }
-      if (filters.minRating) {
-        moviePool = moviePool.filter((m) => m.tmdbRating && m.tmdbRating >= filters.minRating);
-      }
-      if (filters.maxRuntime) {
-        moviePool = moviePool.filter((m) => m.runtime && m.runtime <= filters.maxRuntime);
-      }
-      if (filters.streamingProvider) {
-        moviePool = moviePool.filter((m) => {
-          const providers = m.streamingProviders as { name: string; type: string }[];
-          return providers.some((p) => p.name === filters.streamingProvider && p.type === 'stream');
-        });
-      }
+    // Shuffle (Fisher-Yates) so sessions aren't always the same order
+    for (let i = moviePool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [moviePool[i], moviePool[j]] = [moviePool[j], moviePool[i]];
     }
 
     if (moviePool.length === 0) {
@@ -90,7 +81,74 @@ router.post('/create', authenticate, async (req: AuthRequest, res: Response) => 
       },
     });
 
-    res.status(201).json({ session: fullSession });
+    emit(`couple:${couple.id}`, 'session-created', { sessionId: session.id, session: fullSession, createdBy: req.userId });
+
+    const shareLink = `${CLIENT_URL}/join/${session.id}`;
+    res.status(201).json({ session: fullSession, shareLink });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/create-guest', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { filters } = req.body;
+
+    const watchlistMovies = await prisma.userMovie.findMany({
+      where: {
+        userId: req.userId!,
+        onWatchlist: true,
+        watched: false,
+      },
+      include: { movie: true },
+    });
+
+    let moviePool = applyMovieFilters(
+      watchlistMovies.map((um) => um.movie),
+      filters || {}
+    );
+
+    // Shuffle (Fisher-Yates)
+    for (let i = moviePool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [moviePool[i], moviePool[j]] = [moviePool[j], moviePool[i]];
+    }
+
+    if (moviePool.length === 0) {
+      res.status(400).json({
+        error: 'No movies match your filters. Try adjusting your filters or adding more movies.',
+      });
+      return;
+    }
+
+    // Cancel any existing active guest sessions for this user
+    await prisma.swipeSession.updateMany({
+      where: {
+        userId: req.userId,
+        type: 'guest',
+        status: { in: ['active', 'swiping'] },
+      },
+      data: { status: 'completed' },
+    });
+
+    const session = await prisma.swipeSession.create({
+      data: {
+        type: 'guest',
+        userId: req.userId,
+        coupleId: null,
+        filters: filters || {},
+        movies: {
+          create: moviePool.map((m) => ({ movieId: m.id })),
+        },
+      },
+      include: {
+        movies: { include: { movie: true } },
+      },
+    });
+
+    const shareLink = `${CLIENT_URL}/join/${session.id}`;
+    res.status(201).json({ session, shareLink });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal server error' });
@@ -155,12 +213,12 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    if (session.couple.user1Id !== req.userId && session.couple.user2Id !== req.userId) {
+    const { isUser1, isUser2, isGuest } = resolveSessionRole(req, session);
+
+    if (!isUser1 && !isUser2 && !isGuest) {
       res.status(403).json({ error: 'You are not part of this session' });
       return;
     }
-
-    const isUser1 = session.couple.user1Id === req.userId;
 
     res.json({ session, isUser1 });
   } catch {
@@ -179,13 +237,13 @@ router.get('/history/all', authenticate, async (req: AuthRequest, res: Response)
       },
     });
 
-    if (!couple) {
-      res.status(404).json({ error: 'Not in a couple' });
-      return;
-    }
-
     const sessions = await prisma.swipeSession.findMany({
-      where: { coupleId: couple.id },
+      where: {
+        OR: [
+          ...(couple ? [{ coupleId: couple.id }] : []),
+          { userId: req.userId!, type: { in: ['solo', 'guest'] } },
+        ],
+      },
       include: {
         matches: { include: { movie: true } },
         _count: { select: { movies: true } },
@@ -193,13 +251,14 @@ router.get('/history/all', authenticate, async (req: AuthRequest, res: Response)
       orderBy: { createdAt: 'desc' },
     });
 
-    const history = sessions.map((s) => ({
+    const history = sessions.map((s: (typeof sessions)[number]) => ({
       id: s.id,
+      type: s.type,
       status: s.status,
       createdAt: s.createdAt,
       movieCount: s._count.movies,
       matchCount: s.matches.length,
-      matches: s.matches.map((m) => ({
+      matches: s.matches.map((m: (typeof s.matches)[number]) => ({
         id: m.id,
         movie: m.movie,
         watched: m.watched,
@@ -208,6 +267,40 @@ router.get('/history/all', authenticate, async (req: AuthRequest, res: Response)
     }));
 
     res.json({ sessions: history });
+  } catch {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const sessionId = req.params.id as string;
+    const session = await prisma.swipeSession.findUnique({
+      where: { id: sessionId },
+      include: { couple: true },
+    });
+
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+
+    const isSolo = session.type === 'solo';
+    const isOwner = isSolo
+      ? session.userId === req.userId
+      : session.couple?.user1Id === req.userId || session.couple?.user2Id === req.userId;
+
+    if (!isOwner) {
+      res.status(403).json({ error: 'Not authorized' });
+      return;
+    }
+
+    await prisma.swipeSession.update({
+      where: { id: sessionId },
+      data: { status: 'completed' },
+    });
+
+    res.json({ success: true });
   } catch {
     res.status(500).json({ error: 'Internal server error' });
   }

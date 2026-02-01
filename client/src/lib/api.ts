@@ -22,6 +22,15 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && typeof window !== 'undefined') {
       const currentPath = window.location.pathname;
       if (currentPath !== '/auth' && !error.config?.url?.includes('/auth/')) {
+        // If we have a backed-up user token (from before guest session), restore it
+        const backup = localStorage.getItem('user_token_backup');
+        if (backup) {
+          localStorage.setItem('token', backup);
+          localStorage.removeItem('user_token_backup');
+          localStorage.removeItem('guest_session_id');
+          window.location.href = '/dashboard';
+          return Promise.reject(error);
+        }
         localStorage.removeItem('token');
         window.location.href = '/auth?mode=login&expired=1';
       }
@@ -53,6 +62,9 @@ export const movieApi = {
   search: (query: string, page = 1) => api.get('/movies/search', { params: { q: query, page } }),
   add: (tmdbId: number) => api.post('/movies/add', { tmdbId }),
   removeFromWatchlist: (movieId: string) => api.delete(`/movies/${movieId}/watchlist`),
+  getPoolSize: () => api.get('/movies/pool-size'),
+  markWatched: (movieId: string, watched: boolean) => api.patch(`/movies/${movieId}/watched`, { watched }),
+  rate: (movieId: string, rating: number | null) => api.post(`/movies/${movieId}/rate`, { rating }),
 };
 
 export const importApi = {
@@ -76,19 +88,43 @@ export const importApi = {
 export const sessionApi = {
   create: (filters?: Record<string, unknown>) =>
     api.post('/sessions/create', { filters }),
+  createGuest: (filters?: Record<string, unknown>) =>
+    api.post('/sessions/create-guest', { filters }),
   active: () => api.get('/sessions/active'),
   get: (id: string) => api.get(`/sessions/${id}`),
   history: () => api.get('/sessions/history/all'),
+  cancel: (id: string) => api.delete(`/sessions/${id}`),
+};
+
+export const recommendationApi = {
+  get: () => api.get('/recommendations'),
 };
 
 export const swipeApi = {
   swipe: (sessionId: string, movieId: string, direction: 'left' | 'right') =>
     api.post('/swipes', { sessionId, movieId, direction }),
+  undo: (sessionId: string, movieId: string) =>
+    api.post('/swipes/undo', { sessionId, movieId }),
   done: (sessionId: string) => api.post('/swipes/done', { sessionId }),
   matches: (sessionId: string) => api.get(`/swipes/matches/${sessionId}`),
   markWatched: (matchId: string) => api.post(`/swipes/matches/${matchId}/watched`),
   rateMatch: (matchId: string, rating: number) =>
     api.post(`/swipes/matches/${matchId}/rate`, { rating }),
+};
+
+export const soloApi = {
+  create: (filters?: Record<string, unknown>) =>
+    api.post('/solo/create', { filters }),
+  active: () => api.get('/solo/active'),
+};
+
+export const guestApi = {
+  join: (sessionId: string, displayName: string) =>
+    api.post(`/guest/join/${sessionId}`, { displayName }),
+};
+
+export const providerApi = {
+  list: () => api.get('/providers'),
 };
 
 export default api;
