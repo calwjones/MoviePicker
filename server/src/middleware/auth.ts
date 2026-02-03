@@ -4,6 +4,10 @@ import { JWT_SECRET } from '../config';
 
 export interface AuthRequest extends Request {
   userId?: string;
+  isGuest?: boolean;
+  guestId?: string;
+  couple?: { id: string; user1Id: string; user2Id: string | null; inviteCode: string; createdAt: Date };
+  isUser1?: boolean;
 }
 
 export function authenticate(req: AuthRequest, res: Response, next: NextFunction): void {
@@ -15,8 +19,15 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
 
   const token = authHeader.split(' ')[1];
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-    req.userId = decoded.userId;
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId?: string; guestId?: string };
+    if (decoded.guestId) {
+      req.isGuest = true;
+      req.guestId = decoded.guestId;
+      req.userId = 'guest'; // Keep a dummy userId so other systems don't crash complaining missing userId where permissive
+    } else {
+      req.isGuest = false;
+      req.userId = decoded.userId;
+    }
     next();
   } catch {
     res.status(401).json({ error: 'Invalid token' });
