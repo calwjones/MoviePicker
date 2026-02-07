@@ -3,6 +3,7 @@ import { prisma } from '../app';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { searchMovies, findOrCreateMovieByTmdbId, TMDB_IMAGE_BASE } from '../services/tmdb';
 
+
 const router = Router();
 
 router.get('/search', authenticate, async (req: AuthRequest, res: Response) => {
@@ -109,6 +110,66 @@ router.get('/mine', authenticate, async (req: AuthRequest, res: Response) => {
     res.json({ movies: userMovies });
   } catch {
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/pool-size', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const couple = await prisma.couple.findFirst({
+      where: { OR: [{ user1Id: req.userId! }, { user2Id: req.userId! }] },
+    });
+
+    if (!couple || !couple.user2Id) {
+      res.json({ size: 0 });
+      return;
+    }
+
+    const movies = await prisma.userMovie.findMany({
+      where: {
+        userId: { in: [couple.user1Id, couple.user2Id] },
+        onWatchlist: true,
+      },
+      select: { movieId: true },
+    });
+
+    const uniqueIds = new Set(movies.map((m: { movieId: string }) => m.movieId));
+    res.json({ size: uniqueIds.size });
+  } catch {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.patch('/:movieId/watched', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { watched } = req.body;
+    const userMovie = await prisma.userMovie.update({
+      where: { userId_movieId: { userId: req.userId!, movieId: req.params.movieId as string } },
+      data: { 
+        watched: !!watched,
+        ...(!!watched ? { onWatchlist: false } : {})
+      },
+      include: { movie: true },
+    });
+    res.json({ userMovie });
+  } catch {
+    res.status(500).json({ error: 'Failed to update watched status' });
+  }
+});
+
+router.post('/:movieId/rate', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { rating } = req.body;
+    const userMovie = await prisma.userMovie.update({
+      where: { userId_movieId: { userId: req.userId!, movieId: req.params.movieId as string } },
+      data: {
+        userRating: typeof rating === 'number' ? rating : null,
+        ...(typeof rating === 'number' ? { watched: true, onWatchlist: false } : {}),
+      },
+      include: { movie: true },
+    });
+    res.json({ userMovie });
+  } catch {
+    res.status(500).json({ error: 'Failed to rate movie' });
   }
 });
 

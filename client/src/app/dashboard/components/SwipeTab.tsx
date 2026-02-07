@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { sessionApi, movieApi } from '@/lib/api';
+import { sessionApi, soloApi, movieApi, providerApi } from '@/lib/api';
 import { getErrorMessage } from '@/lib/errors';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import type { Filters } from '@shared/types';
@@ -18,16 +18,20 @@ const DECADE_OPTIONS = ['1970', '1980', '1990', '2000', '2010', '2020'];
 
 interface SwipeTabProps {
   addToast: (message: string) => void;
+  isPaired: boolean;
 }
 
-export default function SwipeTab({ addToast }: SwipeTabProps) {
+export default function SwipeTab({ addToast, isPaired }: SwipeTabProps) {
   const router = useRouter();
 
   const [poolSize, setPoolSize] = useState<number>(0);
   const [poolSizeLoading, setPoolSizeLoading] = useState(false);
   const [activeSession, setActiveSession] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [shareLink, setShareLink] = useState<string | null>(null);
   const [sessionLoading, setSessionLoading] = useState(false);
+  const [soloLoading, setSoloLoading] = useState(false);
+  const [guestLoading, setGuestLoading] = useState(false);
   const [sessionError, setSessionError] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [streamingProviders, setStreamingProviders] = useState<string[]>([]);
@@ -37,7 +41,7 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
     decade: '',
     minRating: 0,
     maxRuntime: 0,
-    streamingProvider: '',
+    streamingProviders: [],
   });
 
   // Load filters from local storage on mount
@@ -45,7 +49,7 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
     try {
       const saved = localStorage.getItem('moviepicker_filters');
       if (saved) {
-        setFilters(JSON.parse(saved));
+        setFilters((prev) => ({ ...prev, ...JSON.parse(saved) }));
       }
     } catch {
       // ignore
@@ -82,17 +86,10 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
 
   const loadStreamingProviders = async () => {
     try {
-      const res = await movieApi.mine();
-      const movies = res.data.movies as { movie: { streamingProviders?: { name: string; type: string }[] } }[];
-      const providers = Array.from(
-        new Set(
-          movies.flatMap((um) =>
-            ((um.movie.streamingProviders || []) as { name: string; type: string }[])
-              .filter((p) => p.type === 'stream')
-              .map((p) => p.name)
-          )
-        )
-      ).sort();
+      const res = await providerApi.list();
+      const providers = (res.data.providers as { name: string }[])
+        .map((p) => p.name)
+        .sort();
       setStreamingProviders(providers);
     } catch {
       // ignore
@@ -110,21 +107,29 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
     setSessionLoading(true);
     setSessionError('');
     try {
-      const activeFilters: Record<string, unknown> = {};
-      if (filters.genres.length > 0) activeFilters.genres = filters.genres;
-      if (filters.decade) activeFilters.decade = filters.decade;
-      if (filters.minRating > 0) activeFilters.minRating = filters.minRating;
-      if (filters.maxRuntime > 0) activeFilters.maxRuntime = filters.maxRuntime;
-      if (filters.streamingProvider) activeFilters.streamingProvider = filters.streamingProvider;
-
-      const res = await sessionApi.create(
-        Object.keys(activeFilters).length > 0 ? activeFilters : undefined
-      );
-      router.push(`/session/${res.data.session.id}`);
+      const res = await sessionApi.create(buildActiveFilters());
+      setShareLink(res.data.shareLink || null);
+      setActiveSession(true);
+      setActiveSessionId(res.data.session.id);
     } catch (err: unknown) {
       setSessionError(getErrorMessage(err, 'Failed to start session'));
     } finally {
       setSessionLoading(false);
+    }
+  };
+
+  const handleStartGuestSession = async () => {
+    setGuestLoading(true);
+    setSessionError('');
+    try {
+      const res = await sessionApi.createGuest(buildActiveFilters());
+      setShareLink(res.data.shareLink || null);
+      setActiveSession(true);
+      setActiveSessionId(res.data.session.id);
+    } catch (err: unknown) {
+      setSessionError(getErrorMessage(err, 'Failed to create session'));
+    } finally {
+      setGuestLoading(false);
     }
   };
 
@@ -144,6 +149,7 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
       await sessionApi.cancel(activeSessionId);
       setActiveSession(false);
       setActiveSessionId(null);
+      setShareLink(null);
       addToast('Session cancelled');
     } catch {
       addToast('Failed to cancel session');
@@ -153,10 +159,33 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
   const toggleGenre = (genre: string) => {
     setFilters((prev) => ({
       ...prev,
-      genres: prev.genres.includes(genre)
-        ? prev.genres.filter((g) => g !== genre)
-        : [...prev.genres, genre],
+      genres: (prev.genres || []).includes(genre)
+        ? (prev.genres || []).filter((g) => g !== genre)
+        : [...(prev.genres || []), genre],
     }));
+  };
+
+  const handleStartSoloSession = async () => {
+    setSoloLoading(true);
+    setSessionError('');
+    try {
+      const res = await soloApi.create(buildActiveFilters());
+      router.push(`/solo/${res.data.session.id}`);
+    } catch (err: unknown) {
+      setSessionError(getErrorMessage(err, 'Failed to start solo session'));
+    } finally {
+      setSoloLoading(false);
+    }
+  };
+
+  const buildActiveFilters = (): Record<string, unknown> | undefined => {
+    const active: Record<string, unknown> = {};
+    if (filters.genres?.length > 0) active.genres = filters.genres;
+    if (filters.decade) active.decade = filters.decade;
+    if (filters.minRating > 0) active.minRating = filters.minRating;
+    if (filters.maxRuntime > 0) active.maxRuntime = filters.maxRuntime;
+    if (filters.streamingProviders?.length > 0) active.streamingProviders = filters.streamingProviders;
+    return Object.keys(active).length > 0 ? active : undefined;
   };
 
   const clearFilters = () => {
@@ -165,9 +194,11 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
       decade: '',
       minRating: 0,
       maxRuntime: 0,
-      streamingProvider: '',
+      streamingProviders: [],
     });
   };
+
+  const anyLoading = sessionLoading || soloLoading || guestLoading;
 
   return (
     <motion.div
@@ -180,7 +211,7 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
       {/* Pool preview */}
       <div className="glass rounded-2xl p-4">
         <p className="text-cream-dim text-sm">
-          Your combined watchlists have <span className="text-amber font-semibold">{poolSizeLoading ? '...' : poolSize}</span> movies.
+          Your movie pool has <span className="text-danger font-semibold">{poolSizeLoading ? '...' : poolSize}</span> movies.
           {poolSize === 0 && !poolSizeLoading && ' Add some movies first from the Library tab.'}
         </p>
       </div>
@@ -201,7 +232,7 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
                   e.stopPropagation();
                   clearFilters();
                 }}
-                className="text-amber text-xs hover:underline"
+                className="text-danger text-xs hover:underline"
               >
                 Clear all
               </button>
@@ -229,11 +260,10 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
                       <button
                         key={genre}
                         onClick={() => toggleGenre(genre)}
-                        className={`px-3 py-1.5 rounded-full text-xs transition-colors ${
-                          filters.genres.includes(genre)
-                            ? 'bg-amber text-charcoal'
-                            : 'glass text-cream-dim'
-                        }`}
+                        className={`px-3 py-1.5 rounded-full text-xs transition-all hover:-translate-y-0.5 hover:shadow-md ${(filters.genres || []).includes(genre)
+                            ? 'bg-coral text-charcoal shadow-coral/20'
+                            : 'glass text-cream-dim shadow-sm'
+                          }`}
                       >
                         {genre}
                       </button>
@@ -249,11 +279,10 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
                       <button
                         key={decade}
                         onClick={() => setFilters((p) => ({ ...p, decade: p.decade === decade ? '' : decade }))}
-                        className={`px-3 py-1.5 rounded-full text-xs transition-colors ${
-                          filters.decade === decade
-                            ? 'bg-amber text-charcoal'
-                            : 'glass text-cream-dim'
-                        }`}
+                        className={`px-3 py-1.5 rounded-full text-xs transition-all hover:-translate-y-0.5 hover:shadow-md ${filters.decade === decade
+                            ? 'bg-coral text-charcoal shadow-coral/20'
+                            : 'glass text-cream-dim shadow-sm'
+                          }`}
                       >
                         {decade}s
                       </button>
@@ -272,14 +301,15 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
                           onClick={() =>
                             setFilters((p) => ({
                               ...p,
-                              streamingProvider: p.streamingProvider === provider ? '' : provider,
+                              streamingProviders: (p.streamingProviders || []).includes(provider)
+                                ? (p.streamingProviders || []).filter((s) => s !== provider)
+                                : [...(p.streamingProviders || []), provider],
                             }))
                           }
-                          className={`px-3 py-1.5 rounded-full text-xs transition-colors ${
-                            filters.streamingProvider === provider
-                              ? 'bg-amber text-charcoal'
-                              : 'glass text-cream-dim'
-                          }`}
+                          className={`px-3 py-1.5 rounded-full text-xs transition-all hover:-translate-y-0.5 hover:shadow-md ${(filters.streamingProviders || []).includes(provider)
+                              ? 'bg-coral text-charcoal shadow-coral/20'
+                              : 'glass text-cream-dim shadow-sm'
+                            }`}
                         >
                           {provider}
                         </button>
@@ -300,7 +330,7 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
                     step="0.5"
                     value={filters.minRating}
                     onChange={(e) => setFilters((p) => ({ ...p, minRating: parseFloat(e.target.value) }))}
-                    className="w-full accent-amber"
+                    className="w-full accent-coral"
                   />
                 </div>
 
@@ -316,7 +346,7 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
                     step="15"
                     value={filters.maxRuntime}
                     onChange={(e) => setFilters((p) => ({ ...p, maxRuntime: parseInt(e.target.value) }))}
-                    className="w-full accent-amber"
+                    className="w-full accent-coral"
                   />
                 </div>
               </div>
@@ -328,7 +358,7 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
       {/* Error message */}
       {sessionError && (
         <div className="p-3 glass rounded-xl border border-danger/30">
-          <p className="text-coral text-sm text-center">{sessionError}</p>
+          <p className="text-danger text-sm text-center">{sessionError}</p>
         </div>
       )}
 
@@ -336,32 +366,95 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
       <div className="glass rounded-2xl p-4">
         <h3 className="font-medium text-sm mb-2">How it works</h3>
         <ol className="text-cream-dim text-xs space-y-1 list-decimal list-inside">
-          <li>Both you and your partner swipe through the movie pool</li>
-          <li>Swipe right to like, left to skip (or tap the buttons)</li>
-          <li>Movies you both swipe right on become matches</li>
-          <li>Spin the roulette wheel to pick your movie night winner</li>
+          <li>Swipe through your movie pool — right to like, left to skip</li>
+          <li>{isPaired ? 'Movies you both like become matches' : 'Movies you like become your shortlist'}</li>
+          <li>Spin the roulette to pick what to watch</li>
         </ol>
       </div>
 
       {/* Start / Resume */}
       <div className="flex flex-col gap-3">
-        <motion.button
-          whileHover={poolSize > 0 ? { scale: 1.02 } : {}}
-          whileTap={poolSize > 0 ? { scale: 0.98 } : {}}
-          onClick={handleStartSession}
-          disabled={sessionLoading || poolSize === 0 || poolSizeLoading}
-          className="w-full py-4 bg-amber text-charcoal font-semibold rounded-xl text-lg hover:bg-amber-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {sessionLoading ? (
-            <span className="flex items-center justify-center gap-2">
-              <LoadingSpinner size="sm" />
-              Creating session...
-            </span>
+        <div className="flex gap-3">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={handleStartSoloSession}
+            disabled={anyLoading}
+            className="flex-1 py-4 bg-coral text-charcoal font-semibold rounded-xl text-lg hover:bg-coral-dark transition-all shadow-md hover:shadow-coral/40 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {soloLoading ? (
+              <span className="flex items-center justify-center gap-2">
+                <LoadingSpinner size="sm" />
+                Starting...
+              </span>
+            ) : (
+              'Solo Mode'
+            )}
+          </motion.button>
+          {isPaired ? (
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={handleStartSession}
+              disabled={anyLoading || poolSize === 0 || poolSizeLoading}
+              className="flex-1 py-4 glass text-danger font-semibold rounded-xl text-lg outline outline-1 outline-coral hover:bg-card-hover transition-all btn-glow disabled:opacity-50"
+            >
+              {sessionLoading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <LoadingSpinner size="sm" />
+                  Starting...
+                </span>
+              ) : (
+                'Group Session'
+              )}
+            </motion.button>
           ) : (
-            `Start Swiping (${poolSize} movies)`
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={handleStartGuestSession}
+              disabled={anyLoading || poolSize === 0 || poolSizeLoading}
+              className="flex-1 py-4 glass text-danger font-semibold rounded-xl text-lg outline outline-1 outline-coral hover:bg-card-hover transition-all btn-glow disabled:opacity-50"
+            >
+              {guestLoading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <LoadingSpinner size="sm" />
+                  Creating...
+                </span>
+              ) : (
+                'Invite a Friend'
+              )}
+            </motion.button>
           )}
-        </motion.button>
-        {activeSession && (
+        </div>
+
+        {activeSession && shareLink && (
+          <div className="glass rounded-xl p-4 space-y-2">
+            <p className="text-cream-dim text-xs">Share this link with your friend to join:</p>
+            <div className="flex gap-2 items-center">
+              <p className="flex-1 text-xs text-cream font-mono truncate bg-charcoal rounded-lg px-3 py-2">{shareLink}</p>
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  navigator.clipboard.writeText(shareLink);
+                  addToast('Link copied!');
+                }}
+                className="px-3 py-2 bg-coral text-charcoal text-xs font-semibold rounded-lg"
+              >
+                Copy
+              </motion.button>
+            </div>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => activeSessionId && router.push(`/session/${activeSessionId}`)}
+              className="w-full py-3 bg-coral text-charcoal font-semibold rounded-xl hover:bg-coral-dark transition-colors"
+            >
+              Start Swiping
+            </motion.button>
+          </div>
+        )}
+        {activeSession && !shareLink && (
           <div className="flex gap-3">
             <motion.button
               whileHover={{ scale: 1.02 }}
@@ -375,7 +468,7 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={handleCancelActiveSession}
-              className="py-3 px-4 glass text-coral text-sm font-medium rounded-xl hover:bg-card-hover transition-colors"
+              className="py-3 px-4 glass text-danger text-sm font-medium rounded-xl hover:bg-card-hover transition-colors"
             >
               Cancel
             </motion.button>

@@ -212,4 +212,32 @@ export async function findOrCreateMovieByTmdbId(tmdbId: number) {
   return movie;
 }
 
+export async function getAvailableProviders(region = 'GB'): Promise<{ id: number; name: string; logoUrl: string }[]> {
+  const params = new URLSearchParams({ api_key: getApiKey(), watch_region: region });
+  try {
+    const res = await rateLimitedFetch(`${TMDB_BASE}/watch/providers/movie?${params}`);
+    if (!res.ok) return [];
+    const data = (await res.json()) as { results?: { provider_id: number; provider_name: string; logo_path: string }[] };
+    return (data.results || []).map((p) => ({
+      id: p.provider_id,
+      name: p.provider_name,
+      logoUrl: `${TMDB_IMAGE_BASE}${p.logo_path}`,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function getTmdbRecommendations(tmdbId: number): Promise<TmdbSearchResult[]> {
+  const params = new URLSearchParams({ api_key: getApiKey() });
+  try {
+    const res = await rateLimitedFetch(`${TMDB_BASE}/movie/${tmdbId}/recommendations?${params}`);
+    if (!res.ok) return [];
+    const data = (await res.json()) as { results?: TmdbSearchResult[] };
+    return data.results || [];
+  } catch {
+    return [];
+  }
+}
+
 export { TMDB_IMAGE_BASE };
