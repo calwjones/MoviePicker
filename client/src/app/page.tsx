@@ -21,7 +21,7 @@ export default function Home() {
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-          className="w-12 h-12 border-3 border-amber border-t-transparent rounded-full"
+          className="w-12 h-12 border-3 border-coral border-t-transparent rounded-full"
         />
       </div>
     );
@@ -39,7 +39,7 @@ export default function Home() {
           className="text-5xl font-bold mb-4 tracking-tight"
           style={{ fontFamily: 'var(--font-playfair)' }}
         >
-          Movie<span className="text-amber">Picker</span>
+          Movie<span className="text-danger">Picker</span>
         </h1>
         <p className="text-cream-dim text-lg mb-10">
           Pick a movie together. No more scrolling debates.
@@ -50,7 +50,7 @@ export default function Home() {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => router.push('/auth?mode=register')}
-            className="w-full py-4 bg-amber text-charcoal font-semibold rounded-xl text-lg transition-colors hover:bg-amber-dark"
+            className="w-full py-4 bg-coral text-charcoal font-semibold rounded-xl text-lg transition-colors hover:bg-coral-dark"
           >
             Get Started
           </motion.button>

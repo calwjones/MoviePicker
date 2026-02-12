@@ -30,7 +30,7 @@ export default function ConfirmModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-charcoal/80 z-50 flex items-center justify-center px-6"
+          className="fixed inset-0 bg-charcoal/60 backdrop-blur-sm z-50 flex items-center justify-center px-6 transition-all"
           onClick={onClose}
         >
           <motion.div
@@ -45,16 +45,16 @@ export default function ConfirmModal({
             <div className="flex gap-3">
               <button
                 onClick={onClose}
-                className="flex-1 py-2 glass rounded-xl text-cream-dim hover:text-cream transition-colors"
+                className="flex-1 py-2 glass rounded-xl text-cream-dim hover:text-cream transition-all btn-glow shadow-sm"
               >
                 {cancelLabel}
               </button>
               <button
                 onClick={onConfirm}
-                className={`flex-1 py-2 rounded-xl transition-colors ${
+                className={`flex-1 py-2 rounded-xl transition-all btn-glow shadow-sm ${
                   danger
                     ? 'bg-danger/80 text-cream hover:bg-danger'
-                    : 'bg-amber text-charcoal hover:bg-amber-dark'
+                    : 'bg-coral text-charcoal hover:bg-coral-dark'
                 }`}
               >
                 {confirmLabel}

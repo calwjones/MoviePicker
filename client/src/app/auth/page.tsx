@@ -58,8 +58,8 @@ function AuthForm() {
         </p>
 
         {expired && (
-          <div className="mb-4 p-3 glass rounded-xl border border-amber/30">
-            <p className="text-amber text-sm text-center">Your session expired. Please sign in again.</p>
+          <div className="mb-4 p-3 glass rounded-xl border border-coral/30">
+            <p className="text-danger text-sm text-center">Your session expired. Please sign in again.</p>
           </div>
         )}
 
@@ -71,7 +71,7 @@ function AuthForm() {
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               required
-              className="w-full px-4 py-3 glass rounded-xl bg-transparent text-cream placeholder:text-cream-dim focus:outline-none focus:ring-2 focus:ring-amber"
+              className="w-full px-4 py-3 glass rounded-xl bg-transparent text-cream placeholder:text-cream-dim focus:outline-none focus:ring-2 focus:ring-coral"
             />
           )}
           <input
@@ -80,7 +80,7 @@ function AuthForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full px-4 py-3 glass rounded-xl bg-transparent text-cream placeholder:text-cream-dim focus:outline-none focus:ring-2 focus:ring-amber"
+            className="w-full px-4 py-3 glass rounded-xl bg-transparent text-cream placeholder:text-cream-dim focus:outline-none focus:ring-2 focus:ring-coral"
           />
           <input
             type="password"
@@ -88,12 +88,12 @@ function AuthForm() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            minLength={6}
-            className="w-full px-4 py-3 glass rounded-xl bg-transparent text-cream placeholder:text-cream-dim focus:outline-none focus:ring-2 focus:ring-amber"
+            minLength={8}
+            className="w-full px-4 py-3 glass rounded-xl bg-transparent text-cream placeholder:text-cream-dim focus:outline-none focus:ring-2 focus:ring-coral"
           />
 
           {error && (
-            <p className="text-coral text-sm text-center">{error}</p>
+            <p className="text-danger text-sm text-center">{error}</p>
           )}
 
           <motion.button
@@ -101,7 +101,7 @@ function AuthForm() {
             whileTap={{ scale: 0.98 }}
             type="submit"
             disabled={loading}
-            className="w-full py-4 bg-amber text-charcoal font-semibold rounded-xl text-lg transition-colors hover:bg-amber-dark disabled:opacity-50"
+            className="w-full py-4 bg-coral text-charcoal font-semibold rounded-xl text-lg transition-colors hover:bg-coral-dark disabled:opacity-50"
           >
             {loading ? 'Loading...' : mode === 'login' ? 'Sign In' : 'Create Account'}
           </motion.button>
@@ -111,7 +111,7 @@ function AuthForm() {
           {mode === 'login' ? "Don't have an account?" : 'Already have an account?'}{' '}
           <button
             onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
-            className="text-amber hover:underline"
+            className="text-danger hover:underline"
           >
             {mode === 'login' ? 'Sign up' : 'Sign in'}
           </button>
@@ -125,7 +125,7 @@ export default function AuthPage() {
   return (
     <Suspense fallback={
       <div className="flex items-center justify-center min-h-dvh">
-        <div className="w-12 h-12 border-3 border-amber border-t-transparent rounded-full animate-spin" />
+        <div className="w-12 h-12 border-3 border-coral border-t-transparent rounded-full animate-spin" />
       </div>
     }>
       <AuthForm />
