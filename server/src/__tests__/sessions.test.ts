@@ -37,10 +37,12 @@ describe('Session Routes', () => {
         user2Id: 'user-2',
       });
 
+      mockPrisma.swipeSession.updateMany.mockResolvedValue({ count: 0 });
+
       mockPrisma.userMovie.findMany.mockResolvedValue([
-        { movieId: 'movie-1', movie: { id: 'movie-1', title: 'Film A', genres: ['Drama'], year: 2020, tmdbRating: 7.5, runtime: 120 } },
-        { movieId: 'movie-2', movie: { id: 'movie-2', title: 'Film B', genres: ['Comedy'], year: 2019, tmdbRating: 6.0, runtime: 90 } },
-        { movieId: 'movie-1', movie: { id: 'movie-1', title: 'Film A', genres: ['Drama'], year: 2020, tmdbRating: 7.5, runtime: 120 } },
+        { movieId: 'movie-1', movie: { id: 'movie-1', title: 'Film A', genres: ['Drama'], year: 2020, tmdbRating: 7.5, runtime: 120, streamingProviders: [] } },
+        { movieId: 'movie-2', movie: { id: 'movie-2', title: 'Film B', genres: ['Comedy'], year: 2019, tmdbRating: 6.0, runtime: 90, streamingProviders: [] } },
+        { movieId: 'movie-1', movie: { id: 'movie-1', title: 'Film A', genres: ['Drama'], year: 2020, tmdbRating: 7.5, runtime: 120, streamingProviders: [] } },
       ]);
 
       mockPrisma.swipeSession.create.mockResolvedValue({
@@ -72,6 +74,40 @@ describe('Session Routes', () => {
       expect(res.body.session.movies).toHaveLength(2);
     });
 
+    it('should cancel existing active sessions before creating', async () => {
+      const token = makeToken('user-1');
+
+      mockPrisma.couple.findFirst.mockResolvedValue({
+        id: 'couple-1',
+        user1Id: 'user-1',
+        user2Id: 'user-2',
+      });
+
+      mockPrisma.swipeSession.updateMany.mockResolvedValue({ count: 1 });
+
+      mockPrisma.userMovie.findMany.mockResolvedValue([
+        { movieId: 'movie-1', movie: { id: 'movie-1', title: 'Film A', genres: [], year: 2020, tmdbRating: 7.0, runtime: 100, streamingProviders: [] } },
+      ]);
+
+      mockPrisma.swipeSession.create.mockResolvedValue({ id: 'session-2', coupleId: 'couple-1', status: 'active', filters: {} });
+      mockPrisma.sessionMovie.createMany.mockResolvedValue({ count: 1 });
+      mockPrisma.swipeSession.findUnique.mockResolvedValue({
+        id: 'session-2',
+        movies: [{ id: 'sm-1', movieId: 'movie-1', movie: { id: 'movie-1', title: 'Film A' } }],
+      });
+
+      const res = await request(app)
+        .post('/api/sessions/create')
+        .set('Authorization', `Bearer ${token}`)
+        .send({});
+
+      expect(res.status).toBe(201);
+      expect(mockPrisma.swipeSession.updateMany).toHaveBeenCalledWith({
+        where: { coupleId: 'couple-1', status: { in: ['active', 'swiping'] } },
+        data: { status: 'completed' },
+      });
+    });
+
     it('should return 400 if couple is incomplete', async () => {
       const token = makeToken('user-1');
 
@@ -99,9 +135,11 @@ describe('Session Routes', () => {
         user2Id: 'user-2',
       });
 
+      mockPrisma.swipeSession.updateMany.mockResolvedValue({ count: 0 });
+
       mockPrisma.userMovie.findMany.mockResolvedValue([
-        { movieId: 'movie-1', movie: { id: 'movie-1', title: 'Film A', genres: ['Drama'], year: 2020, tmdbRating: 7.5, runtime: 120 } },
-        { movieId: 'movie-2', movie: { id: 'movie-2', title: 'Film B', genres: ['Comedy'], year: 2019, tmdbRating: 6.0, runtime: 90 } },
+        { movieId: 'movie-1', movie: { id: 'movie-1', title: 'Film A', genres: ['Drama'], year: 2020, tmdbRating: 7.5, runtime: 120, streamingProviders: [] } },
+        { movieId: 'movie-2', movie: { id: 'movie-2', title: 'Film B', genres: ['Comedy'], year: 2019, tmdbRating: 6.0, runtime: 90, streamingProviders: [] } },
       ]);
 
       mockPrisma.swipeSession.create.mockResolvedValue({
@@ -124,7 +162,6 @@ describe('Session Routes', () => {
         .send({ filters: { genres: ['Drama'] } });
 
       expect(res.status).toBe(201);
-      // Only Drama movie should be in the pool
       expect(mockPrisma.sessionMovie.createMany).toHaveBeenCalledWith({
         data: [expect.objectContaining({ movieId: 'movie-1' })],
       });
