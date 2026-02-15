@@ -1,3 +1,4 @@
+# DEV ONLY — see docker-compose.prod.yml for production
 services:
   db:
     image: postgres:16-alpine
@@ -25,7 +26,8 @@ services:
 
   client:
     build:
-      context: ./client
+      context: .
+      dockerfile: client/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: http://localhost:3001/api
         NEXT_PUBLIC_SOCKET_URL: http://localhost:3001
