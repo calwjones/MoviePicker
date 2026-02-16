@@ -1,0 +1,146 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  displayName  String   @map("display_name")
+  avatarUrl    String?  @map("avatar_url")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  couplesAsUser1 Couple[]    @relation("CoupleUser1")
+  couplesAsUser2 Couple[]    @relation("CoupleUser2")
+  userMovies     UserMovie[]
+
+  @@map("users")
+}
+
+model Couple {
+  id         String   @id @default(uuid())
+  user1Id    String   @map("user_1_id")
+  user2Id    String?  @map("user_2_id")
+  inviteCode String   @unique @map("invite_code")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user1   User            @relation("CoupleUser1", fields: [user1Id], references: [id])
+  user2   User?           @relation("CoupleUser2", fields: [user2Id], references: [id])
+  sessions SwipeSession[]
+  lists    List[]
+
+  @@map("couples")
+}
+
+model Movie {
+  id                 String  @id @default(uuid())
+  tmdbId             Int     @unique @map("tmdb_id")
+  title              String
+  year               Int?
+  posterUrl          String? @map("poster_url")
+  overview           String?
+  genres             Json    @default("[]")
+  director           String?
+  cast               Json    @default("[]")
+  runtime            Int?
+  tmdbRating         Float?  @map("tmdb_rating")
+  streamingProviders Json    @default("[]") @map("streaming_providers")
+
+  userMovies    UserMovie[]
+  sessionMovies SessionMovie[]
+  matches       Match[]
+
+  @@map("movies")
+}
+
+model UserMovie {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  movieId     String   @map("movie_id")
+  source      String   @default("manual") // letterboxd_import | manual | recommendation
+  onWatchlist Boolean  @default(false) @map("on_watchlist")
+  watched     Boolean  @default(false)
+  userRating  Float?   @map("user_rating")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user  User  @relation(fields: [userId], references: [id])
+  movie Movie @relation(fields: [movieId], references: [id])
+
+  @@unique([userId, movieId])
+  @@map("user_movies")
+}
+
+model SwipeSession {
+  id        String   @id @default(uuid())
+  coupleId  String   @map("couple_id")
+  status    String   @default("active") // active | swiping | completed
+  filters   Json     @default("{}") // genre, decade, rating, runtime
+  createdAt DateTime @default(now()) @map("created_at")
+
+  couple  Couple         @relation(fields: [coupleId], references: [id])
+  movies  SessionMovie[]
+  matches Match[]
+
+  @@map("swipe_sessions")
+}
+
+model SessionMovie {
+  id        String  @id @default(uuid())
+  sessionId String  @map("session_id")
+  movieId   String  @map("movie_id")
+  user1Swipe String? @map("user_1_swipe") // left | right | null
+  user2Swipe String? @map("user_2_swipe") // left | right | null
+
+  session SwipeSession @relation(fields: [sessionId], references: [id])
+  movie   Movie        @relation(fields: [movieId], references: [id])
+
+  @@unique([sessionId, movieId])
+  @@map("session_movies")
+}
+
+model Match {
+  id          String   @id @default(uuid())
+  sessionId   String   @map("session_id")
+  movieId     String   @map("movie_id")
+  resolved    Boolean  @default(false)
+  watched     Boolean  @default(false)
+  watchedAt   DateTime? @map("watched_at")
+  user1Rating Float?   @map("user_1_rating")
+  user2Rating Float?   @map("user_2_rating")
+
+  session SwipeSession @relation(fields: [sessionId], references: [id])
+  movie   Movie        @relation(fields: [movieId], references: [id])
+
+  @@unique([sessionId, movieId])
+  @@map("matches")
+}
+
+model List {
+  id          String   @id @default(uuid())
+  coupleId    String   @map("couple_id")
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  couple Couple     @relation(fields: [coupleId], references: [id])
+  movies ListMovie[]
+
+  @@map("lists")
+}
+
+model ListMovie {
+  id          String   @id @default(uuid())
+  listId      String   @map("list_id")
+  movieId     String   @map("movie_id")
+  addedByUserId String @map("added_by_user_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  list List @relation(fields: [listId], references: [id])
+
+  @@map("list_movies")
+}
