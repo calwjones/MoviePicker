@@ -1,6 +1,6 @@
 import type { Movie } from '@prisma/client';
 
-interface MovieFilters {
+export interface MovieFilters {
   genres?: string[];
   decade?: string;
   minRating?: number;

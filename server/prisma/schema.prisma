@@ -15,10 +15,11 @@ model User {
   avatarUrl    String?  @map("avatar_url")
   createdAt    DateTime @default(now()) @map("created_at")
 
-  couplesAsUser1 Couple[]    @relation("CoupleUser1")
-  couplesAsUser2 Couple[]    @relation("CoupleUser2")
-  userMovies     UserMovie[]
-  soloSessions   SwipeSession[]
+  couplesAsUser1    Couple[]       @relation("CoupleUser1")
+  couplesAsUser2    Couple[]       @relation("CoupleUser2")
+  userMovies        UserMovie[]
+  soloSessions      SwipeSession[]
+  groupSessionsAsP2 SwipeSession[] @relation("SessionUser2")
 
   @@map("users")
 }
@@ -78,17 +79,19 @@ model UserMovie {
 
 model SwipeSession {
   id        String   @id @default(uuid())
-  type      String   @default("couple") // couple | solo | guest
+  type      String   @default("group") // group | solo (couple | guest = legacy)
   coupleId  String?  @map("couple_id")
-  userId    String?  @map("user_id")
-  guestId   String?  @map("guest_id")
+  userId    String?  @map("user_id")    // host / solo user
+  user2Id   String?  @map("user_2_id")  // registered second participant
+  guestId   String?  @map("guest_id")   // guest second participant
   guestName String?  @map("guest_name")
-  status    String   @default("active") // active | swiping | completed
+  status    String   @default("waiting") // waiting | swiping | completed
   filters   Json     @default("{}") // genre, decade, rating, runtime
   createdAt DateTime @default(now()) @map("created_at")
 
   couple  Couple?        @relation(fields: [coupleId], references: [id])
   user    User?          @relation(fields: [userId], references: [id])
+  user2   User?          @relation("SessionUser2", fields: [user2Id], references: [id])
   movies  SessionMovie[]
   matches Match[]
 

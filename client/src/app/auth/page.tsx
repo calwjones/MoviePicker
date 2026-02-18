@@ -31,7 +31,8 @@ function AuthForm() {
       } else {
         await login(email, password);
       }
-      router.push('/dashboard');
+      const redirect = searchParams.get('redirect');
+      router.push(redirect || '/dashboard');
     } catch (err: unknown) {
       const error = err as { response?: { data?: { error?: string } } };
       setError(error.response?.data?.error || 'Something went wrong');
