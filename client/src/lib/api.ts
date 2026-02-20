@@ -49,13 +49,6 @@ export const authApi = {
     api.post('/auth/change-password', { currentPassword, newPassword }),
 };
 
-export const coupleApi = {
-  create: () => api.post('/couples/create'),
-  join: (inviteCode: string) => api.post('/couples/join', { inviteCode }),
-  me: () => api.get('/couples/me'),
-  leave: () => api.delete('/couples/leave'),
-};
-
 export const movieApi = {
   mine: (filter?: string) => api.get('/movies/mine', { params: { filter } }),
   get: (id: string) => api.get(`/movies/${id}`),
@@ -86,10 +79,12 @@ export const importApi = {
 };
 
 export const sessionApi = {
-  create: (filters?: Record<string, unknown>) =>
-    api.post('/sessions/create', { filters }),
-  createGuest: (filters?: Record<string, unknown>) =>
-    api.post('/sessions/create-guest', { filters }),
+  createGroup: (filters?: Record<string, unknown>) =>
+    api.post('/sessions/group', { filters }),
+  joinGroup: (sessionId: string) =>
+    api.post(`/sessions/${sessionId}/join`),
+  startGroup: (sessionId: string) =>
+    api.post(`/sessions/${sessionId}/start`),
   active: () => api.get('/sessions/active'),
   get: (id: string) => api.get(`/sessions/${id}`),
   history: () => api.get('/sessions/history/all'),
