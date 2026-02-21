@@ -6,7 +6,6 @@ import { PrismaClient } from '@prisma/client';
 import { CLIENT_URL } from './config';
 
 import authRoutes from './routes/auth';
-import coupleRoutes from './routes/couples';
 import movieRoutes from './routes/movies';
 import importRoutes from './routes/import';
 import sessionRoutes from './routes/sessions';
@@ -35,7 +34,6 @@ const authLimiter = rateLimit({
 });
 
 app.use('/api/auth', authLimiter, authRoutes);
-app.use('/api/couples', coupleRoutes);
 app.use('/api/movies', movieRoutes);
 app.use('/api/import', importRoutes);
 app.use('/api/sessions', sessionRoutes);

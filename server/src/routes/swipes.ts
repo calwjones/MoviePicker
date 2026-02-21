@@ -35,10 +35,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const session = await prisma.swipeSession.findUnique({
-      where: { id: sessionId },
-      include: { couple: true },
-    });
+    const session = await prisma.swipeSession.findUnique({ where: { id: sessionId } });
 
     if (!session) {
       res.status(404).json({ error: 'Session not found' });
@@ -117,10 +114,7 @@ router.post('/undo', authenticate, async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const session = await prisma.swipeSession.findUnique({
-      where: { id: sessionId },
-      include: { couple: true },
-    });
+    const session = await prisma.swipeSession.findUnique({ where: { id: sessionId } });
 
     if (!session) {
       res.status(404).json({ error: 'Session not found' });
@@ -194,10 +188,7 @@ router.post('/done', authenticate, async (req: AuthRequest, res: Response) => {
 
     const session = await prisma.swipeSession.findUnique({
       where: { id: sessionId },
-      include: {
-        couple: true,
-        movies: true,
-      },
+      include: { movies: true },
     });
 
     if (!session) {
@@ -261,10 +252,7 @@ router.get('/matches/:sessionId', authenticate, async (req: AuthRequest, res: Re
   try {
     const sid = req.params.sessionId as string;
 
-    const session = await prisma.swipeSession.findUnique({
-      where: { id: sid },
-      include: { couple: true },
-    });
+    const session = await prisma.swipeSession.findUnique({ where: { id: sid } });
 
     if (!session) {
       res.status(404).json({ error: 'Session not found' });
@@ -304,7 +292,7 @@ router.post('/matches/:matchId/watched', authenticate, async (req: AuthRequest, 
 
     const match = await prisma.match.findUnique({
       where: { id: matchId },
-      include: { session: { include: { couple: true } } },
+      include: { session: true },
     });
 
     if (!match) {
@@ -348,7 +336,7 @@ router.post('/matches/:matchId/rate', authenticate, async (req: AuthRequest, res
 
     const match = await prisma.match.findUnique({
       where: { id: matchId },
-      include: { session: { include: { couple: true } } },
+      include: { session: true },
     });
 
     if (!match) {
