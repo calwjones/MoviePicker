@@ -3,14 +3,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { useAuth } from '@/context/AuthContext';
+import { useAuthGuard } from '@/hooks/useAuthGuard';
 import { sessionApi, swipeApi } from '@/lib/api';
 import SwipeView from '@/components/SwipeView';
 import type { SessionMovie } from '@shared/types';
 
 export default function SoloSessionPage() {
   const { id: sessionId } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuthGuard();
   const router = useRouter();
   const [movies, setMovies] = useState<SessionMovie[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -21,21 +21,21 @@ export default function SoloSessionPage() {
   const [undoStack, setUndoStack] = useState<{ index: number; movieId: string; direction: string }[]>([]);
 
   useEffect(() => {
-    if (!user) router.push('/auth?mode=login');
-  }, [user, router]);
-
-  useEffect(() => {
-    if (!sessionId || !user) return;
+    if (!sessionId || !user || authLoading) return;
     sessionApi.get(sessionId).then((res) => {
       const { session } = res.data;
       const unswiped = session.movies.filter((m: SessionMovie) => m.user1Swipe === null);
       const swiped = session.movies.filter((m: SessionMovie) => m.user1Swipe !== null);
+      for (let i = unswiped.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [unswiped[i], unswiped[j]] = [unswiped[j], unswiped[i]];
+      }
       setMovies(unswiped);
       setCurrentIndex(0);
       if (unswiped.length === 0 && swiped.length > 0) setDone(true);
       setLoading(false);
     }).catch(() => router.push('/dashboard'));
-  }, [sessionId, user, router]);
+  }, [sessionId, user, authLoading, router]);
 
   const handleSwipe = useCallback(async (direction: 'left' | 'right') => {
     if (currentIndex >= movies.length || swiping) return;

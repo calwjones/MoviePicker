@@ -20,9 +20,6 @@ out/
 .DS_Store
 Thumbs.db
 
-# Prisma
-server/prisma/migrations/
-
 # Misc
 *.log
 npm-debug.log*
