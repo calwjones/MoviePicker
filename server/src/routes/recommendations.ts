@@ -64,10 +64,18 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
       return true;
     });
 
-    // 5. Sort by TMDb popularity to surface well-known movies
-    unique.sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
+    // 5. Sort by combined score: rating weighted by log-popularity.
+    // Filters out movies with too few votes so ratings are meaningful.
+    const scored = unique
+      .filter((r) => (r.vote_count ?? 0) >= 100)
+      .map((r) => ({
+        r,
+        score: (r.vote_average ?? 0) * Math.log10((r.popularity ?? 0) + 1),
+      }))
+      .sort((a, b) => b.score - a.score)
+      .map(({ r }) => r);
 
-    const recommendations = unique.slice(0, 10).map((r) => ({
+    const recommendations = scored.slice(0, 10).map((r) => ({
       tmdbId: r.id,
       title: r.title,
       year: r.release_date ? parseInt(r.release_date.slice(0, 4)) : null,
