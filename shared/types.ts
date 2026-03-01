@@ -1,5 +1,3 @@
-// Shared types used by both client and server
-
 export interface StreamingProvider {
   name: string;
   type: string;
@@ -29,6 +27,7 @@ export interface UserMovie {
   watched: boolean;
   userRating: number | null;
   source: string;
+  createdAt: string;
 }
 
 export interface SearchResult {
@@ -71,6 +70,7 @@ export interface Match {
 
 export interface HistorySession {
   id: string;
+  type: string;
   status: string;
   createdAt: string;
   movieCount: number;
@@ -83,7 +83,7 @@ export interface Filters {
   decade: string;
   minRating: number;
   maxRuntime: number;
-  streamingProvider: string;
+  streamingProviders: string[];
 }
 
 export interface User {

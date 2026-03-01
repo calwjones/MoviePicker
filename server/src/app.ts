@@ -11,8 +11,14 @@ import movieRoutes from './routes/movies';
 import importRoutes from './routes/import';
 import sessionRoutes from './routes/sessions';
 import swipeRoutes from './routes/swipes';
+import soloRoutes from './routes/solo';
+import guestRoutes from './routes/guest';
+import recommendationRoutes from './routes/recommendations';
+import providerRoutes from './routes/providers';
 
-export const prisma = new PrismaClient();
+export const prisma = process.env.NODE_ENV === 'test'
+  ? ({} as unknown as PrismaClient)
+  : new PrismaClient();
 
 const app = express();
 
@@ -34,6 +40,10 @@ app.use('/api/movies', movieRoutes);
 app.use('/api/import', importRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/swipes', swipeRoutes);
+app.use('/api/solo', soloRoutes);
+app.use('/api/guest', authLimiter, guestRoutes);
+app.use('/api/recommendations', recommendationRoutes);
+app.use('/api/providers', providerRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

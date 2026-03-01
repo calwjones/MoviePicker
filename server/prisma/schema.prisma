@@ -18,6 +18,7 @@ model User {
   couplesAsUser1 Couple[]    @relation("CoupleUser1")
   couplesAsUser2 Couple[]    @relation("CoupleUser2")
   userMovies     UserMovie[]
+  soloSessions   SwipeSession[]
 
   @@map("users")
 }
@@ -77,12 +78,17 @@ model UserMovie {
 
 model SwipeSession {
   id        String   @id @default(uuid())
-  coupleId  String   @map("couple_id")
+  type      String   @default("couple") // couple | solo | guest
+  coupleId  String?  @map("couple_id")
+  userId    String?  @map("user_id")
+  guestId   String?  @map("guest_id")
+  guestName String?  @map("guest_name")
   status    String   @default("active") // active | swiping | completed
   filters   Json     @default("{}") // genre, decade, rating, runtime
   createdAt DateTime @default(now()) @map("created_at")
 
-  couple  Couple         @relation(fields: [coupleId], references: [id])
+  couple  Couple?        @relation(fields: [coupleId], references: [id])
+  user    User?          @relation(fields: [userId], references: [id])
   movies  SessionMovie[]
   matches Match[]
 
@@ -96,7 +102,7 @@ model SessionMovie {
   user1Swipe String? @map("user_1_swipe") // left | right | null
   user2Swipe String? @map("user_2_swipe") // left | right | null
 
-  session SwipeSession @relation(fields: [sessionId], references: [id])
+  session SwipeSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   movie   Movie        @relation(fields: [movieId], references: [id])
 
   @@unique([sessionId, movieId])
@@ -113,7 +119,7 @@ model Match {
   user1Rating Float?   @map("user_1_rating")
   user2Rating Float?   @map("user_2_rating")
 
-  session SwipeSession @relation(fields: [sessionId], references: [id])
+  session SwipeSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   movie   Movie        @relation(fields: [movieId], references: [id])
 
   @@unique([sessionId, movieId])
