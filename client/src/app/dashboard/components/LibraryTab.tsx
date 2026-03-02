@@ -57,9 +57,14 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
   // Remove confirmation modal
   const [removeMovieId, setRemoveMovieId] = useState<string | null>(null);
 
-  // Recommendations
+  // For You recommendations
   const [recommendations, setRecommendations] = useState<SearchResult[]>([]);
   const [recsLoading, setRecsLoading] = useState(false);
+
+  // Movies Like
+  const [moviesLikeSeed, setMoviesLikeSeed] = useState<Movie | null>(null);
+  const [moviesLike, setMoviesLike] = useState<SearchResult[]>([]);
+  const [moviesLikeLoading, setMoviesLikeLoading] = useState(false);
 
   // Load watchlist on mount and when filter changes
   const loadWatchlist = useCallback(async (filter?: 'watchlist' | 'watched' | 'all') => {
@@ -109,6 +114,23 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
       document.body.style.overflow = 'unset';
     };
   }, [selectedMovie]);
+
+  const loadMoviesLike = async (movie: Movie) => {
+    if (!movie.tmdbId) return;
+    setMoviesLikeSeed(movie);
+    setMoviesLike([]);
+    setMoviesLikeLoading(true);
+    setSelectedMovie(null);
+    setSelectedUserMovie(null);
+    try {
+      const res = await recommendationApi.similar(movie.tmdbId);
+      setMoviesLike(res.data.recommendations || []);
+    } catch {
+      // ignore
+    } finally {
+      setMoviesLikeLoading(false);
+    }
+  };
 
   const loadRecommendations = async () => {
     setRecsLoading(true);
@@ -562,6 +584,57 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
         )}
       </div>
 
+      {/* Movies Like */}
+      <AnimatePresence>
+        {(moviesLikeSeed || moviesLikeLoading) && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="glass rounded-2xl p-4"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-danger uppercase tracking-wider">
+                Movies Like{moviesLikeSeed ? ` ${moviesLikeSeed.title}` : ''}
+              </h3>
+              <button
+                onClick={() => { setMoviesLikeSeed(null); setMoviesLike([]); }}
+                className="text-cream-dim text-xs hover:text-cream transition-colors"
+              >
+                Clear
+              </button>
+            </div>
+            {moviesLikeLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <LoadingSpinner size="sm" />
+              </div>
+            ) : moviesLike.length > 0 ? (
+              <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x">
+                {moviesLike.map((rec) => (
+                  <div key={rec.tmdbId} className="flex-shrink-0 w-28 snap-start group">
+                    <div className="w-28 aspect-[2/3] rounded-xl overflow-hidden bg-card mb-2 shadow-lg group-hover:shadow-coral/20 transition-all">
+                      <MoviePoster posterUrl={rec.posterUrl} title={rec.title} />
+                    </div>
+                    <p className="text-xs font-medium truncate">{rec.title}</p>
+                    <p className="text-cream-dim text-[10px]">
+                      {rec.year}{rec.rating ? ` · ${rec.rating.toFixed(1)}★` : ''}
+                    </p>
+                    <button
+                      onClick={() => handleAddRecommendation(rec)}
+                      className="text-danger text-[10px] hover:underline mt-0.5"
+                    >
+                      + Add to Watchlist
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-cream-dim text-xs">No recommendations found for this movie.</p>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Search bar */}
       <div className="glass rounded-2xl p-4">
         <div className="relative">
@@ -791,6 +864,15 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
                     />
                   </div>
                 </div>
+              )}
+
+              {selectedMovie.tmdbId && (
+                <button
+                  onClick={() => loadMoviesLike(selectedMovie)}
+                  className="w-full py-2.5 mb-3 glass rounded-xl text-sm text-cream-dim hover:text-cream transition-colors"
+                >
+                  Movies Like This
+                </button>
               )}
 
               <div className="flex gap-3">
