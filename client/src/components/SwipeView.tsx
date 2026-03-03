@@ -41,7 +41,6 @@ export default function SwipeView({
   const lastSwipeDir = useRef<'left' | 'right'>('left');
   const cooldownRef = useRef(false);
 
-  // Derive previous movie from undoStack
   const previousSwipe = useMemo(() => {
     if (undoStack.length === 0) return null;
     const last = undoStack[undoStack.length - 1];
@@ -59,7 +58,6 @@ export default function SwipeView({
     if (cooldownRef.current) return;
     cooldownRef.current = true;
     lastSwipeDir.current = direction;
-    // Animate card off-screen first — consistent visual for buttons, small drags, and full drags
     await animate(x, direction === 'right' ? 400 : -400, { duration: 0.25, ease: 'easeIn' });
     try {
       await onSwipe(direction);
@@ -91,7 +89,6 @@ export default function SwipeView({
     if (!isDragging.current) setExpanded(true);
   };
 
-  // Preload the next card's poster image
   useEffect(() => {
     if (currentIndex + 1 < movies.length) {
       const nextPoster = movies[currentIndex + 1]?.movie?.posterUrl;

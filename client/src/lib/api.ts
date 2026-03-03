@@ -22,7 +22,6 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && typeof window !== 'undefined') {
       const currentPath = window.location.pathname;
       if (currentPath !== '/auth' && !error.config?.url?.includes('/auth/')) {
-        // If we have a backed-up user token (from before guest session), restore it
         const backup = localStorage.getItem('user_token_backup');
         if (backup) {
           localStorage.setItem('token', backup);
@@ -52,6 +51,7 @@ export const authApi = {
 export const movieApi = {
   mine: (filter?: string) => api.get('/movies/mine', { params: { filter } }),
   get: (id: string) => api.get(`/movies/${id}`),
+  getByTmdbId: (tmdbId: number) => api.get(`/movies/tmdb/${tmdbId}`),
   search: (query: string, page = 1) => api.get('/movies/search', { params: { q: query, page } }),
   add: (tmdbId: number) => api.post('/movies/add', { tmdbId }),
   removeFromWatchlist: (movieId: string) => api.delete(`/movies/${movieId}/watchlist`),
@@ -94,6 +94,9 @@ export const sessionApi = {
 export const recommendationApi = {
   get: () => api.get('/recommendations'),
   similar: (tmdbId: number) => api.get(`/recommendations/similar/${tmdbId}`),
+  dismiss: (tmdbId: number) => api.post('/recommendations/dismiss', { tmdbId }),
+  undismiss: (tmdbId: number) => api.delete(`/recommendations/dismiss/${tmdbId}`),
+  dismissed: () => api.get('/movies/mine', { params: { filter: 'dismissed' } }),
 };
 
 export const swipeApi = {

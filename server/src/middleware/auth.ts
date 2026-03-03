@@ -21,7 +21,7 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
     if (decoded.guestId) {
       req.isGuest = true;
       req.guestId = decoded.guestId;
-      req.userId = 'guest'; // Keep a dummy userId so other systems don't crash complaining missing userId where permissive
+      req.userId = 'guest';
     } else {
       req.isGuest = false;
       req.userId = decoded.userId;

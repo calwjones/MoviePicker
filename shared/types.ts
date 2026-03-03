@@ -37,6 +37,7 @@ export interface SearchResult {
   posterUrl: string | null;
   overview: string | null;
   rating: number | null;
+  seedTitles?: string[];
 }
 
 export interface SessionMovie {

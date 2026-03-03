@@ -7,8 +7,6 @@ interface Provider {
 }
 
 function getBaseName(name: string): string {
-  // Normalize provider names to catch duplicates like:
-  // "Paramount Plus", "Paramount+ Amazon Channel", "Paramount Plus Apple TV Channel"
   return name
     .replace(/\+/g, ' Plus')           // Paramount+ → Paramount Plus
     .replace(/ with Ads$/i, '')          // "X with Ads" → "X"
@@ -22,7 +20,6 @@ export function dedupeProviders(providers: Provider[]): Provider[] {
   const seen = new Map<string, Provider>();
   for (const p of providers) {
     const key = `${getBaseName(p.name)}::${p.type}`;
-    // Keep the first (usually the "cleanest" name) per base name + type
     if (!seen.has(key)) {
       seen.set(key, p);
     }

@@ -6,12 +6,6 @@ const mockPrisma = {
     update: jest.fn(),
     delete: jest.fn(),
   },
-  couple: {
-    findUnique: jest.fn(),
-    findFirst: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-  },
   movie: {
     findUnique: jest.fn(),
     create: jest.fn(),

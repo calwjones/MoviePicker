@@ -8,7 +8,6 @@ interface AuthenticatedSocket extends Socket {
   guestId?: string;
 }
 
-// Track roulette spins per session (in-memory, resets on server restart)
 const rouletteSpins = new Map<string, number>();
 const MAX_SPINS = 3;
 
@@ -44,20 +43,17 @@ export function setupSocketHandlers(io: Server): void {
           return;
         }
 
-        // Guest access
         if (socket.guestId && session.guestId === socket.guestId) {
           socket.join(`session:${sessionId}`);
           socket.to(`session:${sessionId}`).emit('partner-online');
           return;
         }
 
-        // Solo session owner
         if (session.type === 'solo' && session.userId === socket.userId) {
           socket.join(`session:${sessionId}`);
           return;
         }
 
-        // Group session: host or registered user2
         if (session.type === 'group') {
           const isHost = session.userId === socket.userId;
           const isUser2 = session.user2Id === socket.userId;
@@ -84,7 +80,6 @@ export function setupSocketHandlers(io: Server): void {
       const { sessionId, matchCount } = data;
       if (!sessionId || !matchCount || matchCount <= 0) return;
 
-      // Verify user has joined this session room
       if (!socket.rooms.has(`session:${sessionId}`)) {
         socket.emit('roulette-error', { message: 'Not in session' });
         return;
@@ -100,7 +95,6 @@ export function setupSocketHandlers(io: Server): void {
       const spinsLeft = MAX_SPINS - (currentSpins + 1);
       const winnerIndex = Math.floor(Math.random() * matchCount);
 
-      // Broadcast to entire session room (including sender)
       io.to(`session:${sessionId}`).emit('roulette-result', { winnerIndex, spinsLeft });
     });
 

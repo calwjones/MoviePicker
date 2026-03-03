@@ -48,7 +48,6 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
   const [startLoading, setStartLoading] = useState(false);
   const [sessionError, setSessionError] = useState('');
 
-  // Group session lobby state
   const [groupSessionId, setGroupSessionId] = useState<string | null>(null);
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -86,7 +85,6 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
     run();
   }, []);
 
-  // Socket: listen for participants joining while lobby is open
   useEffect(() => {
     if (!groupSessionId) return;
     connectSocket();

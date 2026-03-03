@@ -40,8 +40,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Guest tokens have guestId instead of userId — /auth/me doesn't support them.
-    // Build a synthetic user from the decoded payload instead.
     const payload = decodeJwtPayload(token);
     if (payload?.guestId) {
       setUser({
