@@ -126,4 +126,18 @@ export const providerApi = {
   list: () => api.get('/providers'),
 };
 
+export const browseApi = {
+  get: () => api.get('/browse'),
+};
+
+export const discoverApi = {
+  movies: (params: { genres?: string[]; minRating?: number; decade?: string; page?: number }) =>
+    api.get('/discover', {
+      params: {
+        ...params,
+        genres: params.genres && params.genres.length > 0 ? params.genres.join(',') : undefined,
+      },
+    }),
+};
+
 export default api;

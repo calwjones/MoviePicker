@@ -6,18 +6,20 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/useToast';
 import ToastContainer from '@/components/ToastContainer';
+import BrowseTab from './components/BrowseTab';
 import LibraryTab from './components/LibraryTab';
 import ImportTab from './components/ImportTab';
+import DiscoverTab from './components/DiscoverTab';
 import SwipeTab from './components/SwipeTab';
 import HistoryTab from './components/HistoryTab';
 
-type Tab = 'library' | 'import' | 'swipe' | 'history';
+type Tab = 'browse' | 'library' | 'import' | 'discover' | 'swipe' | 'history';
 
 export default function DashboardPage() {
   const { user, loading: authLoading, logout } = useAuth();
   const router = useRouter();
   const { toasts, addToast } = useToast();
-  const [tab, setTab] = useState<Tab>('library');
+  const [tab, setTab] = useState<Tab>('browse');
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -33,7 +35,7 @@ export default function DashboardPage() {
     );
   }
 
-  const tabs: Tab[] = ['library', 'import', 'swipe', 'history'];
+  const tabs: Tab[] = ['browse', 'library', 'import', 'discover', 'swipe', 'history'];
 
   return (
     <div className="min-h-dvh px-6 py-8 w-full max-w-5xl mx-auto lg:px-12 flex flex-col items-stretch">
@@ -67,10 +69,12 @@ export default function DashboardPage() {
       </div>
 
       <AnimatePresence mode="wait">
+        {tab === 'browse' && <BrowseTab key="browse" addToast={addToast} />}
         {tab === 'library' && <LibraryTab key="library" addToast={addToast} />}
         {tab === 'import' && (
           <ImportTab key="import" onImportComplete={() => setTab('library')} />
         )}
+        {tab === 'discover' && <DiscoverTab key="discover" addToast={addToast} />}
         {tab === 'swipe' && <SwipeTab key="swipe" addToast={addToast} />}
         {tab === 'history' && <HistoryTab key="history" addToast={addToast} />}
       </AnimatePresence>

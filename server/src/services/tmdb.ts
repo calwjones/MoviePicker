@@ -8,7 +8,7 @@ function getApiKey(): string {
   return TMDB_API_KEY;
 }
 
-interface TmdbSearchResult {
+export interface TmdbSearchResult {
   id: number;
   title: string;
   release_date?: string;
@@ -240,6 +240,95 @@ export async function getTmdbRecommendations(tmdbId: number): Promise<TmdbSearch
   } catch {
     return [];
   }
+}
+
+export async function getTrendingMovies(): Promise<TmdbSearchResult[]> {
+  const params = new URLSearchParams({ api_key: getApiKey() });
+  try {
+    const res = await rateLimitedFetch(`${TMDB_BASE}/trending/movie/week?${params}`);
+    if (!res.ok) return [];
+    const data = (await res.json()) as { results?: TmdbSearchResult[] };
+    return data.results || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function getTopRatedMovies(): Promise<TmdbSearchResult[]> {
+  const params = new URLSearchParams({
+    api_key: getApiKey(),
+    'vote_count.gte': '1000',
+    sort_by: 'vote_average.desc',
+  });
+  try {
+    const res = await rateLimitedFetch(`${TMDB_BASE}/discover/movie?${params}`);
+    if (!res.ok) return [];
+    const data = (await res.json()) as { results?: TmdbSearchResult[] };
+    return data.results || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function getNowPlayingMovies(): Promise<TmdbSearchResult[]> {
+  const params = new URLSearchParams({ api_key: getApiKey() });
+  try {
+    const res = await rateLimitedFetch(`${TMDB_BASE}/movie/now_playing?${params}`);
+    if (!res.ok) return [];
+    const data = (await res.json()) as { results?: TmdbSearchResult[] };
+    return data.results || [];
+  } catch {
+    return [];
+  }
+}
+
+export interface DiscoverParams {
+  genreIds?: number[];
+  genreMode?: 'any' | 'all';
+  minRating?: number;
+  releaseDateGte?: string;
+  releaseDateLte?: string;
+  voteCountGte?: number;
+  sortBy?: string;
+  page?: number;
+}
+
+export async function discoverMovies(opts: DiscoverParams): Promise<{ results: TmdbSearchResult[]; totalPages: number }> {
+  const params = new URLSearchParams({
+    api_key: getApiKey(),
+    sort_by: opts.sortBy || 'popularity.desc',
+    'vote_count.gte': String(opts.voteCountGte ?? 150),
+    page: String(opts.page ?? 1),
+  });
+  if (opts.genreIds && opts.genreIds.length > 0) {
+    const sep = opts.genreMode === 'all' ? ',' : '|';
+    params.set('with_genres', opts.genreIds.join(sep));
+  }
+  if (opts.minRating != null && opts.minRating > 0) {
+    params.set('vote_average.gte', String(opts.minRating));
+  }
+  if (opts.releaseDateGte) params.set('primary_release_date.gte', opts.releaseDateGte);
+  if (opts.releaseDateLte) params.set('primary_release_date.lte', opts.releaseDateLte);
+
+  try {
+    const res = await rateLimitedFetch(`${TMDB_BASE}/discover/movie?${params}`);
+    if (!res.ok) return { results: [], totalPages: 0 };
+    const data = (await res.json()) as { results?: TmdbSearchResult[]; total_pages?: number };
+    return { results: data.results || [], totalPages: data.total_pages || 0 };
+  } catch {
+    return { results: [], totalPages: 0 };
+  }
+}
+
+export function shapeTmdbSearchResult(r: TmdbSearchResult) {
+  return {
+    tmdbId: r.id,
+    title: r.title,
+    year: r.release_date ? parseInt(r.release_date.slice(0, 4)) : null,
+    posterUrl: r.poster_path ? `${TMDB_IMAGE_BASE}${r.poster_path}` : null,
+    overview: r.overview || null,
+    rating: r.vote_average || null,
+  };
 }
 
 export { TMDB_IMAGE_BASE };

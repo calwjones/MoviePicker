@@ -14,6 +14,8 @@ import soloRoutes from './routes/solo';
 import guestRoutes from './routes/guest';
 import recommendationRoutes from './routes/recommendations';
 import providerRoutes from './routes/providers';
+import browseRoutes from './routes/browse';
+import discoverRoutes from './routes/discover';
 
 export const prisma = process.env.NODE_ENV === 'test'
   ? ({} as unknown as PrismaClient)
@@ -42,6 +44,8 @@ app.use('/api/solo', soloRoutes);
 app.use('/api/guest', authLimiter, guestRoutes);
 app.use('/api/recommendations', recommendationRoutes);
 app.use('/api/providers', providerRoutes);
+app.use('/api/browse', browseRoutes);
+app.use('/api/discover', discoverRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
