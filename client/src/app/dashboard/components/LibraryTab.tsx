@@ -10,6 +10,8 @@ import MoviePoster from '@/components/MoviePoster';
 import ConfirmModal from '@/components/ConfirmModal';
 import StarRating from '@/components/StarRating';
 import StreamingProvidersList from '@/components/StreamingProviders';
+import RecDetailSheet from '@/components/RecDetailSheet';
+import { DECADE_OPTIONS } from '@/lib/decades';
 import type { Movie, UserMovie, SearchResult } from '@shared/types';
 
 const GENRE_OPTIONS = [
@@ -17,7 +19,6 @@ const GENRE_OPTIONS = [
   'Drama', 'Family', 'Fantasy', 'History', 'Horror', 'Music',
   'Mystery', 'Romance', 'Science Fiction', 'Thriller', 'War', 'Western',
 ];
-const DECADE_OPTIONS = ['1970', '1980', '1990', '2000', '2010', '2020'];
 
 type SortField = 'dateAdded' | 'year' | 'runtime' | 'tmdbRating' | 'userRating';
 type SortDir = 'asc' | 'desc';
@@ -63,8 +64,6 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
   const [dismissedLoading, setDismissedLoading] = useState(false);
 
   const [recDetail, setRecDetail] = useState<SearchResult | null>(null);
-  const [recDetailFull, setRecDetailFull] = useState<Movie | null>(null);
-  const [recDetailLoading, setRecDetailLoading] = useState(false);
 
   const loadWatchlist = useCallback(async (filter?: 'watchlist' | 'watched' | 'all') => {
     setLibraryLoading(true);
@@ -90,24 +89,7 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
   }, []);
 
   useEffect(() => {
-    if (!recDetail) {
-      setRecDetailFull(null);
-      return;
-    }
-    setRecDetailFull(null);
-    setRecDetailLoading(true);
-    movieApi.getByTmdbId(recDetail.tmdbId)
-      .then((res) => setRecDetailFull(res.data.movie))
-      .catch(() => {})
-      .finally(() => setRecDetailLoading(false));
-  }, [recDetail]);
-
-  useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && recDetail) {
-        setRecDetail(null);
-        return;
-      }
       if (e.key === 'Escape' && selectedMovie) {
         setSelectedMovie(null);
         setSelectedUserMovie(null);
@@ -115,10 +97,10 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
     };
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [selectedMovie, recDetail]);
+  }, [selectedMovie]);
 
   useEffect(() => {
-    if (selectedMovie || recDetail) {
+    if (selectedMovie) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'unset';
@@ -126,7 +108,7 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [selectedMovie, recDetail]);
+  }, [selectedMovie]);
 
   const loadMoviesLike = async (movie: Movie) => {
     if (!movie.tmdbId) return;
@@ -610,8 +592,9 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
                 </div>
                 <button
                   onClick={(e) => { e.stopPropagation(); handleDismissRec(rec); }}
-                  className="absolute top-1 right-1 w-5 h-5 rounded-full bg-charcoal/80 text-cream-dim hover:text-cream flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[10px] leading-none"
+                  className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-charcoal/85 backdrop-blur-sm text-cream-dim hover:text-coral hover:bg-charcoal flex items-center justify-center transition-colors text-sm leading-none shadow-md"
                   title="Not interested"
+                  aria-label="Not interested"
                 >
                   ✕
                 </button>
@@ -708,8 +691,9 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
                     </div>
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDismissRec(rec); }}
-                      className="absolute top-1 right-1 w-5 h-5 rounded-full bg-charcoal/80 text-cream-dim hover:text-cream flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[10px] leading-none"
+                      className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-charcoal/85 backdrop-blur-sm text-cream-dim hover:text-coral hover:bg-charcoal flex items-center justify-center transition-colors text-sm leading-none shadow-md"
                       title="Not interested"
+                      aria-label="Not interested"
                     >
                       ✕
                     </button>
@@ -873,76 +857,12 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
       />
 
       {/* Rec Detail Sheet */}
-      <AnimatePresence>
-        {recDetail && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-charcoal/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center"
-            onClick={() => setRecDetail(null)}
-          >
-            <motion.div
-              initial={{ y: 100, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 100, opacity: 0 }}
-              className="glass rounded-t-2xl sm:rounded-2xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {recDetail.seedTitles && recDetail.seedTitles.length > 0 && (
-                <p className="text-xs text-cream-dim mb-3">
-                  Because you liked{' '}
-                  {recDetail.seedTitles.map((t, i) => (
-                    <span key={t}>
-                      <span className="text-cream">{t}</span>
-                      {i < recDetail.seedTitles!.length - 1 ? ' and ' : ''}
-                    </span>
-                  ))}
-                </p>
-              )}
-              <div className="flex gap-4 mb-4">
-                <div className="w-24 h-36 rounded-xl overflow-hidden flex-shrink-0">
-                  <MoviePoster posterUrl={recDetail.posterUrl} title={recDetail.title} />
-                </div>
-                <div>
-                  <h2 className="text-xl font-semibold font-display">{recDetail.title}</h2>
-                  <p className="text-cream-dim text-sm mt-1">
-                    {recDetail.year}{recDetail.rating ? ` · ${recDetail.rating.toFixed(1)}★` : ''}
-                  </p>
-                  {recDetailFull?.director && (
-                    <p className="text-cream-dim text-sm mt-1">Directed by <span className="text-cream">{recDetailFull.director}</span></p>
-                  )}
-                  {recDetailLoading && !recDetailFull && (
-                    <p className="text-cream-dim text-xs mt-2 animate-pulse">Loading details…</p>
-                  )}
-                </div>
-              </div>
-              {recDetail.overview && (
-                <p className="text-cream-dim text-sm mb-4">{recDetail.overview}</p>
-              )}
-              {recDetailFull?.streamingProviders && recDetailFull.streamingProviders.length > 0 && (
-                <div className="mb-4">
-                  <StreamingProvidersList providers={recDetailFull.streamingProviders} />
-                </div>
-              )}
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setRecDetail(null)}
-                  className="flex-1 py-3 glass rounded-xl text-cream-dim hover:text-cream transition-colors"
-                >
-                  Close
-                </button>
-                <button
-                  onClick={() => handleAddRecommendation(recDetail)}
-                  className="flex-1 py-3 bg-coral text-charcoal rounded-xl font-medium text-sm hover:bg-coral/90 transition-colors"
-                >
-                  Add to Watchlist
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <RecDetailSheet
+        rec={recDetail}
+        onClose={() => setRecDetail(null)}
+        onAdd={handleAddRecommendation}
+        onDismiss={handleDismissRec}
+      />
 
       {/* Movie Detail Modal */}
       <AnimatePresence>

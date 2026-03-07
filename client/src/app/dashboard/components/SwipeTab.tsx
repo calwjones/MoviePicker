@@ -7,6 +7,8 @@ import { sessionApi, soloApi, movieApi, providerApi } from '@/lib/api';
 import { getErrorMessage } from '@/lib/errors';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { connectSocket, getSocket } from '@/lib/socket';
+import { getBaseName } from '@/components/StreamingProviders';
+import { DECADE_OPTIONS } from '@/lib/decades';
 import type { Filters } from '@shared/types';
 
 const GENRE_OPTIONS = [
@@ -15,7 +17,10 @@ const GENRE_OPTIONS = [
   'Mystery', 'Romance', 'Science Fiction', 'Thriller', 'War', 'Western',
 ];
 
-const DECADE_OPTIONS = ['1970', '1980', '1990', '2000', '2010', '2020'];
+interface ProviderChip {
+  name: string;
+  logoUrl: string;
+}
 
 const MOOD_PRESETS = [
   { label: 'Cozy',        genres: ['Animation', 'Family', 'Comedy'],                        minRating: 0,   maxRuntime: 0,   decade: '' },
@@ -42,7 +47,7 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
   const [poolSizeLoading, setPoolSizeLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [activeMood, setActiveMood] = useState<string | null>(null);
-  const [streamingProviders, setStreamingProviders] = useState<string[]>([]);
+  const [streamingProviders, setStreamingProviders] = useState<ProviderChip[]>([]);
   const [sessionLoading, setSessionLoading] = useState(false);
   const [soloLoading, setSoloLoading] = useState(false);
   const [startLoading, setStartLoading] = useState(false);
@@ -59,7 +64,15 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
   useEffect(() => {
     try {
       const saved = localStorage.getItem('moviepicker_filters');
-      if (saved) setFilters((prev) => ({ ...prev, ...JSON.parse(saved) }));
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed.streamingProviders)) {
+          parsed.streamingProviders = Array.from(
+            new Set(parsed.streamingProviders.map((s: string) => getBaseName(s)))
+          );
+        }
+        setFilters((prev) => ({ ...prev, ...parsed }));
+      }
     } catch { /* ignore */ }
   }, []);
 
@@ -76,9 +89,13 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
           providerApi.list(),
         ]);
         setPoolSize(poolRes.data.size);
-        setStreamingProviders(
-          (provRes.data.providers as { name: string }[]).map((p) => p.name).sort()
-        );
+        const raw = provRes.data.providers as { name: string; logoUrl: string }[];
+        const seen = new Map<string, ProviderChip>();
+        for (const p of raw) {
+          const base = getBaseName(p.name);
+          if (!seen.has(base)) seen.set(base, { name: base, logoUrl: p.logoUrl });
+        }
+        setStreamingProviders(Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name)));
       } catch { /* ignore */ }
       finally { setPoolSizeLoading(false); }
     };
@@ -301,26 +318,28 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
                   <div>
                     <label className="text-cream-dim text-sm mb-2 block">Streaming Service</label>
                     <div className="flex flex-wrap gap-2">
-                      {streamingProviders.map((provider) => (
-                        <button
-                          key={provider}
-                          onClick={() =>
-                            setFilters((p) => ({
-                              ...p,
-                              streamingProviders: (p.streamingProviders || []).includes(provider)
-                                ? (p.streamingProviders || []).filter((s) => s !== provider)
-                                : [...(p.streamingProviders || []), provider],
-                            }))
-                          }
-                          className={`px-3 py-1.5 rounded-full text-xs transition-all hover:-translate-y-0.5 ${
-                            (filters.streamingProviders || []).includes(provider)
-                              ? 'bg-coral text-charcoal'
-                              : 'glass text-cream-dim'
-                          }`}
-                        >
-                          {provider}
-                        </button>
-                      ))}
+                      {streamingProviders.map((provider) => {
+                        const selected = (filters.streamingProviders || []).includes(provider.name);
+                        return (
+                          <button
+                            key={provider.name}
+                            onClick={() =>
+                              setFilters((p) => ({
+                                ...p,
+                                streamingProviders: selected
+                                  ? (p.streamingProviders || []).filter((s) => s !== provider.name)
+                                  : [...(p.streamingProviders || []), provider.name],
+                              }))
+                            }
+                            className={`flex items-center gap-1.5 pl-1 pr-3 py-1 rounded-full text-xs transition-all hover:-translate-y-0.5 ${
+                              selected ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
+                            }`}
+                          >
+                            <img src={provider.logoUrl} alt="" className="w-5 h-5 rounded" />
+                            <span>{provider.name}</span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

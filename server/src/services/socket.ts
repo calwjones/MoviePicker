@@ -8,7 +8,12 @@ interface AuthenticatedSocket extends Socket {
   guestId?: string;
 }
 
-const rouletteSpins = new Map<string, number>();
+interface RouletteState {
+  count: number;
+  lastWinner: number | null;
+}
+
+const rouletteSpins = new Map<string, RouletteState>();
 const MAX_SPINS = 3;
 
 export function setupSocketHandlers(io: Server): void {
@@ -85,15 +90,19 @@ export function setupSocketHandlers(io: Server): void {
         return;
       }
 
-      const currentSpins = rouletteSpins.get(sessionId) || 0;
-      if (currentSpins >= MAX_SPINS) {
+      const state = rouletteSpins.get(sessionId) ?? { count: 0, lastWinner: null };
+      if (state.count >= MAX_SPINS) {
         socket.emit('roulette-error', { message: 'No spins left' });
         return;
       }
 
-      rouletteSpins.set(sessionId, currentSpins + 1);
-      const spinsLeft = MAX_SPINS - (currentSpins + 1);
-      const winnerIndex = Math.floor(Math.random() * matchCount);
+      const eligible = state.lastWinner !== null && matchCount > 1
+        ? Array.from({ length: matchCount }, (_, i) => i).filter((i) => i !== state.lastWinner)
+        : Array.from({ length: matchCount }, (_, i) => i);
+      const winnerIndex = eligible[Math.floor(Math.random() * eligible.length)];
+
+      rouletteSpins.set(sessionId, { count: state.count + 1, lastWinner: winnerIndex });
+      const spinsLeft = MAX_SPINS - (state.count + 1);
 
       io.to(`session:${sessionId}`).emit('roulette-result', { winnerIndex, spinsLeft });
     });

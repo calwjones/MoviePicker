@@ -1,4 +1,5 @@
 import type { Movie } from '@prisma/client';
+import { getProviderBaseName } from './providers';
 
 export interface MovieFilters {
   genres?: string[];
@@ -28,9 +29,10 @@ export function applyMovieFilters(movies: Movie[], filters: MovieFilters): Movie
     result = result.filter((m) => m.runtime && m.runtime <= filters.maxRuntime!);
   }
   if (filters.streamingProviders?.length) {
+    const filterBases = new Set(filters.streamingProviders.map(getProviderBaseName));
     result = result.filter((m) => {
       const providers = m.streamingProviders as { name: string; type: string }[];
-      return providers.some((p) => filters.streamingProviders!.includes(p.name) && p.type === 'stream');
+      return providers.some((p) => filterBases.has(getProviderBaseName(p.name)) && p.type === 'stream');
     });
   }
 

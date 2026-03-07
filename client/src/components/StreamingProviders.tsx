@@ -6,7 +6,7 @@ interface Provider {
   logoUrl: string;
 }
 
-function getBaseName(name: string): string {
+export function getBaseName(name: string): string {
   return name
     .replace(/\+/g, ' Plus')           // Paramount+ → Paramount Plus
     .replace(/ with Ads$/i, '')          // "X with Ads" → "X"
