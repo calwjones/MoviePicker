@@ -1,5 +1,7 @@
 'use client';
 
+import { getProviderUrl } from '@/lib/providerLinks';
+
 interface Provider {
   name: string;
   type: string;
@@ -39,10 +41,7 @@ export default function StreamingProvidersList({ providers }: { providers: Provi
       {streaming.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {streaming.map((p, i) => (
-            <div key={i} className="flex items-center gap-1.5 glass rounded-lg px-2 py-1">
-              <img src={p.logoUrl} alt={p.name} className="w-5 h-5 rounded" />
-              <span className="text-xs text-cream-dim">{p.name}</span>
-            </div>
+            <ProviderChip key={i} provider={p} />
           ))}
         </div>
       )}
@@ -51,14 +50,30 @@ export default function StreamingProvidersList({ providers }: { providers: Provi
           <p className="text-xs text-cream-dim/50 mb-1.5">Also available to rent</p>
           <div className="flex flex-wrap gap-2">
             {rental.map((p, i) => (
-              <div key={i} className="flex items-center gap-1.5 glass rounded-lg px-2 py-1 opacity-50">
-                <img src={p.logoUrl} alt={p.name} className="w-5 h-5 rounded" />
-                <span className="text-xs text-cream-dim">{p.name}</span>
-              </div>
+              <ProviderChip key={i} provider={p} dim />
             ))}
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+function ProviderChip({ provider, dim }: { provider: Provider; dim?: boolean }) {
+  const url = getProviderUrl(provider.name);
+  const className = `flex items-center gap-1.5 glass rounded-lg px-2 py-1 transition-colors hover:bg-cream/10 ${
+    dim ? 'opacity-50' : ''
+  }`;
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={className}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <img src={provider.logoUrl} alt={provider.name} className="w-5 h-5 rounded" />
+      <span className="text-xs text-cream-dim">{provider.name}</span>
+    </a>
   );
 }

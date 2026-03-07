@@ -8,9 +8,8 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import SkeletonList from '@/components/SkeletonList';
 import MoviePoster from '@/components/MoviePoster';
 import ConfirmModal from '@/components/ConfirmModal';
-import StarRating from '@/components/StarRating';
-import StreamingProvidersList from '@/components/StreamingProviders';
 import RecDetailSheet from '@/components/RecDetailSheet';
+import MovieDetailModal from '@/components/MovieDetailModal';
 import { DECADE_OPTIONS } from '@/lib/decades';
 import type { Movie, UserMovie, SearchResult } from '@shared/types';
 
@@ -865,124 +864,20 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
       />
 
       {/* Movie Detail Modal */}
-      <AnimatePresence>
-        {selectedMovie && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-charcoal/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center transition-all"
-            onClick={() => { setSelectedMovie(null); setSelectedUserMovie(null); }}
-          >
-            <motion.div
-              initial={{ y: 100, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 100, opacity: 0 }}
-              className="glass rounded-t-2xl sm:rounded-2xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex gap-4 mb-4">
-                <div className="w-24 h-36 rounded-xl overflow-hidden flex-shrink-0">
-                  <MoviePoster posterUrl={selectedMovie.posterUrl} title={selectedMovie.title} />
-                </div>
-                <div>
-                  <h2 className="text-xl font-semibold font-display">
-                    {selectedMovie.title}
-                  </h2>
-                  <p className="text-cream-dim text-sm mt-1">
-                    {selectedMovie.year}
-                    {selectedMovie.runtime ? ` · ${selectedMovie.runtime} min` : ''}
-                    {selectedMovie.tmdbRating ? ` · ${selectedMovie.tmdbRating.toFixed(1)}` : ''}
-                  </p>
-                  {selectedMovie.director && (
-                    <p className="text-cream-dim text-xs mt-1">Dir. {selectedMovie.director}</p>
-                  )}
-                  {selectedMovie.genres && selectedMovie.genres.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {selectedMovie.genres.map((g) => (
-                        <span key={g} className="text-xs px-2 py-0.5 glass rounded-full text-cream-dim">
-                          {g}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {selectedMovie.overview && (
-                <p className="text-cream-dim text-sm mb-4">{selectedMovie.overview}</p>
-              )}
-
-              {selectedMovie.cast && selectedMovie.cast.length > 0 && (
-                <div className="mb-4">
-                  <p className="text-xs text-cream-dim mb-1">Cast</p>
-                  <p className="text-sm">{selectedMovie.cast.join(', ')}</p>
-                </div>
-              )}
-
-              {selectedMovie.streamingProviders && selectedMovie.streamingProviders.length > 0 && (
-                <div className="mb-4">
-                  <p className="text-xs text-cream-dim mb-2">Available on</p>
-                  <StreamingProvidersList providers={selectedMovie.streamingProviders} />
-                </div>
-              )}
-
-              {/* Watched / Rating actions */}
-              {selectedUserMovie && (
-                <div className="glass rounded-xl p-4 mb-4 space-y-3">
-                  <button
-                    onClick={() => handleToggleWatched(selectedUserMovie)}
-                    className={`w-full py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                      selectedUserMovie.watched
-                        ? 'bg-success/20 text-success'
-                        : 'glass text-cream-dim hover:text-cream'
-                    }`}
-                  >
-                    {selectedUserMovie.watched ? 'Watched' : 'Mark as Watched'}
-                  </button>
-                  <div>
-                    <p className="text-xs text-cream-dim mb-2">Your Rating</p>
-                    <StarRating
-                      value={selectedUserMovie.userRating ?? 0}
-                      onChange={(rating) => handleRateMovie(selectedUserMovie, rating)}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {selectedMovie.tmdbId && (
-                <button
-                  onClick={() => loadMoviesLike(selectedMovie)}
-                  className="w-full py-2.5 mb-3 glass rounded-xl text-sm text-cream-dim hover:text-cream transition-colors"
-                >
-                  Movies Like This
-                </button>
-              )}
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => { setSelectedMovie(null); setSelectedUserMovie(null); }}
-                  className="flex-1 py-3 glass rounded-xl text-cream-dim hover:text-cream transition-colors"
-                >
-                  Close
-                </button>
-                {selectedUserMovie && (
-                  <button
-                    onClick={() => {
-                      setRemoveMovieId(selectedUserMovie.movieId);
-                      setSelectedMovie(null);
-                      setSelectedUserMovie(null);
-                    }}
-                    className="py-3 px-4 glass rounded-xl text-danger text-sm hover:bg-danger/10 transition-colors"
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <MovieDetailModal
+        movie={selectedMovie}
+        open={!!selectedMovie}
+        onClose={() => { setSelectedMovie(null); setSelectedUserMovie(null); }}
+        userMovie={selectedUserMovie}
+        onToggleWatched={handleToggleWatched}
+        onRate={handleRateMovie}
+        onRemove={(um) => {
+          setRemoveMovieId(um.movieId);
+          setSelectedMovie(null);
+          setSelectedUserMovie(null);
+        }}
+        onMoviesLike={loadMoviesLike}
+      />
     </motion.div>
   );
 }

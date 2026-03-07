@@ -6,7 +6,7 @@ import { motion, animate, AnimatePresence, useMotionValue, useTransform, PanInfo
 import type { SessionMovie } from '@shared/types';
 import SkeletonCard from '@/components/SkeletonCard';
 import MoviePoster from '@/components/MoviePoster';
-import StreamingProvidersList from '@/components/StreamingProviders';
+import MovieDetailModal from '@/components/MovieDetailModal';
 
 interface SwipeViewProps {
   movies: SessionMovie[];
@@ -38,8 +38,10 @@ export default function SwipeView({
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   const isDragging = useRef(false);
+  const pointerStart = useRef<{ x: number; y: number } | null>(null);
   const lastSwipeDir = useRef<'left' | 'right'>('left');
   const cooldownRef = useRef(false);
+  const TAP_DISTANCE_THRESHOLD = 10;
 
   const previousSwipe = useMemo(() => {
     if (undoStack.length === 0) return null;
@@ -85,8 +87,20 @@ export default function SwipeView({
     }
   };
 
-  const handleCardTap = () => {
-    if (!isDragging.current) setExpanded(true);
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    pointerStart.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const start = pointerStart.current;
+    pointerStart.current = null;
+    if (!start) return;
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    const distance = Math.hypot(dx, dy);
+    if (distance < TAP_DISTANCE_THRESHOLD && !isDragging.current) {
+      setExpanded(true);
+    }
   };
 
   useEffect(() => {
@@ -238,6 +252,8 @@ export default function SwipeView({
             dragElastic={0.8}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
+            onPointerDown={handlePointerDown}
+            onPointerUp={handlePointerUp}
             transition={{ type: 'spring', stiffness: 300, damping: 22 }}
             className="swipe-card relative w-full max-w-md lg:max-w-lg shrink-0 rounded-3xl overflow-hidden shadow-2xl cursor-grab active:cursor-grabbing aspect-[2/3]"
           >
@@ -259,12 +275,6 @@ export default function SwipeView({
             )}
 
             <div className="absolute inset-0 bg-gradient-to-t from-charcoal via-charcoal/40 to-transparent" />
-
-            <button
-              onClick={handleCardTap}
-              className="absolute bottom-0 left-0 right-0 h-1/3 z-20"
-              aria-label="View details"
-            />
 
             <motion.div
               style={{ opacity: rightOpacity }}
@@ -313,109 +323,12 @@ export default function SwipeView({
         </div>
       )}
 
-      {/* Expanded detail sheet */}
-      <AnimatePresence>
-        {expanded && (
-          <motion.div
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed inset-0 z-50 bg-charcoal overflow-y-auto"
-            style={{ touchAction: 'pan-y' }}
-          >
-            <div className="relative max-w-md lg:max-w-lg mx-auto min-h-dvh bg-charcoal">
-              <div className="aspect-[2/3] relative">
-                {currentMovie.posterUrl ? (
-                  <div
-                    className="absolute inset-0 bg-cover bg-center"
-                    style={{ backgroundImage: `url(${currentMovie.posterUrl})` }}
-                  />
-                ) : (
-                  <div className="absolute inset-0 bg-card" />
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-charcoal via-charcoal/50 to-transparent" />
-                <button
-                  onClick={() => setExpanded(false)}
-                  className="absolute top-6 right-6 z-10 w-10 h-10 glass rounded-full flex items-center justify-center text-cream"
-                >
-                  &#10005;
-                </button>
-              </div>
-
-              <div className="px-6 -mt-20 relative z-10 pb-32">
-                <h2
-                  className="text-3xl font-bold mb-2"
-                  style={{ fontFamily: 'var(--font-playfair)' }}
-                >
-                  {currentMovie.title}
-                </h2>
-                <div className="flex items-center gap-3 text-cream-dim text-sm mb-4">
-                  <span>{currentMovie.year}</span>
-                  {currentMovie.runtime && <span>{currentMovie.runtime} min</span>}
-                  {currentMovie.tmdbRating && (
-                    <span className="text-danger">&#9733; {currentMovie.tmdbRating.toFixed(1)}</span>
-                  )}
-                </div>
-
-                {currentMovie.director && (
-                  <p className="text-cream-dim text-sm mb-2">
-                    <span className="text-cream">Director:</span> {currentMovie.director}
-                  </p>
-                )}
-                {(currentMovie.cast as string[]).length > 0 && (
-                  <p className="text-cream-dim text-sm mb-4">
-                    <span className="text-cream">Cast:</span> {(currentMovie.cast as string[]).join(', ')}
-                  </p>
-                )}
-
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {(currentMovie.genres as string[]).map((genre) => (
-                    <span key={genre} className="px-3 py-1 glass rounded-full text-xs text-cream-dim">
-                      {genre}
-                    </span>
-                  ))}
-                </div>
-
-                <p className="text-cream-dim leading-relaxed mb-6">{currentMovie.overview}</p>
-
-                {(currentMovie.streamingProviders as { name: string; type: string; logoUrl: string }[]).length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-semibold mb-3" style={{ fontFamily: 'var(--font-playfair)' }}>
-                      Where to Watch
-                    </h3>
-                    <StreamingProvidersList providers={currentMovie.streamingProviders as { name: string; type: string; logoUrl: string }[]} />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Swipe buttons at bottom of detail view */}
-            <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-charcoal via-charcoal/80 to-transparent z-20 pointer-events-none">
-              <div className="flex gap-4 max-w-sm mx-auto pointer-events-auto">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => { setExpanded(false); handleSwipeInternal('left'); }}
-                  disabled={swiping}
-                  className="flex-1 py-4 glass rounded-xl text-danger text-lg font-semibold disabled:opacity-50"
-                >
-                  Pass
-                </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => { setExpanded(false); handleSwipeInternal('right'); }}
-                  disabled={swiping}
-                  className="flex-1 py-4 bg-coral text-charcoal rounded-xl text-lg font-semibold hover:bg-coral-dark transition-colors disabled:opacity-50"
-                >
-                  Interested
-                </motion.button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Movie detail modal */}
+      <MovieDetailModal
+        movie={currentMovie}
+        open={expanded}
+        onClose={() => setExpanded(false)}
+      />
 
       {/* Bottom buttons */}
       <div className="px-4 py-3 flex gap-3 items-center w-full max-w-md lg:max-w-lg mx-auto">

@@ -214,16 +214,25 @@ export async function findOrCreateMovieByTmdbId(tmdbId: number) {
   return movie;
 }
 
-export async function getAvailableProviders(region = 'GB'): Promise<{ id: number; name: string; logoUrl: string }[]> {
+export async function getAvailableProviders(region = 'GB'): Promise<{ id: number; name: string; logoUrl: string; displayPriority: number }[]> {
   const params = new URLSearchParams({ api_key: getApiKey(), watch_region: region });
   try {
     const res = await rateLimitedFetch(`${TMDB_BASE}/watch/providers/movie?${params}`);
     if (!res.ok) return [];
-    const data = (await res.json()) as { results?: { provider_id: number; provider_name: string; logo_path: string }[] };
+    const data = (await res.json()) as {
+      results?: {
+        provider_id: number;
+        provider_name: string;
+        logo_path: string;
+        display_priority?: number;
+        display_priorities?: Record<string, number>;
+      }[];
+    };
     return (data.results || []).map((p) => ({
       id: p.provider_id,
       name: p.provider_name,
       logoUrl: `${TMDB_IMAGE_BASE}${p.logo_path}`,
+      displayPriority: p.display_priorities?.[region] ?? p.display_priority ?? 9999,
     }));
   } catch {
     return [];

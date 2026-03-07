@@ -20,7 +20,45 @@ const GENRE_OPTIONS = [
 interface ProviderChip {
   name: string;
   logoUrl: string;
+  displayPriority: number;
 }
+
+const PREFERRED_PROVIDERS = [
+  'Netflix',
+  'Disney Plus',
+  'Amazon Prime Video',
+  'Prime Video',
+  'Max',
+  'HBO Max',
+  'Apple TV Plus',
+  'MUBI',
+  'Paramount Plus',
+  'NOW',
+  'BBC iPlayer',
+  'ITVX',
+  'Channel 4',
+  'Crunchyroll',
+  'Hulu',
+  'Peacock',
+  'Shudder',
+  'BritBox',
+];
+
+const RENTAL_PROVIDERS = new Set([
+  'Google Play Movies',
+  'YouTube',
+  'Apple TV',
+  'iTunes',
+  'Amazon Video',
+  'Microsoft Store',
+  'Xbox',
+  'Rakuten TV',
+  'Chili',
+  'Sky Store',
+  'Fandango At Home',
+  'Vudu',
+  'Redbox',
+]);
 
 const MOOD_PRESETS = [
   { label: 'Cozy',        genres: ['Animation', 'Family', 'Comedy'],                        minRating: 0,   maxRuntime: 0,   decade: '' },
@@ -48,6 +86,7 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
   const [showFilters, setShowFilters] = useState(false);
   const [activeMood, setActiveMood] = useState<string | null>(null);
   const [streamingProviders, setStreamingProviders] = useState<ProviderChip[]>([]);
+  const [providersExpanded, setProvidersExpanded] = useState(false);
   const [sessionLoading, setSessionLoading] = useState(false);
   const [soloLoading, setSoloLoading] = useState(false);
   const [startLoading, setStartLoading] = useState(false);
@@ -89,13 +128,34 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
           providerApi.list(),
         ]);
         setPoolSize(poolRes.data.size);
-        const raw = provRes.data.providers as { name: string; logoUrl: string }[];
+        const raw = provRes.data.providers as { name: string; logoUrl: string; displayPriority?: number }[];
         const seen = new Map<string, ProviderChip>();
         for (const p of raw) {
           const base = getBaseName(p.name);
-          if (!seen.has(base)) seen.set(base, { name: base, logoUrl: p.logoUrl });
+          const priority = p.displayPriority ?? 9999;
+          const existing = seen.get(base);
+          if (!existing || priority < existing.displayPriority) {
+            seen.set(base, { name: base, logoUrl: p.logoUrl, displayPriority: priority });
+          }
         }
-        setStreamingProviders(Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name)));
+        const preferredRank = (name: string) => {
+          const idx = PREFERRED_PROVIDERS.indexOf(name);
+          return idx === -1 ? Infinity : idx;
+        };
+        const tier = (p: ProviderChip) => {
+          if (PREFERRED_PROVIDERS.includes(p.name)) return 0;
+          if (RENTAL_PROVIDERS.has(p.name)) return 2;
+          return 1;
+        };
+        setStreamingProviders(
+          Array.from(seen.values()).sort((a, b) => {
+            const ta = tier(a);
+            const tb = tier(b);
+            if (ta !== tb) return ta - tb;
+            if (ta === 0) return preferredRank(a.name) - preferredRank(b.name);
+            return a.displayPriority - b.displayPriority;
+          }),
+        );
       } catch { /* ignore */ }
       finally { setPoolSizeLoading(false); }
     };
@@ -314,35 +374,62 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
                   </div>
                 </div>
 
-                {streamingProviders.length > 0 && (
-                  <div>
-                    <label className="text-cream-dim text-sm mb-2 block">Streaming Service</label>
-                    <div className="flex flex-wrap gap-2">
-                      {streamingProviders.map((provider) => {
-                        const selected = (filters.streamingProviders || []).includes(provider.name);
-                        return (
+                {streamingProviders.length > 0 && (() => {
+                  const selectedSet = new Set(filters.streamingProviders || []);
+                  const defaultSlice = streamingProviders.filter((p) => PREFERRED_PROVIDERS.includes(p.name));
+                  const extraSelected = streamingProviders.filter(
+                    (p) => !PREFERRED_PROVIDERS.includes(p.name) && selectedSet.has(p.name),
+                  );
+                  const visible = providersExpanded
+                    ? streamingProviders
+                    : [...defaultSlice, ...extraSelected];
+                  const hiddenCount = streamingProviders.length - visible.length;
+                  return (
+                    <div>
+                      <label className="text-cream-dim text-sm mb-2 block">Streaming Service</label>
+                      <div className="flex flex-wrap gap-2">
+                        {visible.map((provider) => {
+                          const selected = selectedSet.has(provider.name);
+                          return (
+                            <button
+                              key={provider.name}
+                              onClick={() =>
+                                setFilters((p) => ({
+                                  ...p,
+                                  streamingProviders: selected
+                                    ? (p.streamingProviders || []).filter((s) => s !== provider.name)
+                                    : [...(p.streamingProviders || []), provider.name],
+                                }))
+                              }
+                              className={`flex items-center gap-1.5 pl-1 pr-3 py-1 rounded-full text-xs transition-all hover:-translate-y-0.5 ${
+                                selected ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
+                              }`}
+                            >
+                              <img src={provider.logoUrl} alt="" className="w-5 h-5 rounded" />
+                              <span>{provider.name}</span>
+                            </button>
+                          );
+                        })}
+                        {hiddenCount > 0 && !providersExpanded && (
                           <button
-                            key={provider.name}
-                            onClick={() =>
-                              setFilters((p) => ({
-                                ...p,
-                                streamingProviders: selected
-                                  ? (p.streamingProviders || []).filter((s) => s !== provider.name)
-                                  : [...(p.streamingProviders || []), provider.name],
-                              }))
-                            }
-                            className={`flex items-center gap-1.5 pl-1 pr-3 py-1 rounded-full text-xs transition-all hover:-translate-y-0.5 ${
-                              selected ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
-                            }`}
+                            onClick={() => setProvidersExpanded(true)}
+                            className="px-3 py-1 rounded-full text-xs glass text-cream-dim hover:text-cream transition-colors"
                           >
-                            <img src={provider.logoUrl} alt="" className="w-5 h-5 rounded" />
-                            <span>{provider.name}</span>
+                            +{hiddenCount} more
                           </button>
-                        );
-                      })}
+                        )}
+                        {providersExpanded && (
+                          <button
+                            onClick={() => setProvidersExpanded(false)}
+                            className="px-3 py-1 rounded-full text-xs glass text-cream-dim hover:text-cream transition-colors"
+                          >
+                            Show less
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 <div>
                   <label className="text-cream-dim text-sm mb-2 block">
