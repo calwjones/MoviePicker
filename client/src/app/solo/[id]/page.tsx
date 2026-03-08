@@ -5,7 +5,10 @@ import { useParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useAuthGuard } from '@/hooks/useAuthGuard';
 import { sessionApi, swipeApi } from '@/lib/api';
+import { enqueueSwipe, flushQueue, hasQueuedSwipes } from '@/lib/swipeQueue';
 import SwipeView from '@/components/SwipeView';
+import ToastContainer from '@/components/ToastContainer';
+import { useToast } from '@/hooks/useToast';
 import type { SessionMovie } from '@shared/types';
 
 export default function SoloSessionPage() {
@@ -19,6 +22,36 @@ export default function SoloSessionPage() {
   const [swiping, setSwiping] = useState(false);
   const [swipeError, setSwipeError] = useState('');
   const [undoStack, setUndoStack] = useState<{ index: number; movieId: string; direction: string }[]>([]);
+  const [online, setOnline] = useState(true);
+  const { toasts, addToast, removeToast } = useToast();
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setOnline(navigator.onLine);
+    const handleOnline = () => {
+      setOnline(true);
+      removeToast('reconnect');
+      if (hasQueuedSwipes()) {
+        flushQueue().then((res) => {
+          if (res.flushed > 0) {
+            addToast(`Synced ${res.flushed} swipe${res.flushed === 1 ? '' : 's'}`, { variant: 'success' });
+          }
+        });
+      } else {
+        addToast('Back online', { variant: 'success' });
+      }
+    };
+    const handleOffline = () => {
+      setOnline(false);
+      addToast('Reconnecting…', { id: 'reconnect', variant: 'warn', duration: null });
+    };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [addToast, removeToast]);
 
   useEffect(() => {
     if (!sessionId || !user || authLoading) return;
@@ -42,22 +75,34 @@ export default function SoloSessionPage() {
     const movie = movies[currentIndex];
     setSwiping(true);
     setSwipeError('');
-    try {
-      await swipeApi.swipe(sessionId, movie.movieId, direction);
+    const advance = () => {
       setUndoStack((prev) => [...prev.slice(-9), { index: currentIndex, movieId: movie.movieId, direction }]);
       if (currentIndex + 1 >= movies.length) {
         setDone(true);
-        const res = await swipeApi.done(sessionId);
-        if (res.data.status === 'completed') router.replace(`/matches/${sessionId}`);
       } else {
         setCurrentIndex((prev) => prev + 1);
       }
+    };
+    if (!online) {
+      enqueueSwipe({ sessionId, movieId: movie.movieId, direction });
+      advance();
+      setSwiping(false);
+      return;
+    }
+    try {
+      await swipeApi.swipe(sessionId, movie.movieId, direction);
+      advance();
+      if (currentIndex + 1 >= movies.length) {
+        const res = await swipeApi.done(sessionId);
+        if (res.data.status === 'completed') router.replace(`/matches/${sessionId}`);
+      }
     } catch {
-      setSwipeError('Swipe failed — tap to retry');
+      enqueueSwipe({ sessionId, movieId: movie.movieId, direction });
+      advance();
     } finally {
       setSwiping(false);
     }
-  }, [currentIndex, movies, sessionId, router, swiping]);
+  }, [currentIndex, movies, sessionId, router, swiping, online]);
 
   const handleUndo = useCallback(async () => {
     if (undoStack.length === 0) return;
@@ -88,17 +133,20 @@ export default function SoloSessionPage() {
   );
 
   return (
-    <SwipeView
-      movies={movies}
-      currentIndex={currentIndex}
-      onSwipe={handleSwipe}
-      onUndo={handleUndo}
-      undoStack={undoStack}
-      swiping={swiping}
-      swipeError={swipeError}
-      loading={loading}
-      done={done}
-      doneContent={doneContent}
-    />
+    <>
+      <SwipeView
+        movies={movies}
+        currentIndex={currentIndex}
+        onSwipe={handleSwipe}
+        onUndo={handleUndo}
+        undoStack={undoStack}
+        swiping={swiping}
+        swipeError={swipeError}
+        loading={loading}
+        done={done}
+        doneContent={doneContent}
+      />
+      <ToastContainer toasts={toasts} />
+    </>
   );
 }

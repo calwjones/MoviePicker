@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { useAuthGuard } from '@/hooks/useAuthGuard';
 import { sessionApi, swipeApi } from '@/lib/api';
 import { connectSocket, getSocket } from '@/lib/socket';
+import { enqueueSwipe, flushQueue, hasQueuedSwipes } from '@/lib/swipeQueue';
 import SwipeView from '@/components/SwipeView';
 import ToastContainer from '@/components/ToastContainer';
 import { useToast } from '@/hooks/useToast';
@@ -85,6 +86,13 @@ export default function SessionPage() {
       } else {
         hasConnectedRef.current = true;
       }
+      if (hasQueuedSwipes()) {
+        flushQueue().then((res) => {
+          if (res.flushed > 0) {
+            addToast(`Synced ${res.flushed} swipe${res.flushed === 1 ? '' : 's'}`, { variant: 'success' });
+          }
+        });
+      }
     };
 
     socket.on('swipe-update', handleSwipeUpdate);
@@ -110,18 +118,31 @@ export default function SessionPage() {
     const movie = movies[currentIndex];
     setSwiping(true);
     setSwipeError('');
-    try {
-      await swipeApi.swipe(sessionId, movie.movieId, direction);
+    const socket = getSocket();
+    const advance = () => {
       setUndoStack((prev) => [...prev.slice(-9), { index: currentIndex, movieId: movie.movieId, direction }]);
       if (currentIndex + 1 >= movies.length) {
         setDone(true);
-        const res = await swipeApi.done(sessionId);
-        if (res.data.status === 'completed') router.replace(`/matches/${sessionId}`);
       } else {
         setCurrentIndex((prev) => prev + 1);
       }
+    };
+    if (!socket.connected) {
+      enqueueSwipe({ sessionId, movieId: movie.movieId, direction });
+      advance();
+      setSwiping(false);
+      return;
+    }
+    try {
+      await swipeApi.swipe(sessionId, movie.movieId, direction);
+      advance();
+      if (currentIndex + 1 >= movies.length) {
+        const res = await swipeApi.done(sessionId);
+        if (res.data.status === 'completed') router.replace(`/matches/${sessionId}`);
+      }
     } catch {
-      setSwipeError('Swipe failed — tap to retry');
+      enqueueSwipe({ sessionId, movieId: movie.movieId, direction });
+      advance();
     } finally {
       setSwiping(false);
     }
