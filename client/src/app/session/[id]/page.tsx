@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useAuthGuard } from '@/hooks/useAuthGuard';
 import { sessionApi, swipeApi } from '@/lib/api';
 import { connectSocket, getSocket } from '@/lib/socket';
 import SwipeView from '@/components/SwipeView';
+import ToastContainer from '@/components/ToastContainer';
+import { useToast } from '@/hooks/useToast';
 import type { SessionMovie } from '@shared/types';
 
 export default function SessionPage() {
@@ -22,6 +24,9 @@ export default function SessionPage() {
   const [swiping, setSwiping] = useState(false);
   const [swipeError, setSwipeError] = useState('');
   const [undoStack, setUndoStack] = useState<{ index: number; movieId: string; direction: string }[]>([]);
+  const { toasts, addToast, removeToast } = useToast();
+  const hasConnectedRef = useRef(false);
+  const wasPartnerOnlineRef = useRef(false);
 
   useEffect(() => {
     if (!sessionId || !user || authLoading) return;
@@ -50,23 +55,55 @@ export default function SessionPage() {
     connectSocket();
     const socket = getSocket();
     socket.emit('join-session', sessionId);
-    socket.on('swipe-update', (data: { progress: number }) => {
+
+    const handleSwipeUpdate = (data: { progress: number }) => {
       if (data.progress !== undefined) setPartnerProgress(data.progress);
-    });
-    socket.on('session-complete', () => router.replace(`/matches/${sessionId}`));
-    socket.on('partner-done', () => setPartnerProgress(100));
-    socket.on('partner-online', () => setPartnerOnline(true));
-    socket.on('disconnect', () => setPartnerOnline(false));
-    socket.on('connect', () => socket.emit('join-session', sessionId));
-    return () => {
-      socket.off('swipe-update');
-      socket.off('session-complete');
-      socket.off('partner-done');
-      socket.off('partner-online');
-      socket.off('disconnect');
-      socket.off('connect');
     };
-  }, [sessionId, router]);
+    const handleSessionComplete = () => router.replace(`/matches/${sessionId}`);
+    const handlePartnerDone = () => {
+      setPartnerProgress(100);
+      addToast('Partner finished swiping', { variant: 'info' });
+    };
+    const handlePartnerOnline = () => {
+      setPartnerOnline(true);
+      if (wasPartnerOnlineRef.current) {
+        addToast('Partner back online', { variant: 'success' });
+      } else {
+        addToast('Partner connected', { variant: 'success' });
+        wasPartnerOnlineRef.current = true;
+      }
+    };
+    const handleDisconnect = () => {
+      setPartnerOnline(false);
+      addToast('Reconnecting…', { id: 'reconnect', variant: 'warn', duration: null });
+    };
+    const handleConnect = () => {
+      socket.emit('join-session', sessionId);
+      if (hasConnectedRef.current) {
+        removeToast('reconnect');
+        addToast('Back online', { variant: 'success' });
+      } else {
+        hasConnectedRef.current = true;
+      }
+    };
+
+    socket.on('swipe-update', handleSwipeUpdate);
+    socket.on('session-complete', handleSessionComplete);
+    socket.on('partner-done', handlePartnerDone);
+    socket.on('partner-online', handlePartnerOnline);
+    socket.on('disconnect', handleDisconnect);
+    socket.on('connect', handleConnect);
+    if (socket.connected) hasConnectedRef.current = true;
+
+    return () => {
+      socket.off('swipe-update', handleSwipeUpdate);
+      socket.off('session-complete', handleSessionComplete);
+      socket.off('partner-done', handlePartnerDone);
+      socket.off('partner-online', handlePartnerOnline);
+      socket.off('disconnect', handleDisconnect);
+      socket.off('connect', handleConnect);
+    };
+  }, [sessionId, router, addToast, removeToast]);
 
   const handleSwipe = useCallback(async (direction: 'left' | 'right') => {
     if (currentIndex >= movies.length || swiping) return;
@@ -128,23 +165,26 @@ export default function SessionPage() {
   );
 
   return (
-    <SwipeView
-      movies={movies}
-      currentIndex={currentIndex}
-      onSwipe={handleSwipe}
-      onUndo={handleUndo}
-      undoStack={undoStack}
-      swiping={swiping}
-      swipeError={swipeError}
-      loading={loading}
-      done={done}
-      headerRight={
-        <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${partnerOnline ? 'bg-success animate-pulse' : 'bg-cream-dim'}`} />
-          <span className="text-cream-dim text-xs">Partner: {Math.min(partnerProgress, 100)}%</span>
-        </div>
-      }
-      doneContent={doneContent}
-    />
+    <>
+      <SwipeView
+        movies={movies}
+        currentIndex={currentIndex}
+        onSwipe={handleSwipe}
+        onUndo={handleUndo}
+        undoStack={undoStack}
+        swiping={swiping}
+        swipeError={swipeError}
+        loading={loading}
+        done={done}
+        headerRight={
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${partnerOnline ? 'bg-success animate-pulse' : 'bg-cream-dim'}`} />
+            <span className="text-cream-dim text-xs">Partner: {Math.min(partnerProgress, 100)}%</span>
+          </div>
+        }
+        doneContent={doneContent}
+      />
+      <ToastContainer toasts={toasts} />
+    </>
   );
 }

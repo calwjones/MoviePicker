@@ -1,7 +1,14 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import type { Toast } from '@/hooks/useToast';
+import type { Toast, ToastVariant } from '@/hooks/useToast';
+
+const VARIANT_STYLES: Record<ToastVariant, string> = {
+  info: 'border-cream/20',
+  success: 'border-success/50',
+  warn: 'border-amber-400/60',
+  error: 'border-danger/60',
+};
 
 export default function ToastContainer({ toasts }: { toasts: Toast[] }) {
   return (
@@ -13,7 +20,7 @@ export default function ToastContainer({ toasts }: { toasts: Toast[] }) {
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -20, scale: 0.95 }}
-            className="glass rounded-xl px-4 py-2 text-sm text-cream shadow-lg pointer-events-auto"
+            className={`glass rounded-xl px-4 py-2 text-sm text-cream shadow-lg pointer-events-auto border ${VARIANT_STYLES[toast.variant]}`}
           >
             {toast.message}
           </motion.div>

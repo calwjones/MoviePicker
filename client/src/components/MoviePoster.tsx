@@ -8,23 +8,41 @@ interface MoviePosterProps {
   className?: string;
 }
 
+function getBlurUrl(posterUrl: string): string | null {
+  if (!posterUrl.includes('image.tmdb.org')) return null;
+  return posterUrl.replace(/\/t\/p\/w\d+\//, '/t/p/w92/');
+}
+
 export default function MoviePoster({ posterUrl, title, className = '' }: MoviePosterProps) {
   const [loaded, setLoaded] = useState(false);
 
-  if (posterUrl) {
+  if (!posterUrl) {
     return (
+      <div className={`w-full h-full bg-card flex items-center justify-center p-2 text-center ${className}`}>
+        <span className="text-cream-dim text-xs">{title}</span>
+      </div>
+    );
+  }
+
+  const blurUrl = getBlurUrl(posterUrl);
+
+  return (
+    <div className={`relative w-full h-full overflow-hidden ${className}`}>
+      {blurUrl && (
+        <img
+          src={blurUrl}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl"
+        />
+      )}
       <img
         src={posterUrl}
         alt={title}
         loading="lazy"
         onLoad={() => setLoaded(true)}
-        className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'} ${className}`}
+        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
       />
-    );
-  }
-  return (
-    <div className={`w-full h-full bg-card flex items-center justify-center p-2 text-center ${className}`}>
-      <span className="text-cream-dim text-xs">{title}</span>
     </div>
   );
 }
