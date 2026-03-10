@@ -8,6 +8,7 @@ import { getErrorMessage } from '@/lib/errors';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { connectSocket, getSocket } from '@/lib/socket';
 import { getBaseName } from '@/components/StreamingProviders';
+import MoodPicker, { MOOD_PRESETS, type MoodPreset } from '@/components/MoodPicker';
 import { DECADE_OPTIONS } from '@/lib/decades';
 import type { Filters } from '@shared/types';
 
@@ -60,15 +61,6 @@ const RENTAL_PROVIDERS = new Set([
   'Redbox',
 ]);
 
-const MOOD_PRESETS = [
-  { label: 'Cozy',        genres: ['Animation', 'Family', 'Comedy'],                        minRating: 0,   maxRuntime: 0,   decade: '' },
-  { label: 'Date Night',  genres: ['Romance', 'Drama'],                                     minRating: 0,   maxRuntime: 120, decade: '' },
-  { label: 'Funny',       genres: ['Comedy'],                                                minRating: 6.5, maxRuntime: 0,   decade: '' },
-  { label: 'Intense',     genres: ['Thriller', 'Crime', 'Action'],                          minRating: 7,   maxRuntime: 0,   decade: '' },
-  { label: 'Thoughtful',  genres: ['Drama', 'Documentary'],                                  minRating: 7.5, maxRuntime: 0,   decade: '' },
-  { label: 'Adventurous', genres: ['Adventure', 'Action', 'Fantasy', 'Science Fiction'],    minRating: 0,   maxRuntime: 0,   decade: '' },
-] as const;
-
 interface Participant {
   displayName: string;
   type: 'registered' | 'guest';
@@ -91,6 +83,7 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
   const [soloLoading, setSoloLoading] = useState(false);
   const [startLoading, setStartLoading] = useState(false);
   const [sessionError, setSessionError] = useState('');
+  const [moodPickerOpen, setMoodPickerOpen] = useState(false);
 
   const [groupSessionId, setGroupSessionId] = useState<string | null>(null);
   const [shareLink, setShareLink] = useState<string | null>(null);
@@ -226,17 +219,48 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
     addToast('Session cancelled');
   };
 
-  const handleStartSolo = async () => {
+  const startSoloSession = async (overrideFilters?: Record<string, unknown>) => {
     setSoloLoading(true);
     setSessionError('');
     try {
-      const res = await soloApi.create(buildActiveFilters());
+      const res = await soloApi.create(overrideFilters ?? buildActiveFilters());
       router.push(`/solo/${res.data.session.id}`);
     } catch (err: unknown) {
       setSessionError(getErrorMessage(err, 'Failed to start solo session'));
     } finally {
       setSoloLoading(false);
     }
+  };
+
+  const handleStartSolo = () => {
+    setMoodPickerOpen(true);
+  };
+
+  const handleMoodPick = (preset: MoodPreset) => {
+    setMoodPickerOpen(false);
+    setActiveMood(preset.label);
+    const nextFilters: Filters = {
+      ...filters,
+      genres: [...preset.genres],
+      minRating: preset.minRating,
+      maxRuntime: preset.maxRuntime,
+      decade: preset.decade,
+    };
+    setFilters(nextFilters);
+    const active: Record<string, unknown> = {};
+    if (nextFilters.genres.length > 0) active.genres = nextFilters.genres;
+    if (nextFilters.decade) active.decade = nextFilters.decade;
+    if (nextFilters.minRating > 0) active.minRating = nextFilters.minRating;
+    if (nextFilters.maxRuntime > 0) active.maxRuntime = nextFilters.maxRuntime;
+    if (nextFilters.streamingProviders && nextFilters.streamingProviders.length > 0) {
+      active.streamingProviders = nextFilters.streamingProviders;
+    }
+    startSoloSession(Object.keys(active).length > 0 ? active : undefined);
+  };
+
+  const handleMoodSkip = () => {
+    setMoodPickerOpen(false);
+    startSoloSession();
   };
 
   const toggleGenre = (genre: string) => {
@@ -587,6 +611,13 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
           </div>
         </div>
       )}
+
+      <MoodPicker
+        open={moodPickerOpen}
+        onClose={() => setMoodPickerOpen(false)}
+        onPick={handleMoodPick}
+        onSkip={handleMoodSkip}
+      />
     </motion.div>
   );
 }
