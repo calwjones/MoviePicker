@@ -12,6 +12,7 @@ import ImportTab from './components/ImportTab';
 import DiscoverTab from './components/DiscoverTab';
 import SwipeTab from './components/SwipeTab';
 import HistoryTab from './components/HistoryTab';
+import OnboardingModal from '@/components/OnboardingModal';
 
 type Tab = 'browse' | 'library' | 'import' | 'discover' | 'swipe' | 'history';
 
@@ -20,12 +21,32 @@ export default function DashboardPage() {
   const router = useRouter();
   const { toasts, addToast } = useToast();
   const [tab, setTab] = useState<Tab>('browse');
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/auth?mode=login');
     }
   }, [user, authLoading, router]);
+
+  useEffect(() => {
+    if (authLoading || !user || user.isGuest) return;
+    try {
+      const seen = localStorage.getItem('moviepicker_onboarded');
+      if (!seen) setOnboardingOpen(true);
+    } catch { /* ignore */ }
+  }, [user, authLoading]);
+
+  const dismissOnboarding = () => {
+    setOnboardingOpen(false);
+    try { localStorage.setItem('moviepicker_onboarded', '1'); } catch {}
+  };
+
+  const handleOnboardingPath = (path: 'together' | 'solo' | 'discover') => {
+    dismissOnboarding();
+    if (path === 'discover') setTab('discover');
+    else setTab('swipe');
+  };
 
   if (authLoading) {
     return (
@@ -80,6 +101,11 @@ export default function DashboardPage() {
       </AnimatePresence>
 
       <ToastContainer toasts={toasts} />
+      <OnboardingModal
+        open={onboardingOpen}
+        onClose={dismissOnboarding}
+        onPickPath={handleOnboardingPath}
+      />
     </div>
   );
 }

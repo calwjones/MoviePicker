@@ -3,10 +3,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '@/context/AuthContext';
 import { useAuthGuard } from '@/hooks/useAuthGuard';
 import { swipeApi } from '@/lib/api';
 import type { Movie, StreamingProvider } from '@shared/types';
 import SkeletonList from '@/components/SkeletonList';
+import GuestConvertModal from '@/components/GuestConvertModal';
 
 interface Match {
   id: string;
@@ -23,13 +25,28 @@ interface Compromise {
 export default function MatchesPage() {
   const { id: sessionId } = useParams<{ id: string }>();
   const { user, loading: authLoading } = useAuthGuard();
+  const { user: authUser } = useAuth();
   const router = useRouter();
   const [matches, setMatches] = useState<Match[]>([]);
   const [compromises, setCompromises] = useState<Compromise[]>([]);
   const [revealed, setRevealed] = useState(false);
   const [revealIndex, setRevealIndex] = useState(-1);
   const [loading, setLoading] = useState(true);
+  const [guestModalOpen, setGuestModalOpen] = useState(false);
   const revealTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  useEffect(() => {
+    if (!authUser?.isGuest || loading) return;
+    try {
+      const key = `moviepicker_guest_convert_seen_${sessionId}`;
+      if (localStorage.getItem(key)) return;
+      const timer = setTimeout(() => {
+        setGuestModalOpen(true);
+        localStorage.setItem(key, '1');
+      }, 2500);
+      return () => clearTimeout(timer);
+    } catch { /* ignore */ }
+  }, [authUser, loading, sessionId]);
 
   useEffect(() => {
     return () => {
@@ -61,6 +78,14 @@ export default function MatchesPage() {
     setRevealIndex(matches.length - 1);
   };
 
+  const guestModal = (
+    <GuestConvertModal
+      open={guestModalOpen}
+      onClose={() => setGuestModalOpen(false)}
+      defaultName={authUser?.displayName}
+    />
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-dvh px-6">
@@ -73,6 +98,7 @@ export default function MatchesPage() {
 
   if (matches.length === 0) {
     return (
+      <>
       <div className="flex flex-col items-center justify-center min-h-dvh px-6 text-center">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
@@ -130,6 +156,8 @@ export default function MatchesPage() {
           </button>
         </motion.div>
       </div>
+      {guestModal}
+      </>
     );
   }
 
@@ -138,6 +166,7 @@ export default function MatchesPage() {
 
     if (!revealed) {
       return (
+        <>
         <div className="flex flex-col items-center justify-center min-h-dvh px-6 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -162,10 +191,13 @@ export default function MatchesPage() {
             </motion.button>
           </motion.div>
         </div>
+        {guestModal}
+        </>
       );
     }
 
     return (
+      <>
       <div className="flex flex-col items-center justify-center min-h-dvh px-6">
         <motion.div
           initial={{ opacity: 0, scale: 0.8, y: 30 }}
@@ -230,11 +262,14 @@ export default function MatchesPage() {
           </button>
         </motion.div>
       </div>
+      {guestModal}
+      </>
     );
   }
 
   if (!revealed) {
     return (
+      <>
       <div className="flex flex-col items-center justify-center min-h-dvh px-6 text-center">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -261,10 +296,13 @@ export default function MatchesPage() {
           </motion.button>
         </motion.div>
       </div>
+      {guestModal}
+      </>
     );
   }
 
   return (
+    <>
     <div className="min-h-dvh px-6 py-8 flex flex-col items-center justify-center">
       <h2
         className="text-2xl font-bold mb-8 text-center"
@@ -354,5 +392,7 @@ export default function MatchesPage() {
         </motion.div>
       )}
     </div>
+    {guestModal}
+    </>
   );
 }
