@@ -2,31 +2,27 @@
 
 @theme inline {
   --color-charcoal: #0D0D0D;
-  --color-card: #1A1A2E;
-  --color-card-hover: #232347;
-  --color-amber: #F5A623;
-  --color-amber-dark: #D4900E;
+  --color-card: #1C1C1C;
+  --color-card-hover: #262626;
+  --color-coral: #F5A623;
+  --color-coral-dark: #D4900E;
   --color-coral: #FF6B6B;
   --color-coral-dark: #E04545;
   --color-cream: #F0E6D3;
   --color-cream-dim: #B8AFA3;
-  --color-glass: rgba(26, 26, 46, 0.7);
+  --color-glass: #1C1C1C;
   --color-success: #4ADE80;
   --color-danger: #EF4444;
   --font-sans: "Inter", "DM Sans", system-ui, sans-serif;
   --font-serif: "Playfair Display", Georgia, serif;
 }
 
-@font-face {
-  font-family: "Playfair Display";
-  font-style: normal;
-  font-weight: 400 900;
-  font-display: swap;
-  src: url("https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800;900&display=swap");
-}
-
 body {
   background: var(--color-charcoal);
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(245, 166, 35, 0.08) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(255, 107, 107, 0.05) 0px, transparent 50%);
+  background-attachment: fixed;
   color: var(--color-cream);
   font-family: var(--font-sans);
   min-height: 100dvh;
@@ -38,19 +34,29 @@ body {
   width: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--color-charcoal);
+  background: rgba(0, 0, 0, 0.2);
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-card);
+  background: rgba(245, 166, 35, 0.3);
   border-radius: 3px;
 }
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(245, 166, 35, 0.6);
+}
 
-/* Glass card effect */
+/* Glass card effect — true glassmorphism */
 .glass {
-  background: var(--color-glass);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(245, 166, 35, 0.1);
+  background: rgba(40, 40, 40, 0.4);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+/* Button hover glow */
+.btn-glow:hover {
+  box-shadow: 0 0 20px rgba(245, 166, 35, 0.3);
+  transform: translateY(-2px);
 }
 
 /* Swipe card styles */

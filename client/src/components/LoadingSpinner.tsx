@@ -8,7 +8,7 @@ const sizes = {
 
 export default function LoadingSpinner({ size = 'lg' }: { size?: 'sm' | 'md' | 'lg' }) {
   return (
-    <div className={`${sizes[size]} border-amber border-t-transparent rounded-full animate-spin`} />
+    <div className={`${sizes[size]} border-coral border-t-transparent rounded-full animate-spin`} />
   );
 }
 
