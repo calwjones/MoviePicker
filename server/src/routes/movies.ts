@@ -134,9 +134,9 @@ router.patch('/:movieId/watched', authenticate, async (req: AuthRequest, res: Re
     const { watched } = req.body;
     const userMovie = await prisma.userMovie.update({
       where: { userId_movieId: { userId: req.userId!, movieId: req.params.movieId as string } },
-      data: { 
+      data: {
         watched: !!watched,
-        ...(!!watched ? { onWatchlist: false } : {})
+        ...(watched ? { onWatchlist: false } : {}),
       },
       include: { movie: true },
     });
