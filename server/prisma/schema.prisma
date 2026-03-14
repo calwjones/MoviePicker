@@ -8,12 +8,16 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String   @map("password_hash")
-  displayName  String   @map("display_name")
-  avatarUrl    String?  @map("avatar_url")
-  createdAt    DateTime @default(now()) @map("created_at")
+  id                       String    @id @default(uuid())
+  email                    String    @unique
+  passwordHash             String    @map("password_hash")
+  displayName              String    @map("display_name")
+  avatarUrl                String?   @map("avatar_url")
+  emailVerified            Boolean   @default(false) @map("email_verified")
+  emailVerificationToken   String?   @map("email_verification_token")
+  passwordResetToken       String?   @map("password_reset_token")
+  passwordResetExpiresAt   DateTime? @map("password_reset_expires_at")
+  createdAt                DateTime  @default(now()) @map("created_at")
 
   userMovies        UserMovie[]
   soloSessions      SwipeSession[]
@@ -53,7 +57,7 @@ model UserMovie {
   userRating  Float?   @map("user_rating")
   createdAt   DateTime @default(now()) @map("created_at")
 
-  user  User  @relation(fields: [userId], references: [id])
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   movie Movie @relation(fields: [movieId], references: [id])
 
   @@unique([userId, movieId])
@@ -71,8 +75,8 @@ model SwipeSession {
   filters   Json     @default("{}")
   createdAt DateTime @default(now()) @map("created_at")
 
-  user    User?          @relation(fields: [userId], references: [id])
-  user2   User?          @relation("SessionUser2", fields: [user2Id], references: [id])
+  user    User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user2   User?          @relation("SessionUser2", fields: [user2Id], references: [id], onDelete: Cascade)
   movies  SessionMovie[]
   matches Match[]
 

@@ -46,6 +46,13 @@ export const authApi = {
   me: () => api.get('/auth/me'),
   changePassword: (currentPassword: string, newPassword: string) =>
     api.post('/auth/change-password', { currentPassword, newPassword }),
+  verifyEmail: (token: string) => api.get('/auth/verify', { params: { token } }),
+  resendVerification: (email: string) => api.post('/auth/resend-verification', { email }),
+  forgotPassword: (email: string) => api.post('/auth/forgot-password', { email }),
+  resetPassword: (token: string, newPassword: string) =>
+    api.post('/auth/reset-password', { token, newPassword }),
+  deleteAccount: (currentPassword: string) =>
+    api.delete('/auth/me', { data: { currentPassword } }),
 };
 
 export const movieApi = {

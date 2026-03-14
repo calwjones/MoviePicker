@@ -8,6 +8,7 @@ interface User {
   email: string;
   displayName: string;
   avatarUrl?: string;
+  emailVerified?: boolean;
   isGuest?: boolean;
 }
 

@@ -27,6 +27,7 @@ describe('Auth Routes', () => {
         email: 'test@example.com',
         displayName: 'Test User',
         passwordHash: 'hashed',
+        emailVerified: false,
       });
 
       const res = await request(app)
@@ -38,6 +39,7 @@ describe('Auth Routes', () => {
         id: 'user-1',
         email: 'test@example.com',
         displayName: 'Test User',
+        emailVerified: false,
       });
       expect(res.body.token).toBeDefined();
       expect(mockPrisma.user.create).toHaveBeenCalledTimes(1);
@@ -72,6 +74,7 @@ describe('Auth Routes', () => {
         email: 'test@example.com',
         displayName: 'Test User',
         passwordHash: hashedPassword,
+        emailVerified: true,
       });
 
       const res = await request(app)
@@ -83,12 +86,31 @@ describe('Auth Routes', () => {
       expect(res.body.token).toBeDefined();
     });
 
+    it('should return 403 when email is not verified', async () => {
+      const hashedPassword = await bcrypt.hash('password123', 12);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        email: 'test@example.com',
+        displayName: 'Test User',
+        passwordHash: hashedPassword,
+        emailVerified: false,
+      });
+
+      const res = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'test@example.com', password: 'password123' });
+
+      expect(res.status).toBe(403);
+      expect(res.body.code).toBe('email_unverified');
+    });
+
     it('should return 401 with wrong password', async () => {
       const hashedPassword = await bcrypt.hash('correct-password', 12);
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 'user-1',
         email: 'test@example.com',
         passwordHash: hashedPassword,
+        emailVerified: true,
       });
 
       const res = await request(app)

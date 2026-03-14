@@ -1,13 +1,19 @@
+import { randomBytes } from 'crypto';
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../app';
 import { JWT_SECRET } from '../config';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { sendVerificationEmail, sendPasswordResetEmail } from '../services/email';
 
 const router = Router();
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function randomToken(): string {
+  return randomBytes(32).toString('hex');
+}
 
 router.post('/register', async (req: Request, res: Response) => {
   try {
@@ -42,16 +48,134 @@ router.post('/register', async (req: Request, res: Response) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
+    const verificationToken = randomToken();
     const user = await prisma.user.create({
-      data: { email: trimmedEmail, passwordHash, displayName: trimmedName },
+      data: {
+        email: trimmedEmail,
+        passwordHash,
+        displayName: trimmedName,
+        emailVerificationToken: verificationToken,
+      },
+    });
+
+    sendVerificationEmail(user.email, verificationToken).catch((err) => {
+      console.error('[auth] verification email failed:', err);
     });
 
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
 
     res.status(201).json({
-      user: { id: user.id, email: user.email, displayName: user.displayName },
+      user: { id: user.id, email: user.email, displayName: user.displayName, emailVerified: user.emailVerified },
       token,
     });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/verify', async (req: Request, res: Response) => {
+  try {
+    const token = typeof req.query.token === 'string' ? req.query.token : '';
+    if (!token) {
+      res.status(400).json({ error: 'Token is required' });
+      return;
+    }
+    const user = await prisma.user.findFirst({ where: { emailVerificationToken: token } });
+    if (!user) {
+      res.status(400).json({ error: 'Invalid or expired verification link' });
+      return;
+    }
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerified: true, emailVerificationToken: null },
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/resend-verification', async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      res.status(400).json({ error: 'Email is required' });
+      return;
+    }
+    const trimmedEmail = email.trim().toLowerCase();
+    const user = await prisma.user.findUnique({ where: { email: trimmedEmail } });
+    if (user && !user.emailVerified) {
+      const token = user.emailVerificationToken || randomToken();
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { emailVerificationToken: token },
+      });
+      sendVerificationEmail(user.email, token).catch((err) => {
+        console.error('[auth] resend verification email failed:', err);
+      });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/forgot-password', async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      res.status(400).json({ error: 'Email is required' });
+      return;
+    }
+    const trimmedEmail = email.trim().toLowerCase();
+    const user = await prisma.user.findUnique({ where: { email: trimmedEmail } });
+    if (user) {
+      const token = randomToken();
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { passwordResetToken: token, passwordResetExpiresAt: expiresAt },
+      });
+      sendPasswordResetEmail(user.email, token).catch((err) => {
+        console.error('[auth] reset email failed:', err);
+      });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/reset-password', async (req: Request, res: Response) => {
+  try {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) {
+      res.status(400).json({ error: 'Token and new password are required' });
+      return;
+    }
+    if (typeof newPassword !== 'string' || newPassword.length < 8) {
+      res.status(400).json({ error: 'Password must be at least 8 characters' });
+      return;
+    }
+    const user = await prisma.user.findFirst({ where: { passwordResetToken: token } });
+    if (!user || !user.passwordResetExpiresAt || user.passwordResetExpiresAt < new Date()) {
+      res.status(400).json({ error: 'Invalid or expired reset link' });
+      return;
+    }
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        passwordResetToken: null,
+        passwordResetExpiresAt: null,
+      },
+    });
+    res.json({ success: true });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal server error' });
@@ -80,10 +204,15 @@ router.post('/login', async (req: Request, res: Response) => {
       return;
     }
 
+    if (!user.emailVerified) {
+      res.status(403).json({ error: 'Please verify your email before signing in', code: 'email_unverified' });
+      return;
+    }
+
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
 
     res.json({
-      user: { id: user.id, email: user.email, displayName: user.displayName },
+      user: { id: user.id, email: user.email, displayName: user.displayName, emailVerified: user.emailVerified },
       token,
     });
   } catch (error) {
@@ -134,7 +263,7 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.userId },
-      select: { id: true, email: true, displayName: true, avatarUrl: true },
+      select: { id: true, email: true, displayName: true, avatarUrl: true, emailVerified: true },
     });
     if (!user) {
       res.status(404).json({ error: 'User not found' });
@@ -142,6 +271,31 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
     }
     res.json({ user });
   } catch {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.delete('/me', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { currentPassword } = req.body;
+    if (!currentPassword) {
+      res.status(400).json({ error: 'Current password is required to delete your account' });
+      return;
+    }
+    const user = await prisma.user.findUnique({ where: { id: req.userId } });
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) {
+      res.status(401).json({ error: 'Current password is incorrect' });
+      return;
+    }
+    await prisma.user.delete({ where: { id: user.id } });
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
