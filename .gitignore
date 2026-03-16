@@ -24,3 +24,9 @@ Thumbs.db
 *.log
 npm-debug.log*
 .npm-cache/
+
+# Local notes not for public repo
+ROADMAP*.md
+claude.md
+CLAUDE.md
+.claude/
