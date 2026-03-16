@@ -6,10 +6,23 @@ import { useAuth } from '@/context/AuthContext';
 import { authApi } from '@/lib/api';
 
 export default function ProfilePage() {
-  const { user, loading, logout } = useAuth();
+  const { user, loading, logout, updateDisplayName } = useAuth();
   const router = useRouter();
+
+  const [name, setName] = useState('');
+  const [savingName, setSavingName] = useState(false);
+  const [nameMsg, setNameMsg] = useState('');
+  const [nameError, setNameError] = useState('');
+
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [passwordMsg, setPasswordMsg] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+
   const [showDelete, setShowDelete] = useState(false);
-  const [password, setPassword] = useState('');
+  const [deletePassword, setDeletePassword] = useState('');
   const [confirmText, setConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
@@ -20,6 +33,10 @@ export default function ProfilePage() {
     }
   }, [user, loading, router]);
 
+  useEffect(() => {
+    if (user) setName(user.displayName);
+  }, [user]);
+
   if (loading || !user) {
     return (
       <div className="flex items-center justify-center min-h-dvh">
@@ -28,13 +45,52 @@ export default function ProfilePage() {
     );
   }
 
-  const canDelete = confirmText === 'DELETE' && password.length >= 8;
+  const nameChanged = name.trim() !== user.displayName && name.trim().length > 0;
+
+  const handleSaveName = async () => {
+    setNameMsg('');
+    setNameError('');
+    setSavingName(true);
+    try {
+      await updateDisplayName(name.trim());
+      setNameMsg('Saved');
+    } catch (err: unknown) {
+      const apiErr = err as { response?: { data?: { error?: string } } };
+      setNameError(apiErr.response?.data?.error || 'Failed to update');
+    } finally {
+      setSavingName(false);
+    }
+  };
+
+  const passwordReady =
+    currentPassword.length > 0 && newPassword.length >= 8 && newPassword === confirmPassword;
+
+  const handleChangePassword = async () => {
+    setPasswordMsg('');
+    setPasswordError('');
+    if (!passwordReady) return;
+    setSavingPassword(true);
+    try {
+      await authApi.changePassword(currentPassword, newPassword);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setPasswordMsg('Password changed');
+    } catch (err: unknown) {
+      const apiErr = err as { response?: { data?: { error?: string } } };
+      setPasswordError(apiErr.response?.data?.error || 'Failed to change password');
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
+  const canDelete = confirmText === 'DELETE' && deletePassword.length >= 8;
 
   const handleDelete = async () => {
     setDeleteError('');
     setDeleting(true);
     try {
-      await authApi.deleteAccount(password);
+      await authApi.deleteAccount(deletePassword);
       logout();
       router.push('/auth?mode=register');
     } catch (err: unknown) {
@@ -48,9 +104,7 @@ export default function ProfilePage() {
   return (
     <div className="min-h-dvh px-6 py-8 max-w-lg mx-auto">
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold font-display">
-          Profile
-        </h1>
+        <h1 className="text-2xl font-bold font-display">Profile</h1>
         <button
           onClick={() => router.push('/dashboard')}
           className="text-cream-dim text-sm hover:text-danger transition-colors"
@@ -61,19 +115,101 @@ export default function ProfilePage() {
 
       <div className="glass rounded-2xl p-6 space-y-4 mb-6">
         <div>
-          <label className="text-cream-dim text-xs uppercase tracking-wide">Display Name</label>
-          <p className="text-lg font-medium mt-1">{user.displayName}</p>
-        </div>
-        <div>
           <label className="text-cream-dim text-xs uppercase tracking-wide">Email</label>
           <p className="text-lg font-medium mt-1">{user.email}</p>
         </div>
+        <div>
+          <label className="text-cream-dim text-xs uppercase tracking-wide mb-1 block">Display name</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              setNameMsg('');
+              setNameError('');
+            }}
+            maxLength={50}
+            className="w-full px-4 py-2.5 glass rounded-xl text-cream placeholder:text-cream-dim/50 focus:outline-none focus:border-coral/60 border border-cream/10"
+          />
+          <div className="flex items-center justify-between mt-2 min-h-[1.25rem]">
+            <p className={`text-xs ${nameError ? 'text-danger' : 'text-cream-dim'}`}>
+              {nameError || nameMsg}
+            </p>
+            <button
+              onClick={handleSaveName}
+              disabled={!nameChanged || savingName}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-coral text-charcoal hover:bg-coral-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {savingName ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="glass rounded-2xl p-6 space-y-3 mb-6">
+        <h2 className="text-lg font-semibold">Change password</h2>
+        <div>
+          <label className="text-cream-dim text-xs mb-1 block">Current password</label>
+          <input
+            type="password"
+            value={currentPassword}
+            onChange={(e) => {
+              setCurrentPassword(e.target.value);
+              setPasswordMsg('');
+              setPasswordError('');
+            }}
+            className="w-full px-4 py-2.5 glass rounded-xl text-cream placeholder:text-cream-dim/50 focus:outline-none focus:border-coral/60 border border-cream/10"
+          />
+        </div>
+        <div>
+          <label className="text-cream-dim text-xs mb-1 block">New password</label>
+          <input
+            type="password"
+            value={newPassword}
+            onChange={(e) => {
+              setNewPassword(e.target.value);
+              setPasswordMsg('');
+              setPasswordError('');
+            }}
+            className="w-full px-4 py-2.5 glass rounded-xl text-cream placeholder:text-cream-dim/50 focus:outline-none focus:border-coral/60 border border-cream/10"
+          />
+        </div>
+        <div>
+          <label className="text-cream-dim text-xs mb-1 block">Confirm new password</label>
+          <input
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => {
+              setConfirmPassword(e.target.value);
+              setPasswordMsg('');
+              setPasswordError('');
+            }}
+            className="w-full px-4 py-2.5 glass rounded-xl text-cream placeholder:text-cream-dim/50 focus:outline-none focus:border-coral/60 border border-cream/10"
+          />
+        </div>
+        {confirmPassword.length > 0 && newPassword !== confirmPassword && (
+          <p className="text-danger text-xs">Passwords do not match</p>
+        )}
+        {newPassword.length > 0 && newPassword.length < 8 && (
+          <p className="text-cream-dim text-xs">Must be at least 8 characters</p>
+        )}
+        {passwordError && <p className="text-danger text-xs">{passwordError}</p>}
+        {passwordMsg && <p className="text-green-400 text-xs">{passwordMsg}</p>}
+        <button
+          onClick={handleChangePassword}
+          disabled={!passwordReady || savingPassword}
+          className="w-full py-2.5 bg-coral text-charcoal rounded-xl font-medium hover:bg-coral-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {savingPassword ? 'Saving…' : 'Update password'}
+        </button>
       </div>
 
       <div className="glass rounded-2xl p-6 border border-danger/30 space-y-4">
         <div>
           <h2 className="text-lg font-semibold text-danger">Danger zone</h2>
-          <p className="text-cream-dim text-xs mt-1">Deleting your account is permanent. All your library, sessions, and matches will be removed.</p>
+          <p className="text-cream-dim text-xs mt-1">
+            Deleting your account is permanent. All your library, sessions, and matches will be removed.
+          </p>
         </div>
 
         {!showDelete ? (
@@ -89,13 +225,15 @@ export default function ProfilePage() {
               <label className="text-cream-dim text-xs mb-1 block">Confirm your password</label>
               <input
                 type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
                 className="w-full px-4 py-2.5 glass rounded-xl text-cream placeholder:text-cream-dim/50 focus:outline-none focus:border-danger/60 border border-cream/10"
               />
             </div>
             <div>
-              <label className="text-cream-dim text-xs mb-1 block">Type <span className="text-danger font-bold">DELETE</span> to confirm</label>
+              <label className="text-cream-dim text-xs mb-1 block">
+                Type <span className="text-danger font-bold">DELETE</span> to confirm
+              </label>
               <input
                 type="text"
                 value={confirmText}
@@ -110,7 +248,7 @@ export default function ProfilePage() {
               <button
                 onClick={() => {
                   setShowDelete(false);
-                  setPassword('');
+                  setDeletePassword('');
                   setConfirmText('');
                   setDeleteError('');
                 }}

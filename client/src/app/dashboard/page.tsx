@@ -8,13 +8,12 @@ import { useToast } from '@/hooks/useToast';
 import ToastContainer from '@/components/ToastContainer';
 import BrowseTab from './components/BrowseTab';
 import LibraryTab from './components/LibraryTab';
-import ImportTab from './components/ImportTab';
 import DiscoverTab from './components/DiscoverTab';
 import SwipeTab from './components/SwipeTab';
 import HistoryTab from './components/HistoryTab';
 import OnboardingModal from '@/components/OnboardingModal';
 
-type Tab = 'browse' | 'library' | 'import' | 'discover' | 'swipe' | 'history';
+type Tab = 'browse' | 'library' | 'discover' | 'swipe' | 'history';
 
 export default function DashboardPage() {
   const { user, loading: authLoading, logout } = useAuth();
@@ -56,7 +55,7 @@ export default function DashboardPage() {
     );
   }
 
-  const tabs: Tab[] = ['browse', 'library', 'import', 'discover', 'swipe', 'history'];
+  const tabs: Tab[] = ['browse', 'library', 'discover', 'swipe', 'history'];
 
   return (
     <div className="min-h-dvh px-6 py-8 w-full max-w-5xl mx-auto lg:px-12 flex flex-col items-stretch">
@@ -65,7 +64,17 @@ export default function DashboardPage() {
           Movie<span className="text-danger">Picker</span>
         </h1>
         <div className="flex items-center gap-3">
-          <span className="text-cream-dim text-sm">{user?.displayName}</span>
+          {user && !user.isGuest && (
+            <button
+              onClick={() => router.push('/profile')}
+              className="text-cream-dim text-sm hover:text-coral transition-colors"
+            >
+              {user.displayName}
+            </button>
+          )}
+          {user?.isGuest && (
+            <span className="text-cream-dim text-sm">{user.displayName}</span>
+          )}
           <button
             onClick={logout}
             className="text-cream-dim text-sm hover:text-danger transition-colors"
@@ -92,9 +101,6 @@ export default function DashboardPage() {
       <AnimatePresence mode="wait">
         {tab === 'browse' && <BrowseTab key="browse" addToast={addToast} />}
         {tab === 'library' && <LibraryTab key="library" addToast={addToast} />}
-        {tab === 'import' && (
-          <ImportTab key="import" onImportComplete={() => setTab('library')} />
-        )}
         {tab === 'discover' && <DiscoverTab key="discover" addToast={addToast} />}
         {tab === 'swipe' && <SwipeTab key="swipe" addToast={addToast} />}
         {tab === 'history' && <HistoryTab key="history" addToast={addToast} />}

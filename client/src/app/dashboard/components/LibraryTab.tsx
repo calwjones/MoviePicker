@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { movieApi, recommendationApi } from '@/lib/api';
+import { movieApi, recommendationApi, importApi } from '@/lib/api';
 import { getErrorMessage } from '@/lib/errors';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import SkeletonList from '@/components/SkeletonList';
@@ -63,6 +63,10 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
   const [dismissedLoading, setDismissedLoading] = useState(false);
 
   const [recDetail, setRecDetail] = useState<SearchResult | null>(null);
+
+  const [importOpen, setImportOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importStatus, setImportStatus] = useState('');
 
   const loadWatchlist = useCallback(async (filter?: 'watchlist' | 'watched' | 'all') => {
     setLibraryLoading(true);
@@ -173,6 +177,45 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
     } finally {
       setAddingTmdbId(null);
     }
+  };
+
+  const handleFolderImport = async (files: FileList) => {
+    setImporting(true);
+    setImportStatus('Reading export folder...');
+    const fileMap: Record<string, File> = {};
+    for (let i = 0; i < files.length; i++) {
+      const name = files[i].name.toLowerCase();
+      if (name === 'watchlist.csv') fileMap.watchlist = files[i];
+      if (name === 'ratings.csv') fileMap.ratings = files[i];
+      if (name === 'watched.csv') fileMap.watched = files[i];
+    }
+
+    const types = ['watchlist', 'ratings', 'watched'] as const;
+    const found = types.filter((t) => fileMap[t]);
+    if (found.length === 0) {
+      setImportStatus('No Letterboxd CSV files found. Make sure you selected the unzipped export folder.');
+      setImporting(false);
+      return;
+    }
+
+    const summaries: string[] = [];
+    for (const type of found) {
+      setImportStatus(`Importing ${type}... (${found.indexOf(type) + 1}/${found.length})`);
+      try {
+        const res = await importApi[type](fileMap[type]);
+        const { imported, skipped, failed, total } = res.data.results;
+        let s = `${type}: ${imported} imported`;
+        if (skipped > 0) s += `, ${skipped} existed`;
+        if (failed > 0) s += `, ${failed} failed`;
+        s += ` (${total})`;
+        summaries.push(s);
+      } catch {
+        summaries.push(`${type}: failed`);
+      }
+    }
+    setImportStatus(summaries.join(' · '));
+    loadWatchlist();
+    setImporting(false);
   };
 
   const handleDismissRec = async (rec: SearchResult) => {
@@ -769,6 +812,76 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
         {searchQuery.length >= 2 && !searching && searchResults.length === 0 && (
           <p className="text-cream-dim text-sm text-center mt-3">No movies found</p>
         )}
+
+        {/* Letterboxd import */}
+        <div className="mt-3 pt-3 border-t border-cream-dim/10">
+          <button
+            onClick={() => setImportOpen((v) => !v)}
+            className="text-cream-dim text-xs hover:text-cream transition-colors flex items-center gap-1.5"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5m0 0l5 5m-5-5v12" />
+            </svg>
+            {importOpen ? 'Hide Letterboxd import' : 'Import from Letterboxd'}
+          </button>
+
+          <AnimatePresence>
+            {importOpen && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="pt-3">
+                  <p className="text-cream-dim text-xs mb-2">
+                    Pulls your Letterboxd watchlist, ratings, and watched history in one go.
+                  </p>
+                  <ol className="text-cream-dim text-xs mb-3 space-y-1 list-decimal list-inside">
+                    <li>
+                      Open{' '}
+                      <a
+                        href="https://letterboxd.com/settings/data/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-coral hover:underline"
+                      >
+                        letterboxd.com/settings/data
+                      </a>{' '}
+                      and click &quot;Export your data&quot;.
+                    </li>
+                    <li>Unzip the downloaded file.</li>
+                    <li>Choose the unzipped folder below.</li>
+                  </ol>
+                  <label
+                    className={`flex items-center justify-center gap-2 p-4 glass rounded-xl border border-dashed border-cream-dim/30 transition-colors ${
+                      importing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-coral/50 hover:bg-card-hover'
+                    }`}
+                  >
+                    <svg className="w-5 h-5 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                    </svg>
+                    <span className="text-cream text-sm">
+                      {importing ? 'Importing...' : 'Select Letterboxd export folder'}
+                    </span>
+                    <input
+                      type="file"
+                      className="hidden"
+                      {...({ webkitdirectory: 'true', directory: 'true' } as Record<string, string>)}
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files.length > 0) handleFolderImport(e.target.files);
+                      }}
+                      disabled={importing}
+                    />
+                  </label>
+                  {importStatus && (
+                    <p className="text-cream-dim text-xs text-center mt-2">{importStatus}</p>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
 
       {/* Watchlist with search/filter */}
@@ -805,7 +918,7 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
         ) : watchlist.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-cream-dim mb-2">Your watchlist is empty</p>
-            <p className="text-cream-dim text-sm">Search for movies above or import from Letterboxd</p>
+            <p className="text-cream-dim text-sm">Search for movies above, or import your Letterboxd export.</p>
           </div>
         ) : (
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">

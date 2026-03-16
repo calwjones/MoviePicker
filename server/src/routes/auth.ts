@@ -275,6 +275,30 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
+router.patch('/me', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { displayName } = req.body;
+    if (typeof displayName !== 'string') {
+      res.status(400).json({ error: 'Display name is required' });
+      return;
+    }
+    const trimmed = displayName.trim();
+    if (trimmed.length < 1 || trimmed.length > 50) {
+      res.status(400).json({ error: 'Display name must be 1-50 characters' });
+      return;
+    }
+    const user = await prisma.user.update({
+      where: { id: req.userId },
+      data: { displayName: trimmed },
+      select: { id: true, email: true, displayName: true, avatarUrl: true, emailVerified: true },
+    });
+    res.json({ user });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.delete('/me', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { currentPassword } = req.body;
