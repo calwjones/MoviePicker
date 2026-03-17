@@ -27,15 +27,20 @@ const mockPrisma = {
     findFirst: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
+    updateMany: jest.fn(),
   },
   sessionMovie: {
     findUnique: jest.fn(),
+    findMany: jest.fn(),
     createMany: jest.fn(),
     update: jest.fn(),
+    count: jest.fn(),
   },
   match: {
     findMany: jest.fn(),
     create: jest.fn(),
+    upsert: jest.fn(),
+    deleteMany: jest.fn(),
   },
 };
 
