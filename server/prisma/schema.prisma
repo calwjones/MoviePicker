@@ -73,6 +73,7 @@ model SwipeSession {
   guestName String?  @map("guest_name")
   status    String   @default("waiting")
   filters   Json     @default("{}")
+  batchSize Int?     @map("batch_size")
   createdAt DateTime @default(now()) @map("created_at")
 
   user    User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
