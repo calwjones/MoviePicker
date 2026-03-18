@@ -17,51 +17,64 @@ function shuffle<T>(arr: T[]): T[] {
   return arr;
 }
 
+function parseBatchSize(value: unknown): number | null {
+  if (value === null) return null;
+  if (typeof value === 'number' && value > 0) return Math.floor(value);
+  return 50;
+}
+
 async function buildGroupPool(
   hostId: string,
   user2Id: string | null,
-  filters: MovieFilters
+  filters: MovieFilters,
+  batchSize: number | null,
 ): Promise<Movie[]> {
   const MIN_SHARED = 15;
-  const MAX_POOL = 50;
 
   const hostMovies = await prisma.userMovie.findMany({
     where: { userId: hostId, onWatchlist: true, watched: false },
     include: { movie: true },
   });
-  const hostPool = hostMovies.map((um) => um.movie);
+  const hostPool = applyMovieFilters(hostMovies.map((um) => um.movie), filters);
+
+  const capped = (pool: Movie[]) => (batchSize != null ? pool.slice(0, batchSize) : pool);
 
   if (!user2Id) {
-    return applyMovieFilters(shuffle(hostPool).slice(0, MAX_POOL), filters);
+    return capped(shuffle([...hostPool]));
   }
+
   const user2Movies = await prisma.userMovie.findMany({
     where: { userId: user2Id, onWatchlist: true, watched: false },
     include: { movie: true },
   });
-  const user2Pool = user2Movies.map((um) => um.movie);
+  const user2Pool = applyMovieFilters(user2Movies.map((um) => um.movie), filters);
 
   const user2Ids = new Set(user2Pool.map((m) => m.id));
   const intersection = hostPool.filter((m) => user2Ids.has(m.id));
 
   let pool: Movie[];
   if (intersection.length >= MIN_SHARED) {
-    pool = shuffle(intersection);
+    pool = shuffle([...intersection]);
   } else {
     const intersectionIds = new Set(intersection.map((m) => m.id));
     const unionMap = new Map<string, Movie>();
     for (const m of [...hostPool, ...user2Pool]) {
       if (!intersectionIds.has(m.id)) unionMap.set(m.id, m);
     }
-    const fill = shuffle(Array.from(unionMap.values())).slice(0, MAX_POOL - intersection.length);
+    const fillCap = batchSize != null
+      ? Math.max(0, batchSize - intersection.length)
+      : unionMap.size;
+    const fill = shuffle(Array.from(unionMap.values())).slice(0, fillCap);
     pool = shuffle([...intersection, ...fill]);
   }
 
-  return applyMovieFilters(pool.slice(0, MAX_POOL), filters);
+  return capped(pool);
 }
 
 router.post('/group', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { filters } = req.body;
+    const batchSize = parseBatchSize(req.body.batchSize);
 
     await prisma.swipeSession.updateMany({
       where: {
@@ -78,6 +91,7 @@ router.post('/group', authenticate, async (req: AuthRequest, res: Response) => {
         userId: req.userId,
         status: 'waiting',
         filters: filters || {},
+        batchSize,
       },
     });
 
@@ -158,7 +172,8 @@ router.post('/:id/start', authenticate, async (req: AuthRequest, res: Response) 
     const moviePool = await buildGroupPool(
       session.userId!,
       session.user2Id ?? null,
-      (session.filters ?? {}) as MovieFilters
+      (session.filters ?? {}) as MovieFilters,
+      session.batchSize
     );
 
     if (moviePool.length === 0) {

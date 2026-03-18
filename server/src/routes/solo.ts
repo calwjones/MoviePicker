@@ -5,6 +5,12 @@ import { applyMovieFilters } from '../lib/filterMovies';
 
 const router = Router();
 
+function parseBatchSize(value: unknown): number | null {
+  if (value === null) return null;
+  if (typeof value === 'number' && value > 0) return Math.floor(value);
+  return 50;
+}
+
 router.get('/active', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const session = await prisma.swipeSession.findFirst({
@@ -35,6 +41,7 @@ router.get('/active', authenticate, async (req: AuthRequest, res: Response) => {
 router.post('/create', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { filters } = req.body;
+    const batchSize = parseBatchSize(req.body.batchSize);
 
     const movieWhere = {
       userMovies: {
@@ -55,7 +62,9 @@ router.post('/create', authenticate, async (req: AuthRequest, res: Response) => 
       const j = Math.floor(Math.random() * (i + 1));
       [watchlistMovies[i], watchlistMovies[j]] = [watchlistMovies[j], watchlistMovies[i]];
     }
-    watchlistMovies = watchlistMovies.slice(0, 50);
+    if (batchSize != null) {
+      watchlistMovies = watchlistMovies.slice(0, batchSize);
+    }
 
     if (watchlistMovies.length === 0) {
       res.status(400).json({ error: 'No unwatched movies found in your watchlist' });
@@ -77,6 +86,7 @@ router.post('/create', authenticate, async (req: AuthRequest, res: Response) => 
         userId: req.userId,
         status: 'swiping',
         filters: filters || {},
+        batchSize,
         movies: {
           create: watchlistMovies.map((m) => ({
             movieId: m.id,
