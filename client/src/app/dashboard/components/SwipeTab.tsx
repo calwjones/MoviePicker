@@ -92,6 +92,7 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
   const [filters, setFilters] = useState<Filters>({
     genres: [], decade: '', minRating: 0, maxRuntime: 0, streamingProviders: [],
   });
+  const [batchSize, setBatchSize] = useState<number | null>(50);
 
   useEffect(() => {
     try {
@@ -111,6 +112,26 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
   useEffect(() => {
     localStorage.setItem('moviepicker_filters', JSON.stringify(filters));
   }, [filters]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('moviepicker_batch_size');
+      if (saved !== null) {
+        if (saved === 'all') setBatchSize(null);
+        else {
+          const parsed = parseInt(saved, 10);
+          if (!Number.isNaN(parsed) && parsed > 0) setBatchSize(parsed);
+        }
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(
+      'moviepicker_batch_size',
+      batchSize === null ? 'all' : String(batchSize),
+    );
+  }, [batchSize]);
 
   useEffect(() => {
     const run = async () => {
@@ -574,7 +595,31 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
 
       {/* Primary action buttons — hidden while lobby is open */}
       {!groupSessionId && (
-        <div className="space-y-2">
+        <div className="space-y-3">
+          <div className="glass rounded-2xl p-4">
+            <p className="text-cream-dim text-xs mb-2">Batch size</p>
+            <div className="flex flex-wrap gap-2">
+              {[10, 20, 50, 100].map((size) => (
+                <button
+                  key={size}
+                  onClick={() => setBatchSize(size)}
+                  className={`px-3 py-1.5 rounded-full text-xs transition-all ${
+                    batchSize === size ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
+                  }`}
+                >
+                  {size}
+                </button>
+              ))}
+              <button
+                onClick={() => setBatchSize(null)}
+                className={`px-3 py-1.5 rounded-full text-xs transition-all ${
+                  batchSize === null ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
+                }`}
+              >
+                All
+              </button>
+            </div>
+          </div>
           {poolSize === 0 && !poolSizeLoading && (
             <p className="text-center text-xs text-cream-dim">
               Add movies to your library first — they form the swipe deck.

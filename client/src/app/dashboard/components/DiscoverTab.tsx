@@ -30,6 +30,21 @@ interface DiscoverTabProps {
 export default function DiscoverTab({ addToast }: DiscoverTabProps) {
   const [phase, setPhase] = useState<Phase>('filters');
   const [filters, setFilters] = useState<DiscoverFilters>({ genres: [], minRating: 0, decade: '' });
+  const [batchSize, setBatchSize] = useState<number>(50);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('moviepicker_batch_size');
+      if (saved !== null && saved !== 'all') {
+        const parsed = parseInt(saved, 10);
+        if (!Number.isNaN(parsed) && parsed > 0) setBatchSize(parsed);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('moviepicker_batch_size', String(batchSize));
+  }, [batchSize]);
 
   const [cards, setCards] = useState<SearchResult[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -268,6 +283,23 @@ export default function DiscoverTab({ addToast }: DiscoverTabProps) {
               onChange={(e) => setFilters((p) => ({ ...p, minRating: parseFloat(e.target.value) }))}
               className="w-full accent-coral"
             />
+          </div>
+
+          <div>
+            <label className="text-cream-dim text-sm mb-2 block">Batch size</label>
+            <div className="flex flex-wrap gap-2">
+              {[10, 20, 50, 100].map((size) => (
+                <button
+                  key={size}
+                  onClick={() => setBatchSize(size)}
+                  className={`px-3 py-1.5 rounded-full text-xs transition-all hover:-translate-y-0.5 ${
+                    batchSize === size ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
+                  }`}
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
           </div>
 
           {error && (
