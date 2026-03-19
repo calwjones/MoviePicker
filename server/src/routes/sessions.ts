@@ -28,6 +28,7 @@ async function buildGroupPool(
   user2Id: string | null,
   filters: MovieFilters,
   batchSize: number | null,
+  excludeMovieIds: Set<string> = new Set(),
 ): Promise<Movie[]> {
   const MIN_SHARED = 15;
 
@@ -35,7 +36,10 @@ async function buildGroupPool(
     where: { userId: hostId, onWatchlist: true, watched: false },
     include: { movie: true },
   });
-  const hostPool = applyMovieFilters(hostMovies.map((um) => um.movie), filters);
+  const hostPool = applyMovieFilters(
+    hostMovies.map((um) => um.movie).filter((m) => !excludeMovieIds.has(m.id)),
+    filters,
+  );
 
   const capped = (pool: Movie[]) => (batchSize != null ? pool.slice(0, batchSize) : pool);
 
@@ -47,7 +51,10 @@ async function buildGroupPool(
     where: { userId: user2Id, onWatchlist: true, watched: false },
     include: { movie: true },
   });
-  const user2Pool = applyMovieFilters(user2Movies.map((um) => um.movie), filters);
+  const user2Pool = applyMovieFilters(
+    user2Movies.map((um) => um.movie).filter((m) => !excludeMovieIds.has(m.id)),
+    filters,
+  );
 
   const user2Ids = new Set(user2Pool.map((m) => m.id));
   const intersection = hostPool.filter((m) => user2Ids.has(m.id));
@@ -69,6 +76,27 @@ async function buildGroupPool(
   }
 
   return capped(pool);
+}
+
+async function sampleSoloBatch(
+  userId: string,
+  filters: MovieFilters,
+  batchSize: number | null,
+  excludeMovieIds: Set<string> = new Set(),
+): Promise<Movie[]> {
+  const movies = await prisma.movie.findMany({
+    where: {
+      userMovies: {
+        some: { userId, onWatchlist: true, watched: false },
+      },
+    },
+  });
+  const filtered = applyMovieFilters(
+    movies.filter((m) => !excludeMovieIds.has(m.id)),
+    filters,
+  );
+  const shuffled = shuffle([...filtered]);
+  return batchSize != null ? shuffled.slice(0, batchSize) : shuffled;
 }
 
 router.post('/group', authenticate, async (req: AuthRequest, res: Response) => {
@@ -173,7 +201,7 @@ router.post('/:id/start', authenticate, async (req: AuthRequest, res: Response) 
       session.userId!,
       session.user2Id ?? null,
       (session.filters ?? {}) as MovieFilters,
-      session.batchSize
+      session.batchSize,
     );
 
     if (moviePool.length === 0) {
@@ -196,6 +224,82 @@ router.post('/:id/start', authenticate, async (req: AuthRequest, res: Response) 
     emit(`session:${sessionId}`, 'session-started', { sessionId });
 
     res.json({ sessionId });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/:id/another-batch', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const sessionId = req.params.id as string;
+
+    const session = await prisma.swipeSession.findUnique({
+      where: { id: sessionId },
+      include: { movies: true },
+    });
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+    if (session.type !== 'solo' && session.type !== 'group') {
+      res.status(400).json({ error: 'Another batch is not supported for this session type' });
+      return;
+    }
+    if (session.userId !== req.userId) {
+      res.status(403).json({ error: 'Only the owner can extend this session' });
+      return;
+    }
+
+    const seenMovieIds = new Set(session.movies.map((sm) => sm.movieId));
+    const filters = (session.filters ?? {}) as MovieFilters;
+    const batchSize = session.batchSize;
+
+    let newMovies: Movie[];
+    if (session.type === 'solo') {
+      newMovies = await sampleSoloBatch(session.userId!, filters, batchSize, seenMovieIds);
+    } else {
+      newMovies = await buildGroupPool(
+        session.userId!,
+        session.user2Id ?? null,
+        filters,
+        batchSize,
+        seenMovieIds,
+      );
+    }
+
+    if (newMovies.length === 0) {
+      const refreshed = await prisma.swipeSession.findUnique({
+        where: { id: sessionId },
+        include: { movies: { include: { movie: true } }, matches: { include: { movie: true } } },
+      });
+      res.json({ added: 0, session: refreshed });
+      return;
+    }
+
+    await prisma.sessionMovie.createMany({
+      data: newMovies.map((m) => ({ sessionId, movieId: m.id })),
+      skipDuplicates: true,
+    });
+
+    if (session.status === 'completed') {
+      await prisma.swipeSession.update({
+        where: { id: sessionId },
+        data: { status: 'swiping' },
+      });
+    }
+
+    const updatedSession = await prisma.swipeSession.findUnique({
+      where: { id: sessionId },
+      include: { movies: { include: { movie: true } }, matches: { include: { movie: true } } },
+    });
+
+    emit(`session:${sessionId}`, 'new-batch', {
+      added: newMovies.length,
+      session: updatedSession,
+    });
+
+    res.json({ added: newMovies.length, session: updatedSession });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal server error' });
