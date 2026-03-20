@@ -1,11 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { discoverApi, movieApi } from '@/lib/api';
 import { getErrorMessage } from '@/lib/errors';
 import MoviePoster from '@/components/MoviePoster';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import SwipeCard, { type SwipeCardHandle } from '@/components/SwipeCard';
 import { DECADE_OPTIONS } from '@/lib/decades';
 import type { Movie, SearchResult, StreamingProvider } from '@shared/types';
 
@@ -30,7 +31,25 @@ interface DiscoverTabProps {
 export default function DiscoverTab({ addToast }: DiscoverTabProps) {
   const [phase, setPhase] = useState<Phase>('filters');
   const [filters, setFilters] = useState<DiscoverFilters>({ genres: [], minRating: 0, decade: '' });
+
+  const [cards, setCards] = useState<SearchResult[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [shortlist, setShortlist] = useState<SearchResult[]>([]);
+
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const [addingTmdbId, setAddingTmdbId] = useState<number | null>(null);
+  const [addedTmdbIds, setAddedTmdbIds] = useState<Set<number>>(new Set());
+  const [seenTmdbIds, setSeenTmdbIds] = useState<Set<number>>(new Set());
   const [batchSize, setBatchSize] = useState<number>(50);
+
+  const [winner, setWinner] = useState<SearchResult | null>(null);
+  const [winnerFull, setWinnerFull] = useState<Movie | null>(null);
+  const [winnerLoading, setWinnerLoading] = useState(false);
+
+  const cardRef = useRef<SwipeCardHandle>(null);
 
   useEffect(() => {
     try {
@@ -45,24 +64,6 @@ export default function DiscoverTab({ addToast }: DiscoverTabProps) {
   useEffect(() => {
     localStorage.setItem('moviepicker_batch_size', String(batchSize));
   }, [batchSize]);
-
-  const [cards, setCards] = useState<SearchResult[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [shortlist, setShortlist] = useState<SearchResult[]>([]);
-  const [exitDir, setExitDir] = useState<'left' | 'right' | null>(null);
-
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const prefetchingRef = useRef(false);
-
-  const [addingTmdbId, setAddingTmdbId] = useState<number | null>(null);
-  const [addedTmdbIds, setAddedTmdbIds] = useState<Set<number>>(new Set());
-
-  const [winner, setWinner] = useState<SearchResult | null>(null);
-  const [winnerFull, setWinnerFull] = useState<Movie | null>(null);
-  const [winnerLoading, setWinnerLoading] = useState(false);
 
   const fetchPage = useCallback(async (targetPage: number): Promise<{ movies: SearchResult[]; totalPages: number } | null> => {
     try {
@@ -89,57 +90,54 @@ export default function DiscoverTab({ addToast }: DiscoverTabProps) {
       setError('No movies match these filters — try broadening them.');
       return;
     }
-    setCards(result.movies);
-    setTotalPages(result.totalPages);
+    const capped = result.movies.slice(0, batchSize);
+    setCards(capped);
     setPage(1);
     setCurrentIndex(0);
     setShortlist([]);
     setAddedTmdbIds(new Set());
+    setSeenTmdbIds(new Set(capped.map((m) => m.tmdbId)));
     setPhase('swiping');
   };
 
   useEffect(() => {
-    if (phase !== 'swiping') return;
-    if (prefetchingRef.current) return;
-    if (page >= totalPages) return;
-    if (currentIndex < cards.length - 3) return;
-
-    prefetchingRef.current = true;
-    fetchPage(page + 1).then((result) => {
-      if (result) {
-        setCards((prev) => {
-          const existing = new Set(prev.map((m) => m.tmdbId));
-          const fresh = result.movies.filter((m) => !existing.has(m.tmdbId));
-          return [...prev, ...fresh];
-        });
-        setTotalPages(result.totalPages);
-        setPage((p) => p + 1);
-      }
-      prefetchingRef.current = false;
-    });
-  }, [phase, currentIndex, cards.length, page, totalPages, fetchPage]);
-
-  useEffect(() => {
-    if (phase === 'swiping' && currentIndex >= cards.length && cards.length > 0 && page >= totalPages) {
+    if (phase === 'swiping' && cards.length > 0 && currentIndex >= cards.length) {
       setPhase('results');
     }
-  }, [phase, currentIndex, cards.length, page, totalPages]);
+  }, [phase, currentIndex, cards.length]);
 
-  const commit = (dir: 'left' | 'right') => {
-    if (exitDir) return;
+  const handleSwipe = useCallback((direction: 'left' | 'right') => {
     const card = cards[currentIndex];
     if (!card) return;
-    setExitDir(dir);
-    if (dir === 'right') setShortlist((prev) => [...prev, card]);
+    if (direction === 'right') setShortlist((prev) => [...prev, card]);
     setCurrentIndex((i) => i + 1);
-  };
+  }, [cards, currentIndex]);
 
   const handleDone = () => {
     setPhase('results');
   };
 
-  const handleKeepSwiping = () => {
-    if (currentIndex >= cards.length && page < totalPages) return;
+  const handleAnotherBatch = async () => {
+    setLoading(true);
+    setError('');
+    const nextPage = page + 1;
+    const result = await fetchPage(nextPage);
+    setLoading(false);
+    if (!result) return;
+    const fresh = result.movies.filter((m) => !seenTmdbIds.has(m.tmdbId));
+    if (fresh.length === 0) {
+      setError('No new movies on this page — try adjusting filters.');
+      return;
+    }
+    const capped = fresh.slice(0, batchSize);
+    setCards(capped);
+    setSeenTmdbIds((prev) => {
+      const next = new Set(prev);
+      for (const m of capped) next.add(m.tmdbId);
+      return next;
+    });
+    setPage(nextPage);
+    setCurrentIndex(0);
     setPhase('swiping');
   };
 
@@ -148,8 +146,8 @@ export default function DiscoverTab({ addToast }: DiscoverTabProps) {
     setShortlist([]);
     setCurrentIndex(0);
     setPage(1);
-    setTotalPages(1);
     setAddedTmdbIds(new Set());
+    setSeenTmdbIds(new Set());
     setWinner(null);
     setWinnerFull(null);
     setPhase('filters');
@@ -338,38 +336,87 @@ export default function DiscoverTab({ addToast }: DiscoverTabProps) {
             </button>
           </div>
 
-          <DiscoverSwipeDeck
-            cards={cards}
-            currentIndex={currentIndex}
-            exitDir={exitDir}
-            onCommit={commit}
-            onExitComplete={() => setExitDir(null)}
-          />
+          <div className="relative aspect-[2/3] max-w-sm mx-auto overflow-hidden">
+            {cards[currentIndex + 1] && (
+              <div className="absolute inset-0 scale-95 opacity-60 pointer-events-none">
+                <SwipeCardFace movie={cards[currentIndex + 1]} />
+              </div>
+            )}
+            {cards[currentIndex] ? (
+              <SwipeCard
+                ref={cardRef}
+                cardKey={cards[currentIndex].tmdbId}
+                onSwipe={handleSwipe}
+                className="absolute inset-0 rounded-3xl overflow-hidden cursor-grab active:cursor-grabbing"
+              >
+                <SwipeCardFace movie={cards[currentIndex]} />
+              </SwipeCard>
+            ) : (
+              <div className="absolute inset-0 glass rounded-3xl flex flex-col items-center justify-center">
+                <LoadingSpinner size="md" />
+                <p className="text-cream-dim text-xs mt-3">Loading more movies…</p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-3 max-w-sm mx-auto">
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => cardRef.current?.swipe('left')}
+              disabled={!cards[currentIndex]}
+              className="flex-1 py-4 glass rounded-xl text-danger text-lg font-semibold disabled:opacity-50"
+            >
+              &#10005;
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => cardRef.current?.swipe('right')}
+              disabled={!cards[currentIndex]}
+              className="flex-1 py-4 bg-coral text-charcoal rounded-xl text-lg font-semibold hover:bg-coral-dark transition-colors disabled:opacity-50"
+            >
+              &#10003;
+            </motion.button>
+          </div>
         </div>
       )}
 
       {phase === 'results' && (
         <div className="glass rounded-2xl p-6 space-y-4">
-          <div>
-            <h2 className="text-lg font-semibold font-display">
-              {shortlist.length > 0 ? 'Your shortlist' : 'Nothing caught your eye'}
-            </h2>
-            <p className="text-cream-dim text-xs mt-1">
-              {shortlist.length > 0
-                ? `${shortlist.length} movie${shortlist.length === 1 ? '' : 's'} right-swiped`
-                : 'Try adjusting your filters and discover again.'}
-            </p>
-          </div>
-
           {shortlist.length === 0 ? (
-            <button
-              onClick={handleStartOver}
-              className="w-full py-3 glass rounded-xl text-cream-dim text-sm hover:text-cream transition-colors"
-            >
-              Back to filters
-            </button>
+            <>
+              <div>
+                <h2 className="text-lg font-semibold font-display">
+                  You skipped everything in this batch
+                </h2>
+                <p className="text-cream-dim text-xs mt-1">
+                  Try another batch, or tweak your filters.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={handleAnotherBatch}
+                  disabled={loading}
+                  className="w-full py-3 bg-coral text-charcoal font-semibold rounded-xl text-sm hover:bg-coral-dark transition-colors disabled:opacity-50"
+                >
+                  {loading ? 'Loading…' : 'Another batch'}
+                </button>
+                <button
+                  onClick={handleStartOver}
+                  className="w-full py-3 glass rounded-xl text-cream-dim text-sm hover:text-cream transition-colors"
+                >
+                  Done
+                </button>
+              </div>
+            </>
           ) : (
             <>
+              <div>
+                <h2 className="text-lg font-semibold font-display">Your shortlist</h2>
+                <p className="text-cream-dim text-xs mt-1">
+                  {shortlist.length} movie{shortlist.length === 1 ? '' : 's'} right-swiped
+                </p>
+              </div>
+
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
                 {shortlist.map((rec) => {
                   const added = addedTmdbIds.has(rec.tmdbId);
@@ -397,33 +444,30 @@ export default function DiscoverTab({ addToast }: DiscoverTabProps) {
 
               <div className="flex flex-col gap-2">
                 <button
+                  onClick={() => handlePickForTonight()}
+                  className="w-full py-3 bg-coral text-charcoal font-semibold rounded-xl text-sm hover:bg-coral-dark transition-colors"
+                >
+                  Pick one for tonight
+                </button>
+                <button
                   onClick={handleAddAll}
                   disabled={shortlist.every((m) => addedTmdbIds.has(m.tmdbId))}
-                  className="w-full py-3 bg-coral text-charcoal font-semibold rounded-xl text-sm hover:bg-coral-dark transition-colors disabled:opacity-50"
+                  className="w-full py-3 glass rounded-xl text-danger font-semibold text-sm outline outline-1 outline-coral hover:bg-card-hover transition-colors disabled:opacity-50"
                 >
-                  Add all to watchlist
+                  Save all to watchlist
                 </button>
-                {shortlist.length >= 2 && (
-                  <button
-                    onClick={() => handlePickForTonight()}
-                    className="w-full py-3 glass rounded-xl text-danger font-semibold text-sm outline outline-1 outline-coral hover:bg-card-hover transition-colors"
-                  >
-                    Pick one for tonight
-                  </button>
-                )}
-                {currentIndex < cards.length || page < totalPages ? (
-                  <button
-                    onClick={handleKeepSwiping}
-                    className="w-full py-2.5 glass rounded-xl text-cream-dim text-sm hover:text-cream transition-colors"
-                  >
-                    Keep swiping
-                  </button>
-                ) : null}
+                <button
+                  onClick={handleAnotherBatch}
+                  disabled={loading}
+                  className="w-full py-2.5 glass rounded-xl text-cream-dim text-sm hover:text-cream transition-colors disabled:opacity-50"
+                >
+                  {loading ? 'Loading…' : 'Another batch'}
+                </button>
                 <button
                   onClick={handleStartOver}
                   className="w-full py-2.5 text-cream-dim/70 text-xs hover:text-cream transition-colors"
                 >
-                  Start over with new filters
+                  Done
                 </button>
               </div>
             </>
@@ -443,66 +487,6 @@ export default function DiscoverTab({ addToast }: DiscoverTabProps) {
         />
       )}
     </motion.div>
-  );
-}
-
-function DiscoverSwipeDeck({
-  cards,
-  currentIndex,
-  exitDir,
-  onCommit,
-  onExitComplete,
-}: {
-  cards: SearchResult[];
-  currentIndex: number;
-  exitDir: 'left' | 'right' | null;
-  onCommit: (dir: 'left' | 'right') => void;
-  onExitComplete: () => void;
-}) {
-  const current = cards[currentIndex];
-  const next = cards[currentIndex + 1];
-
-  if (!current) {
-    return (
-      <div className="glass rounded-2xl p-12 flex flex-col items-center justify-center">
-        <LoadingSpinner size="md" />
-        <p className="text-cream-dim text-xs mt-3">Loading more movies…</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative aspect-[2/3] max-w-sm mx-auto">
-      {next && (
-        <div className="absolute inset-0 scale-95 opacity-60 pointer-events-none">
-          <SwipeCardFace movie={next} />
-        </div>
-      )}
-      <AnimatePresence mode="popLayout" onExitComplete={onExitComplete}>
-        <motion.div
-          key={current.tmdbId}
-          drag="x"
-          dragConstraints={{ left: 0, right: 0 }}
-          dragElastic={0.7}
-          onDragEnd={(_, info) => {
-            if (info.offset.x > 80) onCommit('right');
-            else if (info.offset.x < -80) onCommit('left');
-          }}
-          initial={{ scale: 0.96, opacity: 0.85 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{
-            x: exitDir === 'right' ? 600 : -600,
-            opacity: 0,
-            rotate: exitDir === 'right' ? 18 : -18,
-            transition: { duration: 0.3 },
-          }}
-          transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-          className="absolute inset-0 cursor-grab active:cursor-grabbing"
-        >
-          <SwipeCardFace movie={current} />
-        </motion.div>
-      </AnimatePresence>
-    </div>
   );
 }
 
