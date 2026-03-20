@@ -88,8 +88,8 @@ export const importApi = {
 };
 
 export const sessionApi = {
-  createGroup: (filters?: Record<string, unknown>) =>
-    api.post('/sessions/group', { filters }),
+  createGroup: (filters?: Record<string, unknown>, batchSize?: number | null) =>
+    api.post('/sessions/group', { filters, batchSize }),
   joinGroup: (sessionId: string) =>
     api.post(`/sessions/${sessionId}/join`),
   startGroup: (sessionId: string) =>
@@ -98,6 +98,8 @@ export const sessionApi = {
   get: (id: string) => api.get(`/sessions/${id}`),
   history: () => api.get('/sessions/history/all'),
   cancel: (id: string) => api.delete(`/sessions/${id}`),
+  anotherBatch: (sessionId: string) =>
+    api.post(`/sessions/${sessionId}/another-batch`),
 };
 
 export const recommendationApi = {
@@ -121,8 +123,8 @@ export const swipeApi = {
 };
 
 export const soloApi = {
-  create: (filters?: Record<string, unknown>) =>
-    api.post('/solo/create', { filters }),
+  create: (filters?: Record<string, unknown>, batchSize?: number | null) =>
+    api.post('/solo/create', { filters, batchSize }),
   active: () => api.get('/solo/active'),
 };
 

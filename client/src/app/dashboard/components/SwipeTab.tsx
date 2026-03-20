@@ -204,7 +204,7 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
     setSessionLoading(true);
     setSessionError('');
     try {
-      const res = await sessionApi.createGroup(buildActiveFilters());
+      const res = await sessionApi.createGroup(buildActiveFilters(), batchSize);
       setGroupSessionId(res.data.session.id);
       setShareLink(res.data.shareLink);
       setParticipants([]);
@@ -244,7 +244,7 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
     setSoloLoading(true);
     setSessionError('');
     try {
-      const res = await soloApi.create(overrideFilters ?? buildActiveFilters());
+      const res = await soloApi.create(overrideFilters ?? buildActiveFilters(), batchSize);
       router.push(`/solo/${res.data.session.id}`);
     } catch (err: unknown) {
       setSessionError(getErrorMessage(err, 'Failed to start solo session'));
