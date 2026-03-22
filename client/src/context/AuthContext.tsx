@@ -8,6 +8,7 @@ interface User {
   email: string;
   displayName: string;
   avatarUrl?: string;
+  isGuest?: boolean;
 }
 
 interface AuthContextType {
@@ -20,23 +21,46 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    return JSON.parse(atob(token.split('.')[1]));
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (token) {
-      authApi.me()
-        .then((res) => setUser(res.data.user))
-        .catch(() => {
-          localStorage.removeItem('token');
-          setUser(null);
-        })
-        .finally(() => setLoading(false));
-    } else {
+    if (!token) {
       setLoading(false);
+      return;
     }
+
+    // Guest tokens have guestId instead of userId — /auth/me doesn't support them.
+    // Build a synthetic user from the decoded payload instead.
+    const payload = decodeJwtPayload(token);
+    if (payload?.guestId) {
+      setUser({
+        id: payload.guestId as string,
+        email: '',
+        displayName: (payload.displayName as string) || 'Guest',
+        isGuest: true,
+      });
+      setLoading(false);
+      return;
+    }
+
+    authApi.me()
+      .then((res) => setUser(res.data.user))
+      .catch(() => {
+        localStorage.removeItem('token');
+        setUser(null);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -53,6 +77,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     localStorage.removeItem('token');
+    localStorage.removeItem('guest_session_id');
+    localStorage.removeItem('user_token_backup');
     setUser(null);
   }, []);
 

@@ -38,10 +38,7 @@ export function setupSocketHandlers(io: Server): void {
 
     socket.on('join-session', async (sessionId: string) => {
       try {
-        const session = await prisma.swipeSession.findUnique({
-          where: { id: sessionId },
-          include: { couple: true },
-        });
+        const session = await prisma.swipeSession.findUnique({ where: { id: sessionId } });
         if (!session) {
           socket.emit('error', { message: 'Not authorized for this session' });
           return;
@@ -51,41 +48,31 @@ export function setupSocketHandlers(io: Server): void {
         if (socket.guestId && session.guestId === socket.guestId) {
           socket.join(`session:${sessionId}`);
           socket.to(`session:${sessionId}`).emit('partner-online');
-          console.log(`Guest ${socket.guestId} joined session ${sessionId}`);
           return;
         }
 
         // Solo session owner
         if (session.type === 'solo' && session.userId === socket.userId) {
           socket.join(`session:${sessionId}`);
-          console.log(`User ${socket.userId} joined solo session ${sessionId}`);
           return;
         }
 
-        // Couple member
-        if (!session.couple || (session.couple.user1Id !== socket.userId && session.couple.user2Id !== socket.userId)) {
-          socket.emit('error', { message: 'Not authorized for this session' });
+        // Group session: host or registered user2
+        if (session.type === 'group') {
+          const isHost = session.userId === socket.userId;
+          const isUser2 = session.user2Id === socket.userId;
+          if (!isHost && !isUser2) {
+            socket.emit('error', { message: 'Not authorized for this session' });
+            return;
+          }
+          socket.join(`session:${sessionId}`);
+          if (!isHost) socket.to(`session:${sessionId}`).emit('partner-online');
           return;
         }
-        socket.join(`session:${sessionId}`);
-        socket.to(`session:${sessionId}`).emit('partner-online');
-        console.log(`User ${socket.userId} joined session ${sessionId}`);
+
+        socket.emit('error', { message: 'Not authorized for this session' });
       } catch {
         socket.emit('error', { message: 'Failed to join session' });
-      }
-    });
-
-    socket.on('join-couple', async (coupleId: string) => {
-      try {
-        const couple = await prisma.couple.findUnique({ where: { id: coupleId } });
-        if (!couple || (couple.user1Id !== socket.userId && couple.user2Id !== socket.userId)) {
-          socket.emit('error', { message: 'Not authorized for this couple' });
-          return;
-        }
-        socket.join(`couple:${coupleId}`);
-        console.log(`User ${socket.userId} joined couple room ${coupleId}`);
-      } catch {
-        socket.emit('error', { message: 'Failed to join couple room' });
       }
     });
 

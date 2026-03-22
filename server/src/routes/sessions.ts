@@ -3,147 +3,95 @@ import { prisma } from '../app';
 import { emit } from '../services/emitter';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { CLIENT_URL } from '../config';
-import { applyMovieFilters } from '../lib/filterMovies';
+import { applyMovieFilters, MovieFilters } from '../lib/filterMovies';
 import { resolveSessionRole } from '../lib/resolveSessionRole';
+import type { Movie } from '@prisma/client';
 
 const router = Router();
 
-router.post('/create', authenticate, async (req: AuthRequest, res: Response) => {
-  try {
-    const { filters } = req.body;
+// ─── Helpers ────────────────────────────────────────────────────────────────
 
-    const couple = await prisma.couple.findFirst({
-      where: {
-        OR: [
-          { user1Id: req.userId! },
-          { user2Id: req.userId! },
-        ],
-      },
-    });
-
-    if (!couple || !couple.user2Id) {
-      res.status(400).json({ error: 'You need to be in a complete couple to start a session' });
-      return;
-    }
-
-    // Cancel any existing active sessions for this couple
-    await prisma.swipeSession.updateMany({
-      where: { coupleId: couple.id, status: { in: ['active', 'swiping'] } },
-      data: { status: 'completed' },
-    });
-
-    const watchlistMovies = await prisma.userMovie.findMany({
-      where: {
-        userId: { in: [couple.user1Id, couple.user2Id] },
-        onWatchlist: true,
-      },
-      include: { movie: true },
-    });
-
-    const movieMap = new Map<string, typeof watchlistMovies[0]['movie']>();
-    for (const um of watchlistMovies) {
-      movieMap.set(um.movieId, um.movie);
-    }
-
-    const moviePool = applyMovieFilters(Array.from(movieMap.values()), filters || {});
-
-    // Shuffle (Fisher-Yates) so sessions aren't always the same order
-    for (let i = moviePool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [moviePool[i], moviePool[j]] = [moviePool[j], moviePool[i]];
-    }
-
-    if (moviePool.length === 0) {
-      res.status(400).json({
-        error: 'No movies match your filters. Try adjusting your filters or adding more movies to your watchlists.',
-      });
-      return;
-    }
-
-    const session = await prisma.swipeSession.create({
-      data: {
-        coupleId: couple.id,
-        filters: filters || {},
-      },
-    });
-
-    await prisma.sessionMovie.createMany({
-      data: moviePool.map((m) => ({
-        sessionId: session.id,
-        movieId: m.id,
-      })),
-    });
-
-    const fullSession = await prisma.swipeSession.findUnique({
-      where: { id: session.id },
-      include: {
-        movies: { include: { movie: true } },
-      },
-    });
-
-    emit(`couple:${couple.id}`, 'session-created', { sessionId: session.id, session: fullSession, createdBy: req.userId });
-
-    const shareLink = `${CLIENT_URL}/join/${session.id}`;
-    res.status(201).json({ session: fullSession, shareLink });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+function shuffle<T>(arr: T[]): T[] {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
   }
-});
+  return arr;
+}
 
-router.post('/create-guest', authenticate, async (req: AuthRequest, res: Response) => {
+/**
+ * Build the movie pool for a group session at start time.
+ * - Both registered: intersection of watchlists. If < MIN_SHARED, fill from union up to MAX_POOL.
+ * - Guest joining: host's watchlist only.
+ */
+async function buildGroupPool(
+  hostId: string,
+  user2Id: string | null,
+  filters: MovieFilters
+): Promise<Movie[]> {
+  const MIN_SHARED = 15;
+  const MAX_POOL = 50;
+
+  const hostMovies = await prisma.userMovie.findMany({
+    where: { userId: hostId, onWatchlist: true, watched: false },
+    include: { movie: true },
+  });
+  const hostPool = hostMovies.map((um) => um.movie);
+
+  if (!user2Id) {
+    // Guest joining — use host's watchlist only
+    return applyMovieFilters(shuffle(hostPool).slice(0, MAX_POOL), filters);
+  }
+
+  // Registered user2 — compute intersection, fill from union if needed
+  const user2Movies = await prisma.userMovie.findMany({
+    where: { userId: user2Id, onWatchlist: true, watched: false },
+    include: { movie: true },
+  });
+  const user2Pool = user2Movies.map((um) => um.movie);
+
+  const user2Ids = new Set(user2Pool.map((m) => m.id));
+  const intersection = hostPool.filter((m) => user2Ids.has(m.id));
+
+  let pool: Movie[];
+  if (intersection.length >= MIN_SHARED) {
+    pool = shuffle(intersection);
+  } else {
+    // Fill from union (deduplicated), excluding already-included intersection movies
+    const intersectionIds = new Set(intersection.map((m) => m.id));
+    const unionMap = new Map<string, Movie>();
+    for (const m of [...hostPool, ...user2Pool]) {
+      if (!intersectionIds.has(m.id)) unionMap.set(m.id, m);
+    }
+    const fill = shuffle(Array.from(unionMap.values())).slice(0, MAX_POOL - intersection.length);
+    pool = shuffle([...intersection, ...fill]);
+  }
+
+  return applyMovieFilters(pool.slice(0, MAX_POOL), filters);
+}
+
+// ─── Group session: create ───────────────────────────────────────────────────
+
+router.post('/group', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { filters } = req.body;
 
-    const watchlistMovies = await prisma.userMovie.findMany({
-      where: {
-        userId: req.userId!,
-        onWatchlist: true,
-        watched: false,
-      },
-      include: { movie: true },
-    });
-
-    let moviePool = applyMovieFilters(
-      watchlistMovies.map((um) => um.movie),
-      filters || {}
-    );
-
-    // Shuffle (Fisher-Yates)
-    for (let i = moviePool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [moviePool[i], moviePool[j]] = [moviePool[j], moviePool[i]];
-    }
-
-    if (moviePool.length === 0) {
-      res.status(400).json({
-        error: 'No movies match your filters. Try adjusting your filters or adding more movies.',
-      });
-      return;
-    }
-
-    // Cancel any existing active guest sessions for this user
+    // Cancel any existing active group sessions for this user
     await prisma.swipeSession.updateMany({
       where: {
         userId: req.userId,
-        type: 'guest',
-        status: { in: ['active', 'swiping'] },
+        type: 'group',
+        status: { in: ['waiting', 'swiping'] },
       },
       data: { status: 'completed' },
     });
 
     const session = await prisma.swipeSession.create({
       data: {
-        type: 'guest',
+        type: 'group',
         userId: req.userId,
-        coupleId: null,
+        status: 'waiting',
         filters: filters || {},
-        movies: {
-          create: moviePool.map((m) => ({ movieId: m.id })),
-        },
-      },
-      include: {
-        movies: { include: { movie: true } },
       },
     });
 
@@ -155,46 +103,159 @@ router.post('/create-guest', authenticate, async (req: AuthRequest, res: Respons
   }
 });
 
-router.get('/active', authenticate, async (req: AuthRequest, res: Response) => {
-  try {
-    const couple = await prisma.couple.findFirst({
-      where: {
-        OR: [
-          { user1Id: req.userId! },
-          { user2Id: req.userId! },
-        ],
-      },
-    });
+// ─── Group session: registered user joins ────────────────────────────────────
 
-    if (!couple) {
-      res.status(404).json({ error: 'Not in a couple' });
+router.post('/:id/join', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const sessionId = req.params.id as string;
+
+    const session = await prisma.swipeSession.findUnique({ where: { id: sessionId } });
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+    if (session.type !== 'group') {
+      res.status(400).json({ error: 'Not a group session' });
+      return;
+    }
+    if (session.status !== 'waiting') {
+      res.status(400).json({ error: 'Session has already started' });
+      return;
+    }
+    if (session.userId === req.userId) {
+      res.status(400).json({ error: 'You are the host' });
+      return;
+    }
+    if (session.user2Id && session.user2Id !== req.userId) {
+      res.status(400).json({ error: 'Session already has a second participant' });
       return;
     }
 
-    const session = await prisma.swipeSession.findFirst({
+    const updated = await prisma.swipeSession.update({
+      where: { id: sessionId },
+      data: { user2Id: req.userId },
+    });
+
+    const joiner = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { displayName: true },
+    });
+
+    // Notify host that someone joined
+    emit(`session:${sessionId}`, 'participant-joined', {
+      displayName: joiner?.displayName,
+      type: 'registered',
+    });
+
+    res.json({ session: updated });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── Group session: host starts swiping ──────────────────────────────────────
+
+router.post('/:id/start', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const sessionId = req.params.id as string;
+
+    const session = await prisma.swipeSession.findUnique({ where: { id: sessionId } });
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+    if (session.userId !== req.userId) {
+      res.status(403).json({ error: 'Only the host can start the session' });
+      return;
+    }
+    if (session.status !== 'waiting') {
+      res.status(400).json({ error: 'Session is not in waiting state' });
+      return;
+    }
+
+    // Build the pool now that we know all participants
+    const moviePool = await buildGroupPool(
+      session.userId!,
+      session.user2Id ?? null,
+      (session.filters ?? {}) as MovieFilters
+    );
+
+    if (moviePool.length === 0) {
+      res.status(400).json({
+        error: 'No movies match your filters. Try adjusting filters or adding more movies.',
+      });
+      return;
+    }
+
+    // Create session movies and update status in a transaction
+    await prisma.$transaction([
+      prisma.sessionMovie.createMany({
+        data: moviePool.map((m) => ({ sessionId, movieId: m.id })),
+      }),
+      prisma.swipeSession.update({
+        where: { id: sessionId },
+        data: { status: 'swiping' },
+      }),
+    ]);
+
+    // Tell all participants (host + guest/user2) to navigate to the session
+    emit(`session:${sessionId}`, 'session-started', { sessionId });
+
+    res.json({ sessionId });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── Active session ───────────────────────────────────────────────────────────
+
+router.get('/active', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    // Check for active group session (host or participant)
+    const groupSession = await prisma.swipeSession.findFirst({
       where: {
-        coupleId: couple.id,
-        status: { in: ['active', 'swiping'] },
+        OR: [
+          { userId: req.userId, type: 'group', status: { in: ['waiting', 'swiping'] } },
+          { user2Id: req.userId, type: 'group', status: { in: ['waiting', 'swiping'] } },
+        ],
       },
-      include: {
-        movies: { include: { movie: true } },
-        matches: { include: { movie: true } },
-      },
+      include: { movies: { include: { movie: true } }, matches: { include: { movie: true } } },
       orderBy: { createdAt: 'desc' },
     });
 
-    if (!session) {
-      res.status(404).json({ error: 'No active session' });
+    if (groupSession) {
+      const isUser1 = groupSession.userId === req.userId;
+      res.json({ session: groupSession, isUser1 });
       return;
     }
 
-    const isUser1 = couple.user1Id === req.userId;
-
-    res.json({ session, isUser1, couple });
+    res.status(404).json({ error: 'No active session' });
   } catch {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// ─── Public session preview (host name, status) — used by join page ──────────
+
+router.get('/:id/preview', async (req, res: Response) => {
+  try {
+    const session = await prisma.swipeSession.findUnique({
+      where: { id: req.params.id },
+      include: { user: { select: { displayName: true } } },
+    });
+    if (!session || session.status !== 'waiting') {
+      res.status(404).json({ error: 'Session not found or already started' });
+      return;
+    }
+    res.json({ hostName: session.user?.displayName ?? null });
+  } catch {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── Get session by ID ────────────────────────────────────────────────────────
 
 router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
@@ -204,7 +265,6 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
       include: {
         movies: { include: { movie: true } },
         matches: { include: { movie: true } },
-        couple: true,
       },
     });
 
@@ -214,7 +274,6 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
     }
 
     const { isUser1, isUser2, isGuest } = resolveSessionRole(req, session);
-
     if (!isUser1 && !isUser2 && !isGuest) {
       res.status(403).json({ error: 'You are not part of this session' });
       return;
@@ -226,22 +285,15 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
+// ─── Session history ──────────────────────────────────────────────────────────
+
 router.get('/history/all', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const couple = await prisma.couple.findFirst({
-      where: {
-        OR: [
-          { user1Id: req.userId! },
-          { user2Id: req.userId! },
-        ],
-      },
-    });
-
     const sessions = await prisma.swipeSession.findMany({
       where: {
         OR: [
-          ...(couple ? [{ coupleId: couple.id }] : []),
-          { userId: req.userId!, type: { in: ['solo', 'guest'] } },
+          { userId: req.userId!, type: { in: ['solo', 'group', 'guest'] } },
+          { user2Id: req.userId! },
         ],
       },
       include: {
@@ -251,14 +303,14 @@ router.get('/history/all', authenticate, async (req: AuthRequest, res: Response)
       orderBy: { createdAt: 'desc' },
     });
 
-    const history = sessions.map((s: (typeof sessions)[number]) => ({
+    const history = sessions.map((s) => ({
       id: s.id,
       type: s.type,
       status: s.status,
       createdAt: s.createdAt,
       movieCount: s._count.movies,
       matchCount: s.matches.length,
-      matches: s.matches.map((m: (typeof s.matches)[number]) => ({
+      matches: s.matches.map((m) => ({
         id: m.id,
         movie: m.movie,
         watched: m.watched,
@@ -272,23 +324,19 @@ router.get('/history/all', authenticate, async (req: AuthRequest, res: Response)
   }
 });
 
+// ─── Cancel / delete session ──────────────────────────────────────────────────
+
 router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const sessionId = req.params.id as string;
-    const session = await prisma.swipeSession.findUnique({
-      where: { id: sessionId },
-      include: { couple: true },
-    });
+    const session = await prisma.swipeSession.findUnique({ where: { id: sessionId } });
 
     if (!session) {
       res.status(404).json({ error: 'Session not found' });
       return;
     }
 
-    const isSolo = session.type === 'solo';
-    const isOwner = isSolo
-      ? session.userId === req.userId
-      : session.couple?.user1Id === req.userId || session.couple?.user2Id === req.userId;
+    const isOwner = session.userId === req.userId;
 
     if (!isOwner) {
       res.status(403).json({ error: 'Not authorized' });
