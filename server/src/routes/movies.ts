@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { prisma } from '../app';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { searchMovies, findOrCreateMovieByTmdbId, TMDB_IMAGE_BASE } from '../services/tmdb';
+import { getInCinemaIds, attachInCinema } from '../services/cinemaStatus';
 
 
 const router = Router();
@@ -15,7 +16,10 @@ router.get('/search', authenticate, async (req: AuthRequest, res: Response) => {
     }
 
     const page = parseInt(req.query.page as string) || 1;
-    const { results, totalPages } = await searchMovies(query.trim(), page);
+    const [{ results, totalPages }, inCinemaSet] = await Promise.all([
+      searchMovies(query.trim(), page),
+      getInCinemaIds(),
+    ]);
 
     const movies = results.map((r) => ({
       tmdbId: r.id,
@@ -24,6 +28,7 @@ router.get('/search', authenticate, async (req: AuthRequest, res: Response) => {
       posterUrl: r.poster_path ? `${TMDB_IMAGE_BASE}${r.poster_path}` : null,
       overview: r.overview || null,
       rating: r.vote_average || null,
+      inCinema: inCinemaSet.has(r.id),
     }));
 
     res.json({ movies, totalPages, page });
@@ -60,7 +65,8 @@ router.post('/add', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
 
-    res.json({ movie });
+    const inCinemaSet = await getInCinemaIds();
+    res.json({ movie: attachInCinema(movie, inCinemaSet) });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to add movie' });
@@ -106,13 +112,21 @@ router.get('/mine', authenticate, async (req: AuthRequest, res: Response) => {
       if (filter === 'watched') where.watched = true;
     }
 
-    const userMovies = await prisma.userMovie.findMany({
-      where,
-      include: { movie: true },
-      orderBy: { createdAt: 'desc' },
-    });
+    const [userMovies, inCinemaSet] = await Promise.all([
+      prisma.userMovie.findMany({
+        where,
+        include: { movie: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+      getInCinemaIds(),
+    ]);
 
-    res.json({ movies: userMovies });
+    const decorated = userMovies.map((um) => ({
+      ...um,
+      movie: attachInCinema(um.movie, inCinemaSet),
+    }));
+
+    res.json({ movies: decorated });
   } catch {
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -132,15 +146,18 @@ router.get('/pool-size', authenticate, async (req: AuthRequest, res: Response) =
 router.patch('/:movieId/watched', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { watched } = req.body;
-    const userMovie = await prisma.userMovie.update({
-      where: { userId_movieId: { userId: req.userId!, movieId: req.params.movieId as string } },
-      data: {
-        watched: !!watched,
-        ...(watched ? { onWatchlist: false } : {}),
-      },
-      include: { movie: true },
-    });
-    res.json({ userMovie });
+    const [userMovie, inCinemaSet] = await Promise.all([
+      prisma.userMovie.update({
+        where: { userId_movieId: { userId: req.userId!, movieId: req.params.movieId as string } },
+        data: {
+          watched: !!watched,
+          ...(watched ? { onWatchlist: false } : {}),
+        },
+        include: { movie: true },
+      }),
+      getInCinemaIds(),
+    ]);
+    res.json({ userMovie: { ...userMovie, movie: attachInCinema(userMovie.movie, inCinemaSet) } });
   } catch {
     res.status(500).json({ error: 'Failed to update watched status' });
   }
@@ -149,15 +166,18 @@ router.patch('/:movieId/watched', authenticate, async (req: AuthRequest, res: Re
 router.post('/:movieId/rate', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { rating } = req.body;
-    const userMovie = await prisma.userMovie.update({
-      where: { userId_movieId: { userId: req.userId!, movieId: req.params.movieId as string } },
-      data: {
-        userRating: typeof rating === 'number' ? rating : null,
-        ...(typeof rating === 'number' ? { watched: true, onWatchlist: false } : {}),
-      },
-      include: { movie: true },
-    });
-    res.json({ userMovie });
+    const [userMovie, inCinemaSet] = await Promise.all([
+      prisma.userMovie.update({
+        where: { userId_movieId: { userId: req.userId!, movieId: req.params.movieId as string } },
+        data: {
+          userRating: typeof rating === 'number' ? rating : null,
+          ...(typeof rating === 'number' ? { watched: true, onWatchlist: false } : {}),
+        },
+        include: { movie: true },
+      }),
+      getInCinemaIds(),
+    ]);
+    res.json({ userMovie: { ...userMovie, movie: attachInCinema(userMovie.movie, inCinemaSet) } });
   } catch {
     res.status(500).json({ error: 'Failed to rate movie' });
   }
@@ -175,7 +195,8 @@ router.get('/tmdb/:tmdbId', authenticate, async (req: AuthRequest, res: Response
       res.status(404).json({ error: 'Movie not found' });
       return;
     }
-    res.json({ movie });
+    const inCinemaSet = await getInCinemaIds();
+    res.json({ movie: attachInCinema(movie, inCinemaSet) });
   } catch {
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -184,16 +205,17 @@ router.get('/tmdb/:tmdbId', authenticate, async (req: AuthRequest, res: Response
 router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const movieId = req.params.id as string;
-    const movie = await prisma.movie.findUnique({
-      where: { id: movieId },
-    });
+    const [movie, inCinemaSet] = await Promise.all([
+      prisma.movie.findUnique({ where: { id: movieId } }),
+      getInCinemaIds(),
+    ]);
 
     if (!movie) {
       res.status(404).json({ error: 'Movie not found' });
       return;
     }
 
-    res.json({ movie });
+    res.json({ movie: attachInCinema(movie, inCinemaSet) });
   } catch {
     res.status(500).json({ error: 'Internal server error' });
   }

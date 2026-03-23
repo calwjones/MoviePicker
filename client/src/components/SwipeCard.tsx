@@ -90,7 +90,7 @@ const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function SwipeCard
       <motion.div
         key={cardKey}
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0, x: 0, rotate: 0 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, transition: { duration: 0.1 } }}
         style={{ x, rotate, zIndex: 10 }}
         drag="x"

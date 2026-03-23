@@ -1,5 +1,6 @@
 import { prisma } from '../app';
 import { getTmdbRecommendations, TMDB_IMAGE_BASE } from './tmdb';
+import { getInCinemaIds } from './cinemaStatus';
 
 export interface ShapedRec {
   tmdbId: number;
@@ -9,6 +10,7 @@ export interface ShapedRec {
   overview: string | null;
   rating: number | null;
   seedTitles: string[];
+  inCinema: boolean;
 }
 
 type TmdbRec = Awaited<ReturnType<typeof getTmdbRecommendations>>[number];
@@ -17,6 +19,7 @@ export function scoreAndShape(
   recsBySeed: { seedTitle: string; recs: TmdbRec[] }[],
   knownTmdbIds: Set<number | null>,
   limit = 10,
+  inCinemaSet?: Set<number>,
 ): ShapedRec[] {
   const seedMap = new Map<number, string[]>();
   const recMap = new Map<number, TmdbRec>();
@@ -51,6 +54,7 @@ export function scoreAndShape(
       overview: r.overview || null,
       rating: r.vote_average || null,
       seedTitles: seedMap.get(r.id) ?? [],
+      inCinema: inCinemaSet ? inCinemaSet.has(r.id) : false,
     }));
 }
 
@@ -122,7 +126,7 @@ export async function buildForYouRecommendations(userId: string, limit = 20): Pr
   const pickedIds = picked.map((m) => m.tmdbId);
   const seedTitleMap = new Map(picked.map((m) => [m.tmdbId, m.title]));
 
-  const [recsBySeed, knownTmdbIds] = await Promise.all([
+  const [recsBySeed, knownTmdbIds, inCinemaSet] = await Promise.all([
     Promise.all(
       pickedIds.map(async (id) => ({
         seedTitle: seedTitleMap.get(id) ?? String(id),
@@ -130,9 +134,10 @@ export async function buildForYouRecommendations(userId: string, limit = 20): Pr
       })),
     ),
     getKnownTmdbIds(userId),
+    getInCinemaIds(),
   ]);
 
-  return scoreAndShape(recsBySeed, knownTmdbIds, limit);
+  return scoreAndShape(recsBySeed, knownTmdbIds, limit, inCinemaSet);
 }
 
 export async function buildSimilarRecommendations(
@@ -140,12 +145,13 @@ export async function buildSimilarRecommendations(
   userId: string,
   limit = 10,
 ): Promise<ShapedRec[]> {
-  const [recs, knownTmdbIds, seedMovie] = await Promise.all([
+  const [recs, knownTmdbIds, seedMovie, inCinemaSet] = await Promise.all([
     getTmdbRecommendations(tmdbId),
     getKnownTmdbIds(userId),
     prisma.movie.findUnique({ where: { tmdbId }, select: { title: true } }),
+    getInCinemaIds(),
   ]);
 
   const seedTitle = seedMovie?.title ?? String(tmdbId);
-  return scoreAndShape([{ seedTitle, recs }], knownTmdbIds, limit);
+  return scoreAndShape([{ seedTitle, recs }], knownTmdbIds, limit, inCinemaSet);
 }

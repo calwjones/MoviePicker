@@ -3,8 +3,21 @@ import { prisma } from '../app';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { discoverMovies, shapeTmdbSearchResult, TmdbSearchResult } from '../services/tmdb';
 import { mapGenreNamesToIds } from '../services/tmdbGenres';
+import { getInCinemaIds } from '../services/cinemaStatus';
 
 const router = Router();
+
+const BAYESIAN_PRIOR_VOTES = 500;
+const BAYESIAN_PRIOR_MEAN = 6.8;
+const TOP_BAND_RATIO = 0.6;
+const TMDB_PAGES_PER_POOL = 5;
+const TMDB_PAGE_WINDOW = 15;
+
+function weightedScore(voteAverage: number, voteCount: number): number {
+  const v = Math.max(0, voteCount);
+  const r = Math.max(0, voteAverage);
+  return (v / (v + BAYESIAN_PRIOR_VOTES)) * r + (BAYESIAN_PRIOR_VOTES / (v + BAYESIAN_PRIOR_VOTES)) * BAYESIAN_PRIOR_MEAN;
+}
 
 function shuffleInPlace<T>(arr: T[]): T[] {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -12,6 +25,12 @@ function shuffleInPlace<T>(arr: T[]): T[] {
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
+}
+
+function samplePages(windowSize: number, count: number): number[] {
+  const pool = Array.from({ length: windowSize }, (_, i) => i + 1);
+  shuffleInPlace(pool);
+  return pool.slice(0, Math.min(count, windowSize));
 }
 
 router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
@@ -28,6 +47,24 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
     const pageParam = req.query.page ? parseInt(req.query.page as string, 10) : 1;
     const safePage = !isNaN(pageParam) && pageParam > 0 ? pageParam : 1;
 
+    const providersParam = typeof req.query.providers === 'string' ? req.query.providers : '';
+    let watchProviderIds: number[] | undefined;
+    if (providersParam === 'none') {
+      watchProviderIds = undefined;
+    } else if (providersParam.length > 0) {
+      watchProviderIds = providersParam
+        .split(',')
+        .map((s) => parseInt(s.trim(), 10))
+        .filter((n) => !isNaN(n) && n > 0);
+    } else {
+      const user = await prisma.user.findUnique({
+        where: { id: req.userId! },
+        select: { preferredStreamingProviderIds: true },
+      });
+      const prefs = user?.preferredStreamingProviderIds ?? [];
+      watchProviderIds = prefs.length > 0 ? prefs : undefined;
+    }
+
     let releaseDateGte: string | undefined;
     let releaseDateLte: string | undefined;
     if (decade && !isNaN(decade)) {
@@ -35,21 +72,30 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
       releaseDateLte = `${decade + 9}-12-31`;
     }
 
-    const baseOpts = { genreIds, minRating, releaseDateGte, releaseDateLte, page: safePage };
+    const baseOpts = { genreIds, minRating, releaseDateGte, releaseDateLte, watchProviderIds };
 
-    const [popular, topRated, mostVoted] = await Promise.all([
-      discoverMovies({ ...baseOpts, sortBy: 'popularity.desc', voteCountGte: 500 }),
-      discoverMovies({ ...baseOpts, sortBy: 'vote_average.desc', voteCountGte: 1500 }),
-      discoverMovies({ ...baseOpts, sortBy: 'vote_count.desc', voteCountGte: 500 }),
+    const tmdbPages = samplePages(TMDB_PAGE_WINDOW, TMDB_PAGES_PER_POOL);
+
+    const [topRatedBatches, mostVotedBatches] = await Promise.all([
+      Promise.all(tmdbPages.map((p) => discoverMovies({ ...baseOpts, sortBy: 'vote_average.desc', voteCountGte: 1500, page: p }))),
+      Promise.all(tmdbPages.map((p) => discoverMovies({ ...baseOpts, sortBy: 'vote_count.desc', voteCountGte: BAYESIAN_PRIOR_VOTES, page: p }))),
     ]);
 
     const seen = new Set<number>();
     const merged: TmdbSearchResult[] = [];
-    for (const r of [...popular.results, ...topRated.results, ...mostVoted.results]) {
-      if (seen.has(r.id)) continue;
-      seen.add(r.id);
-      merged.push(r);
+    for (const batch of [...topRatedBatches, ...mostVotedBatches]) {
+      for (const r of batch.results) {
+        if (seen.has(r.id)) continue;
+        seen.add(r.id);
+        merged.push(r);
+      }
     }
+
+    const maxTmdbTotalPages = Math.max(
+      ...topRatedBatches.map((b) => b.totalPages),
+      ...mostVotedBatches.map((b) => b.totalPages),
+      1,
+    );
 
     const library = await prisma.userMovie.findMany({
       where: { userId: req.userId! },
@@ -57,17 +103,18 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
     });
     const excluded = new Set(library.map((r) => r.movie.tmdbId).filter((id): id is number => id !== null));
 
-    const movies = shuffleInPlace(merged.filter((r) => !excluded.has(r.id)))
-      .map(shapeTmdbSearchResult);
+    const ranked = merged
+      .filter((r) => !excluded.has(r.id))
+      .map((r) => ({ r, score: weightedScore(r.vote_average ?? 0, r.vote_count ?? 0) }))
+      .sort((a, b) => b.score - a.score);
 
-    const totalPages = Math.max(
-      1,
-      Math.min(
-        popular.totalPages || 1,
-        topRated.totalPages || 1,
-        mostVoted.totalPages || 1,
-      ),
-    );
+    const topBandSize = Math.max(1, Math.ceil(ranked.length * TOP_BAND_RATIO));
+    const topBand = ranked.slice(0, topBandSize).map((x) => x.r);
+
+    const inCinemaSet = await getInCinemaIds();
+    const movies = shuffleInPlace(topBand).map((r) => shapeTmdbSearchResult(r, inCinemaSet));
+
+    const totalPages = Math.max(1, Math.ceil(maxTmdbTotalPages / TMDB_PAGES_PER_POOL));
 
     res.json({ movies, totalPages, page: safePage });
   } catch (error) {

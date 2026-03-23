@@ -2,8 +2,18 @@ import { Router, Response } from 'express';
 import { prisma } from '../app';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { applyMovieFilters } from '../lib/filterMovies';
+import { getInCinemaIds, attachInCinema } from '../services/cinemaStatus';
 
 const router = Router();
+
+async function decorateSoloSession<T extends { movies?: { movie: { tmdbId: number | null } }[] } | null>(session: T): Promise<T> {
+  if (!session) return session;
+  const set = await getInCinemaIds();
+  return {
+    ...session,
+    movies: session.movies?.map((sm) => ({ ...sm, movie: attachInCinema(sm.movie, set) })),
+  } as T;
+}
 
 function parseBatchSize(value: unknown): number | null {
   if (value === null) return null;
@@ -31,7 +41,7 @@ router.get('/active', authenticate, async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    res.json({ session });
+    res.json({ session: await decorateSoloSession(session) });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal server error' });
@@ -100,7 +110,7 @@ router.post('/create', authenticate, async (req: AuthRequest, res: Response) => 
       },
     });
 
-    res.status(201).json({ session });
+    res.status(201).json({ session: await decorateSoloSession(session) });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' });

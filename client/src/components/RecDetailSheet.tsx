@@ -26,6 +26,7 @@ function recToMovie(rec: SearchResult): Movie {
     runtime: null,
     tmdbRating: rec.rating,
     streamingProviders: [],
+    inCinema: rec.inCinema,
   };
 }
 

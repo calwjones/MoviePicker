@@ -33,15 +33,17 @@ export default function MoviePoster({ posterUrl, title, className = '' }: MovieP
           src={blurUrl}
           alt=""
           aria-hidden="true"
-          className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl"
+          draggable={false}
+          className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl pointer-events-none select-none"
         />
       )}
       <img
         src={posterUrl}
         alt={title}
         loading="lazy"
+        draggable={false}
         onLoad={() => setLoaded(true)}
-        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 pointer-events-none select-none ${loaded ? 'opacity-100' : 'opacity-0'}`}
       />
     </div>
   );

@@ -5,9 +5,25 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 import { CLIENT_URL } from '../config';
 import { applyMovieFilters, MovieFilters } from '../lib/filterMovies';
 import { resolveSessionRole } from '../lib/resolveSessionRole';
+import { getInCinemaIds, attachInCinema } from '../services/cinemaStatus';
 import type { Movie } from '@prisma/client';
 
 const router = Router();
+
+type SessionWithMovies = {
+  movies?: { movie: Movie }[];
+  matches?: { movie: Movie }[];
+} & Record<string, unknown>;
+
+async function decorateSession<T extends SessionWithMovies | null>(session: T): Promise<T> {
+  if (!session) return session;
+  const set = await getInCinemaIds();
+  return {
+    ...session,
+    movies: session.movies?.map((sm) => ({ ...sm, movie: attachInCinema(sm.movie, set) })),
+    matches: session.matches?.map((m) => ({ ...m, movie: attachInCinema(m.movie, set) })),
+  } as T;
+}
 
 function shuffle<T>(arr: T[]): T[] {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -273,7 +289,7 @@ router.post('/:id/another-batch', authenticate, async (req: AuthRequest, res: Re
         where: { id: sessionId },
         include: { movies: { include: { movie: true } }, matches: { include: { movie: true } } },
       });
-      res.json({ added: 0, session: refreshed });
+      res.json({ added: 0, session: await decorateSession(refreshed) });
       return;
     }
 
@@ -293,13 +309,14 @@ router.post('/:id/another-batch', authenticate, async (req: AuthRequest, res: Re
       where: { id: sessionId },
       include: { movies: { include: { movie: true } }, matches: { include: { movie: true } } },
     });
+    const decoratedSession = await decorateSession(updatedSession);
 
     emit(`session:${sessionId}`, 'new-batch', {
       added: newMovies.length,
-      session: updatedSession,
+      session: decoratedSession,
     });
 
-    res.json({ added: newMovies.length, session: updatedSession });
+    res.json({ added: newMovies.length, session: decoratedSession });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal server error' });
@@ -321,7 +338,7 @@ router.get('/active', authenticate, async (req: AuthRequest, res: Response) => {
 
     if (groupSession) {
       const isUser1 = groupSession.userId === req.userId;
-      res.json({ session: groupSession, isUser1 });
+      res.json({ session: await decorateSession(groupSession), isUser1 });
       return;
     }
 
@@ -369,7 +386,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    res.json({ session, isUser1 });
+    res.json({ session: await decorateSession(session), isUser1 });
   } catch {
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -391,6 +408,7 @@ router.get('/history/all', authenticate, async (req: AuthRequest, res: Response)
       orderBy: { createdAt: 'desc' },
     });
 
+    const inCinemaSet = await getInCinemaIds();
     const history = sessions.map((s) => ({
       id: s.id,
       type: s.type,
@@ -400,7 +418,7 @@ router.get('/history/all', authenticate, async (req: AuthRequest, res: Response)
       matchCount: s.matches.length,
       matches: s.matches.map((m) => ({
         id: m.id,
-        movie: m.movie,
+        movie: attachInCinema(m.movie, inCinemaSet),
         watched: m.watched,
         watchedAt: m.watchedAt,
       })),

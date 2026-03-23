@@ -7,6 +7,7 @@ import { getErrorMessage } from '@/lib/errors';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import SkeletonList from '@/components/SkeletonList';
 import MoviePoster from '@/components/MoviePoster';
+import InCinemaBadge from '@/components/InCinemaBadge';
 import ConfirmModal from '@/components/ConfirmModal';
 import RecDetailSheet from '@/components/RecDetailSheet';
 import MovieDetailModal from '@/components/MovieDetailModal';
@@ -928,8 +929,13 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
                 className="relative group cursor-pointer"
                 onClick={() => { setSelectedMovie(um.movie); setSelectedUserMovie(um); }}
               >
-                <div className="aspect-[2/3] rounded-xl overflow-hidden bg-card transition-all duration-200 group-hover:ring-2 group-hover:ring-coral/50 group-hover:scale-[1.03] group-hover:shadow-lg group-hover:shadow-coral/10">
+                <div className="relative aspect-[2/3] rounded-xl overflow-hidden bg-card transition-all duration-200 group-hover:ring-2 group-hover:ring-coral/50 group-hover:scale-[1.03] group-hover:shadow-lg group-hover:shadow-coral/10">
                   <MoviePoster posterUrl={um.movie.posterUrl} title={um.movie.title} />
+                  {um.movie.inCinema && (
+                    <div className="absolute top-1.5 left-1.5">
+                      <InCinemaBadge size="sm" />
+                    </div>
+                  )}
                 </div>
                 <p className="text-xs mt-1 truncate">{um.movie.title}</p>
                 <p className="text-xs text-cream-dim">

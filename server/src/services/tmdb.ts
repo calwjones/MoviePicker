@@ -280,8 +280,9 @@ export async function getTopRatedMovies(page = 1): Promise<TmdbSearchResult[]> {
   }
 }
 
-export async function getNowPlayingMovies(page = 1): Promise<TmdbSearchResult[]> {
+export async function getNowPlayingMovies(page = 1, region?: string): Promise<TmdbSearchResult[]> {
   const params = new URLSearchParams({ api_key: getApiKey(), page: String(page) });
+  if (region) params.set('region', region);
   try {
     const res = await rateLimitedFetch(`${TMDB_BASE}/movie/now_playing?${params}`);
     if (!res.ok) return [];
@@ -301,6 +302,8 @@ export interface DiscoverParams {
   voteCountGte?: number;
   sortBy?: string;
   page?: number;
+  watchProviderIds?: number[];
+  watchRegion?: string;
 }
 
 export async function discoverMovies(opts: DiscoverParams): Promise<{ results: TmdbSearchResult[]; totalPages: number }> {
@@ -319,6 +322,11 @@ export async function discoverMovies(opts: DiscoverParams): Promise<{ results: T
   }
   if (opts.releaseDateGte) params.set('primary_release_date.gte', opts.releaseDateGte);
   if (opts.releaseDateLte) params.set('primary_release_date.lte', opts.releaseDateLte);
+  if (opts.watchProviderIds && opts.watchProviderIds.length > 0) {
+    params.set('with_watch_providers', opts.watchProviderIds.join('|'));
+    params.set('watch_region', opts.watchRegion || 'GB');
+    params.set('with_watch_monetization_types', 'flatrate');
+  }
 
   try {
     const res = await rateLimitedFetch(`${TMDB_BASE}/discover/movie?${params}`);
@@ -330,7 +338,7 @@ export async function discoverMovies(opts: DiscoverParams): Promise<{ results: T
   }
 }
 
-export function shapeTmdbSearchResult(r: TmdbSearchResult) {
+export function shapeTmdbSearchResult(r: TmdbSearchResult, inCinemaSet?: Set<number>) {
   return {
     tmdbId: r.id,
     title: r.title,
@@ -338,6 +346,7 @@ export function shapeTmdbSearchResult(r: TmdbSearchResult) {
     posterUrl: r.poster_path ? `${TMDB_IMAGE_BASE}${r.poster_path}` : null,
     overview: r.overview || null,
     rating: r.vote_average || null,
+    inCinema: inCinemaSet ? inCinemaSet.has(r.id) : false,
   };
 }
 

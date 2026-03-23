@@ -8,6 +8,7 @@ import SkeletonCard from '@/components/SkeletonCard';
 import MoviePoster from '@/components/MoviePoster';
 import MovieDetailModal from '@/components/MovieDetailModal';
 import SwipeCard, { type SwipeCardHandle } from '@/components/SwipeCard';
+import InCinemaBadge from '@/components/InCinemaBadge';
 
 interface SwipeViewProps {
   movies: SessionMovie[];
@@ -21,6 +22,8 @@ interface SwipeViewProps {
   done: boolean;
   headerRight?: React.ReactNode;
   doneContent: React.ReactNode;
+  onExpand?: (movie: SessionMovie['movie']) => void;
+  detailLoading?: boolean;
 }
 
 export default function SwipeView({
@@ -35,6 +38,8 @@ export default function SwipeView({
   done,
   headerRight,
   doneContent,
+  onExpand,
+  detailLoading,
 }: SwipeViewProps) {
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
@@ -186,7 +191,7 @@ export default function SwipeView({
           ref={cardRef}
           cardKey={currentMovie.id}
           onSwipe={onSwipe}
-          onTap={() => setExpanded(true)}
+          onTap={() => { setExpanded(true); onExpand?.(currentMovie); }}
           enableHaptics
           className="relative w-full max-w-md lg:max-w-lg shrink-0 rounded-3xl overflow-hidden shadow-2xl cursor-grab active:cursor-grabbing aspect-[2/3]"
         >
@@ -208,6 +213,12 @@ export default function SwipeView({
           )}
 
           <div className="absolute inset-0 bg-gradient-to-t from-charcoal via-charcoal/40 to-transparent" />
+
+          {currentMovie.inCinema && (
+            <div className="absolute top-4 left-4 z-10 pointer-events-none">
+              <InCinemaBadge />
+            </div>
+          )}
 
           <div className="absolute bottom-0 left-0 right-0 p-6 z-10 pointer-events-none">
             <h2
@@ -246,6 +257,7 @@ export default function SwipeView({
       <MovieDetailModal
         movie={currentMovie}
         open={expanded}
+        loading={detailLoading}
         onClose={() => setExpanded(false)}
       />
 

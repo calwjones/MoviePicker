@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { browseApi, movieApi } from '@/lib/api';
 import MoviePoster from '@/components/MoviePoster';
+import InCinemaBadge from '@/components/InCinemaBadge';
 import RecDetailSheet from '@/components/RecDetailSheet';
 import type { SearchResult } from '@shared/types';
 
@@ -113,19 +114,28 @@ export default function BrowseTab({ addToast }: BrowseTabProps) {
 }
 
 function BrowseRowView({ row, onSelect }: { row: BrowseRow; onSelect: (rec: SearchResult) => void }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollLeft = 0;
+  }, [row.movies]);
   if (row.movies.length === 0) return null;
   return (
     <div className="glass rounded-2xl p-4">
       <h3 className="text-sm font-semibold text-danger uppercase tracking-wider mb-3">{row.title}</h3>
-      <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x">
+      <div ref={scrollRef} className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x">
         {row.movies.map((rec) => (
           <div
             key={rec.tmdbId}
             className="flex-shrink-0 w-28 snap-start group cursor-pointer"
             onClick={() => onSelect(rec)}
           >
-            <div className="w-28 aspect-[2/3] rounded-xl overflow-hidden bg-card mb-2 shadow-lg group-hover:shadow-coral/20 group-hover:scale-[1.03] transition-all">
+            <div className="relative w-28 aspect-[2/3] rounded-xl overflow-hidden bg-card mb-2 shadow-lg group-hover:shadow-coral/20 group-hover:scale-[1.03] transition-all">
               <MoviePoster posterUrl={rec.posterUrl} title={rec.title} />
+              {rec.inCinema && (
+                <div className="absolute top-1.5 left-1.5">
+                  <InCinemaBadge size="sm" />
+                </div>
+              )}
             </div>
             <p className="text-xs font-medium truncate">{rec.title}</p>
             <p className="text-cream-dim text-[10px]">

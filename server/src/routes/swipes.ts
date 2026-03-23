@@ -3,26 +3,30 @@ import { prisma } from '../app';
 import { emit } from '../services/emitter';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { resolveSessionRole } from '../lib/resolveSessionRole';
+import { getInCinemaIds, attachInCinema } from '../services/cinemaStatus';
 
 const router = Router();
 
 async function getCompromises(sessionId: string) {
-  const oneSided = await prisma.sessionMovie.findMany({
-    where: {
-      sessionId,
-      OR: [
-        { user1Swipe: 'right', user2Swipe: 'left' },
-        { user1Swipe: 'left', user2Swipe: 'right' },
-      ],
-    },
-    include: { movie: true },
-    orderBy: { movie: { tmdbRating: 'desc' } },
-    take: 3,
-  });
+  const [oneSided, inCinemaSet] = await Promise.all([
+    prisma.sessionMovie.findMany({
+      where: {
+        sessionId,
+        OR: [
+          { user1Swipe: 'right', user2Swipe: 'left' },
+          { user1Swipe: 'left', user2Swipe: 'right' },
+        ],
+      },
+      include: { movie: true },
+      orderBy: { movie: { tmdbRating: 'desc' } },
+      take: 3,
+    }),
+    getInCinemaIds(),
+  ]);
   return oneSided.map((sm) => ({
     id: sm.id,
     movieId: sm.movieId,
-    movie: sm.movie,
+    movie: attachInCinema(sm.movie, inCinemaSet),
   }));
 }
 
@@ -220,10 +224,14 @@ router.post('/done', authenticate, async (req: AuthRequest, res: Response) => {
         data: { status: 'completed' },
       });
 
-      const matches = await prisma.match.findMany({
-        where: { sessionId },
-        include: { movie: true },
-      });
+      const [rawMatches, inCinemaSet] = await Promise.all([
+        prisma.match.findMany({
+          where: { sessionId },
+          include: { movie: true },
+        }),
+        getInCinemaIds(),
+      ]);
+      const matches = rawMatches.map((m) => ({ ...m, movie: attachInCinema(m.movie, inCinemaSet) }));
 
       const compromises = (!isSolo && matches.length === 0)
         ? await getCompromises(sessionId)
@@ -271,10 +279,14 @@ router.get('/matches/:sessionId', authenticate, async (req: AuthRequest, res: Re
       return;
     }
 
-    const matches = await prisma.match.findMany({
-      where: { sessionId: sid },
-      include: { movie: true },
-    });
+    const [rawMatches, inCinemaSet] = await Promise.all([
+      prisma.match.findMany({
+        where: { sessionId: sid },
+        include: { movie: true },
+      }),
+      getInCinemaIds(),
+    ]);
+    const matches = rawMatches.map((m) => ({ ...m, movie: attachInCinema(m.movie, inCinemaSet) }));
 
     const compromises = (!isSolo && matches.length === 0)
       ? await getCompromises(sid)
@@ -312,13 +324,16 @@ router.post('/matches/:matchId/watched', authenticate, async (req: AuthRequest, 
       return;
     }
 
-    const updated = await prisma.match.update({
-      where: { id: matchId },
-      data: { watched: true, watchedAt: new Date() },
-      include: { movie: true },
-    });
+    const [updated, inCinemaSet] = await Promise.all([
+      prisma.match.update({
+        where: { id: matchId },
+        data: { watched: true, watchedAt: new Date() },
+        include: { movie: true },
+      }),
+      getInCinemaIds(),
+    ]);
 
-    res.json({ match: updated });
+    res.json({ match: { ...updated, movie: attachInCinema(updated.movie, inCinemaSet) } });
   } catch {
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -357,13 +372,16 @@ router.post('/matches/:matchId/rate', authenticate, async (req: AuthRequest, res
     }
 
     const updateField = isUser1 ? 'user1Rating' as const : 'user2Rating' as const;
-    const updated = await prisma.match.update({
-      where: { id: matchId },
-      data: { [updateField]: rating },
-      include: { movie: true },
-    });
+    const [updated, inCinemaSet] = await Promise.all([
+      prisma.match.update({
+        where: { id: matchId },
+        data: { [updateField]: rating },
+        include: { movie: true },
+      }),
+      getInCinemaIds(),
+    ]);
 
-    res.json({ match: updated });
+    res.json({ match: { ...updated, movie: attachInCinema(updated.movie, inCinemaSet) } });
   } catch {
     res.status(500).json({ error: 'Internal server error' });
   }

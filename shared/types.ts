@@ -17,6 +17,7 @@ export interface Movie {
   runtime: number | null;
   tmdbRating: number | null;
   streamingProviders: StreamingProvider[];
+  inCinema?: boolean;
 }
 
 export interface UserMovie {
@@ -38,6 +39,7 @@ export interface SearchResult {
   overview: string | null;
   rating: number | null;
   seedTitles?: string[];
+  inCinema?: boolean;
 }
 
 export interface SessionMovie {

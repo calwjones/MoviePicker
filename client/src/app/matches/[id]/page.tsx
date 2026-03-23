@@ -8,6 +8,7 @@ import { useAuthGuard } from '@/hooks/useAuthGuard';
 import { swipeApi } from '@/lib/api';
 import type { Movie, StreamingProvider } from '@shared/types';
 import SkeletonList from '@/components/SkeletonList';
+import InCinemaBadge from '@/components/InCinemaBadge';
 import GuestConvertModal from '@/components/GuestConvertModal';
 
 interface Match {
@@ -221,6 +222,11 @@ export default function MatchesPage() {
               <div className="absolute top-4 left-4 px-3 py-1 bg-coral rounded-full">
                 <span className="text-charcoal text-xs font-bold">YOUR PICK</span>
               </div>
+              {movie.inCinema && (
+                <div className="absolute top-4 right-4">
+                  <InCinemaBadge />
+                </div>
+              )}
             </div>
 
             <div className="h-4 ticket-edge" />
@@ -344,6 +350,11 @@ export default function MatchesPage() {
                   </div>
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-card to-transparent" />
+                {match.movie.inCinema && (
+                  <div className="absolute top-2 left-2">
+                    <InCinemaBadge size="sm" />
+                  </div>
+                )}
                 <div className="absolute bottom-2 left-2 right-2">
                   <p className="text-sm font-semibold truncate">{match.movie.title}</p>
                   <p className="text-xs text-cream-dim">{match.movie.year}</p>
