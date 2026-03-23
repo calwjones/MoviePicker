@@ -251,8 +251,8 @@ export async function getTmdbRecommendations(tmdbId: number): Promise<TmdbSearch
   }
 }
 
-export async function getTrendingMovies(): Promise<TmdbSearchResult[]> {
-  const params = new URLSearchParams({ api_key: getApiKey() });
+export async function getTrendingMovies(page = 1): Promise<TmdbSearchResult[]> {
+  const params = new URLSearchParams({ api_key: getApiKey(), page: String(page) });
   try {
     const res = await rateLimitedFetch(`${TMDB_BASE}/trending/movie/week?${params}`);
     if (!res.ok) return [];
@@ -263,11 +263,12 @@ export async function getTrendingMovies(): Promise<TmdbSearchResult[]> {
   }
 }
 
-export async function getTopRatedMovies(): Promise<TmdbSearchResult[]> {
+export async function getTopRatedMovies(page = 1): Promise<TmdbSearchResult[]> {
   const params = new URLSearchParams({
     api_key: getApiKey(),
     'vote_count.gte': '1000',
     sort_by: 'vote_average.desc',
+    page: String(page),
   });
   try {
     const res = await rateLimitedFetch(`${TMDB_BASE}/discover/movie?${params}`);
@@ -279,8 +280,8 @@ export async function getTopRatedMovies(): Promise<TmdbSearchResult[]> {
   }
 }
 
-export async function getNowPlayingMovies(): Promise<TmdbSearchResult[]> {
-  const params = new URLSearchParams({ api_key: getApiKey() });
+export async function getNowPlayingMovies(page = 1): Promise<TmdbSearchResult[]> {
+  const params = new URLSearchParams({ api_key: getApiKey(), page: String(page) });
   try {
     const res = await rateLimitedFetch(`${TMDB_BASE}/movie/now_playing?${params}`);
     if (!res.ok) return [];

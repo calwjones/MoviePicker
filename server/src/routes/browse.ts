@@ -21,6 +21,7 @@ interface BrowseRow {
 }
 
 const ROW_CAP = 20;
+const POOL_PAGES = 3;
 const PERSONALISED_HISTORY_FLOOR = 5;
 const EDITORIAL_CACHE_TTL_MS = 60 * 60 * 1000;
 
@@ -46,6 +47,34 @@ async function fetchCached(key: string, loader: () => Promise<TmdbSearchResult[]
   const results = await loader();
   if (results.length > 0) setCached(key, results);
   return results;
+}
+
+async function fetchPages(
+  fetcher: (page: number) => Promise<TmdbSearchResult[]>,
+  pages: number,
+): Promise<TmdbSearchResult[]> {
+  const batches = await Promise.all(
+    Array.from({ length: pages }, (_, i) => fetcher(i + 1)),
+  );
+  const seen = new Set<number>();
+  const combined: TmdbSearchResult[] = [];
+  for (const batch of batches) {
+    for (const r of batch) {
+      if (seen.has(r.id)) continue;
+      seen.add(r.id);
+      combined.push(r);
+    }
+  }
+  return combined;
+}
+
+function shuffled<T>(arr: readonly T[]): T[] {
+  const out = arr.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
 }
 
 async function getLibraryTmdbIds(userId: string): Promise<Set<number>> {
@@ -122,26 +151,31 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
     ]);
 
     const [trending, topRated, nowPlaying, genreRowResults, forYouRecs] = await Promise.all([
-      fetchCached('trending', getTrendingMovies),
-      fetchCached('top_rated', getTopRatedMovies),
-      fetchCached('now_playing', getNowPlayingMovies),
+      fetchCached('trending', () => fetchPages(getTrendingMovies, POOL_PAGES)),
+      fetchCached('top_rated', () => fetchPages(getTopRatedMovies, POOL_PAGES)),
+      fetchCached('now_playing', () => fetchPages(getNowPlayingMovies, POOL_PAGES)),
       Promise.all(
         topGenres.map((g) =>
-          fetchCached(`genre_${g.id}`, () => discoverMovies({ genreIds: [g.id] }).then((r) => r.results)),
+          fetchCached(`genre_${g.id}`, () =>
+            fetchPages(
+              (page) => discoverMovies({ genreIds: [g.id], page }).then((r) => r.results),
+              POOL_PAGES,
+            ),
+          ),
         ),
       ),
       historyCount > 0 ? buildForYouRecommendations(userId, ROW_CAP) : Promise.resolve([]),
     ]);
 
     const editorial: BrowseRow[] = [
-      { id: 'trending', title: 'Trending this week', movies: filterAndCap(trending, library).map(shapeTmdbSearchResult) },
-      { id: 'top_rated', title: 'All-time greats', movies: filterAndCap(topRated, library).map(shapeTmdbSearchResult) },
-      { id: 'now_playing', title: 'New releases', movies: filterAndCap(nowPlaying, library).map(shapeTmdbSearchResult) },
+      { id: 'trending', title: 'Trending this week', movies: filterAndCap(shuffled(trending), library).map(shapeTmdbSearchResult) },
+      { id: 'top_rated', title: 'All-time greats', movies: filterAndCap(shuffled(topRated), library).map(shapeTmdbSearchResult) },
+      { id: 'now_playing', title: 'New releases', movies: filterAndCap(shuffled(nowPlaying), library).map(shapeTmdbSearchResult) },
     ].filter((row) => row.movies.length > 0);
 
     const personalised: BrowseRow[] = [];
     topGenres.forEach((genre, i) => {
-      const filtered = filterAndCap(genreRowResults[i] ?? [], library);
+      const filtered = filterAndCap(shuffled(genreRowResults[i] ?? []), library);
       if (filtered.length === 0) return;
       personalised.push({
         id: `genre_${genre.id}`,
