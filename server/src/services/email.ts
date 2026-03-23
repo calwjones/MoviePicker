@@ -1,7 +1,7 @@
 import { CLIENT_URL } from '../config';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const FROM_EMAIL = process.env.EMAIL_FROM || 'MoviePicker <noreply@moviepicker.app>';
+const FROM_EMAIL = process.env.EMAIL_FROM || 'Matchsticked <noreply@matchsticked.com>';
 
 export interface EmailPayload {
   to: string;
@@ -53,7 +53,7 @@ export async function sendEmail(payload: EmailPayload, devUrl?: string): Promise
 function wrap(inner: string): string {
   return `
     <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; background: #1a1a1a; color: #e8e2d5; border-radius: 16px;">
-      <h1 style="font-size: 24px; color: #e8e2d5; margin: 0 0 16px;">MoviePicker</h1>
+      <h1 style="font-size: 24px; color: #e8e2d5; margin: 0 0 16px;">Matchsticked</h1>
       ${inner}
       <p style="margin-top: 32px; font-size: 12px; color: #9a9284;">If you didn't expect this email, you can safely ignore it.</p>
     </div>
@@ -65,11 +65,11 @@ export function sendVerificationEmail(to: string, token: string): Promise<void> 
   return sendEmail(
     {
       to,
-      subject: 'Verify your MoviePicker email',
+      subject: 'Verify your Matchsticked email',
       html: wrap(`
         <p>Welcome! Confirm your email to start picking movies.</p>
         <p style="margin: 24px 0;">
-          <a href="${link}" style="display: inline-block; background: #ff6b6b; color: #1a1a1a; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: 600;">Verify email</a>
+          <a href="${link}" style="display: inline-block; background: #FF6B3D; color: #1a1a1a; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: 600;">Verify email</a>
         </p>
         <p style="font-size: 12px; color: #9a9284;">Or copy this link: ${link}</p>
       `),
@@ -83,12 +83,12 @@ export function sendPasswordResetEmail(to: string, token: string): Promise<void>
   return sendEmail(
     {
       to,
-      subject: 'Reset your MoviePicker password',
+      subject: 'Reset your Matchsticked password',
       html: wrap(`
         <p>Someone asked to reset the password for this account.</p>
         <p>The reset link is valid for 15 minutes.</p>
         <p style="margin: 24px 0;">
-          <a href="${link}" style="display: inline-block; background: #ff6b6b; color: #1a1a1a; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: 600;">Reset password</a>
+          <a href="${link}" style="display: inline-block; background: #FF6B3D; color: #1a1a1a; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: 600;">Reset password</a>
         </p>
         <p style="font-size: 12px; color: #9a9284;">Or copy this link: ${link}</p>
       `),

@@ -7,6 +7,7 @@ import { useAuthGuard } from '@/hooks/useAuthGuard';
 import { swipeApi } from '@/lib/api';
 import { connectSocket, getSocket } from '@/lib/socket';
 import StreamingProvidersList from '@/components/StreamingProviders';
+import InCinemaBadge from '@/components/InCinemaBadge';
 
 interface Movie {
   id: string;
@@ -19,6 +20,7 @@ interface Movie {
   runtime: number | null;
   tmdbRating: number | null;
   streamingProviders: { name: string; type: string; logoUrl: string }[];
+  inCinema?: boolean;
 }
 
 interface Match {
@@ -157,7 +159,7 @@ export default function RoulettePage() {
 
     ctx.beginPath();
     ctx.arc(center, center, outerRadius, 0, 2 * Math.PI);
-    ctx.strokeStyle = 'rgba(255, 107, 107, 0.15)';
+    ctx.strokeStyle = 'rgba(161, 47, 10, 0.15)';
     ctx.lineWidth = 1;
     ctx.stroke();
 
@@ -229,7 +231,7 @@ export default function RoulettePage() {
 
     ctx.beginPath();
     ctx.arc(center, center, hubRadius + 4, 0, 2 * Math.PI);
-    ctx.fillStyle = 'rgba(255, 107, 107, 0.08)';
+    ctx.fillStyle = 'rgba(161, 47, 10, 0.08)';
     ctx.fill();
 
     const hubGrad = ctx.createRadialGradient(center, center, 0, center, center, hubRadius);
@@ -242,7 +244,7 @@ export default function RoulettePage() {
 
     ctx.beginPath();
     ctx.arc(center, center, hubRadius, 0, 2 * Math.PI);
-    ctx.strokeStyle = 'rgba(255, 107, 107, 0.4)';
+    ctx.strokeStyle = 'rgba(161, 47, 10, 0.4)';
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
@@ -255,12 +257,12 @@ export default function RoulettePage() {
     ctx.closePath();
 
     const pGrad = ctx.createLinearGradient(center, 0, center, pointerH + 2);
-    pGrad.addColorStop(0, '#FF6B6B');
-    pGrad.addColorStop(1, '#E04545');
+    pGrad.addColorStop(0, '#A12F0A');
+    pGrad.addColorStop(1, '#7A2308');
     ctx.fillStyle = pGrad;
     ctx.fill();
 
-    ctx.shadowColor = 'rgba(255, 107, 107, 0.4)';
+    ctx.shadowColor = 'rgba(161, 47, 10, 0.4)';
     ctx.shadowBlur = 8;
     ctx.fill();
     ctx.shadowColor = 'transparent';
@@ -321,8 +323,8 @@ export default function RoulettePage() {
             className="relative mb-6 rounded-full"
             style={{
               boxShadow: spinning
-                ? '0 0 60px rgba(255, 107, 107, 0.15), 0 0 120px rgba(255, 107, 107, 0.05)'
-                : '0 0 40px rgba(255, 107, 107, 0.08), 0 0 80px rgba(255, 107, 107, 0.03)',
+                ? '0 0 60px rgba(161, 47, 10, 0.15), 0 0 120px rgba(161, 47, 10, 0.05)'
+                : '0 0 40px rgba(161, 47, 10, 0.08), 0 0 80px rgba(161, 47, 10, 0.03)',
               transition: 'box-shadow 0.5s ease',
             }}
           >
@@ -344,7 +346,7 @@ export default function RoulettePage() {
               disabled={spinning || spinsLeft <= 0}
               className="py-4 px-16 bg-coral text-charcoal font-bold rounded-xl text-lg hover:bg-coral-dark transition-all disabled:opacity-40"
               style={{
-                boxShadow: spinning ? 'none' : '0 0 20px rgba(255, 107, 107, 0.2)',
+                boxShadow: spinning ? 'none' : '0 0 20px rgba(161, 47, 10, 0.2)',
               }}
             >
               {spinning ? 'Spinning...' : spinsLeft <= 0 ? 'No spins left' : 'SPIN'}
@@ -377,6 +379,11 @@ export default function RoulettePage() {
                   <div className="absolute top-4 left-4 px-3 py-1 bg-coral rounded-full">
                     <span className="text-charcoal text-xs font-bold">YOUR PICK</span>
                   </div>
+                  {winner.inCinema && (
+                    <div className="absolute top-4 right-4">
+                      <InCinemaBadge />
+                    </div>
+                  )}
                 </div>
 
                 <div className="h-4 ticket-edge" />

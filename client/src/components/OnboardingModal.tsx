@@ -21,7 +21,7 @@ const PATHS = [
   },
   {
     id: 'discover' as const,
-    title: 'Find something for tonight',
+    title: 'Find something for today',
     description: 'Start with filters, discover new movies, build a shortlist in minutes.',
   },
 ];
@@ -50,7 +50,7 @@ export default function OnboardingModal({ open, onClose, onPickPath }: Onboardin
                   className="text-2xl font-bold text-cream mb-1"
                   style={{ fontFamily: 'var(--font-playfair)' }}
                 >
-                  Welcome to MoviePicker
+                  Welcome to Matchsticked
                 </h2>
                 <p className="text-cream-dim text-sm">Pick a path to get started. You can always do the others later.</p>
               </div>

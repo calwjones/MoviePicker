@@ -3,7 +3,7 @@ import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 
 export const metadata: Metadata = {
-  title: "MoviePicker",
+  title: "Matchsticked",
   description: "Pick a movie together. No more scrolling debates.",
 };
 
