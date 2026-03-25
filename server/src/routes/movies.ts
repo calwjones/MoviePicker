@@ -115,25 +115,10 @@ router.get('/mine', authenticate, async (req: AuthRequest, res: Response) => {
 
 router.get('/pool-size', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const couple = await prisma.couple.findFirst({
-      where: { OR: [{ user1Id: req.userId! }, { user2Id: req.userId! }] },
+    const size = await prisma.userMovie.count({
+      where: { userId: req.userId!, onWatchlist: true, watched: false },
     });
-
-    if (!couple || !couple.user2Id) {
-      res.json({ size: 0 });
-      return;
-    }
-
-    const movies = await prisma.userMovie.findMany({
-      where: {
-        userId: { in: [couple.user1Id, couple.user2Id] },
-        onWatchlist: true,
-      },
-      select: { movieId: true },
-    });
-
-    const uniqueIds = new Set(movies.map((m: { movieId: string }) => m.movieId));
-    res.json({ size: uniqueIds.size });
+    res.json({ size });
   } catch {
     res.status(500).json({ error: 'Internal server error' });
   }

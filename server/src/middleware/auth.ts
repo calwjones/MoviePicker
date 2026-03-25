@@ -6,8 +6,6 @@ export interface AuthRequest extends Request {
   userId?: string;
   isGuest?: boolean;
   guestId?: string;
-  couple?: { id: string; user1Id: string; user2Id: string | null; inviteCode: string; createdAt: Date };
-  isUser1?: boolean;
 }
 
 export function authenticate(req: AuthRequest, res: Response, next: NextFunction): void {

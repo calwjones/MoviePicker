@@ -80,7 +80,6 @@ router.post('/create', authenticate, async (req: AuthRequest, res: Response) => 
       data: {
         type: 'solo',
         userId: req.userId,
-        coupleId: null,
         status: 'swiping',
         filters: filters || {},
         movies: {

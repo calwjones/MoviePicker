@@ -39,18 +39,6 @@ export interface SearchResult {
   rating: number | null;
 }
 
-export interface CoupleUser {
-  id: string;
-  displayName: string;
-}
-
-export interface Couple {
-  id: string;
-  inviteCode: string;
-  user1: CoupleUser;
-  user2: CoupleUser | null;
-}
-
 export interface SessionMovie {
   id: string;
   movieId: string;
