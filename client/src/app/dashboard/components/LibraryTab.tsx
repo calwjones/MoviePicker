@@ -10,7 +10,7 @@ import MoviePoster from '@/components/MoviePoster';
 import ConfirmModal from '@/components/ConfirmModal';
 import StarRating from '@/components/StarRating';
 import StreamingProvidersList from '@/components/StreamingProviders';
-import type { Couple, Movie, UserMovie, SearchResult } from '@shared/types';
+import type { Movie, UserMovie, SearchResult } from '@shared/types';
 
 const GENRE_OPTIONS = [
   'Action', 'Adventure', 'Animation', 'Comedy', 'Crime', 'Documentary',
@@ -23,11 +23,10 @@ type SortField = 'dateAdded' | 'year' | 'runtime' | 'tmdbRating' | 'userRating';
 type SortDir = 'asc' | 'desc';
 
 interface LibraryTabProps {
-  couple: Couple | null;
   addToast: (message: string) => void;
 }
 
-export default function LibraryTab({ couple, addToast }: LibraryTabProps) {
+export default function LibraryTab({ addToast }: LibraryTabProps) {
   // Library state
   const [watchlist, setWatchlist] = useState<UserMovie[]>([]);
   const [libraryLoading, setLibraryLoading] = useState(false);
@@ -205,7 +204,6 @@ export default function LibraryTab({ couple, addToast }: LibraryTabProps) {
   };
 
   const handleRateMovie = async (um: UserMovie, rating: number) => {
-    // Convert 5-star scale to 0-10
     const ratingValue = rating > 0 ? rating : null;
     try {
       const res = await movieApi.rate(um.movieId, ratingValue);
@@ -521,50 +519,48 @@ export default function LibraryTab({ couple, addToast }: LibraryTabProps) {
       </div>
 
       {/* For You Recommendations */}
-      {couple?.user2 && (
-        <div className="glass rounded-2xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-danger uppercase tracking-wider">For You</h3>
-            <button
-              onClick={loadRecommendations}
-              disabled={recsLoading}
-              className="text-cream-dim text-xs hover:text-cream transition-colors"
-            >
-              {recsLoading ? 'Loading...' : recommendations.length > 0 ? 'Refresh' : 'Get Recommendations'}
-            </button>
-          </div>
-          {recommendations.length > 0 ? (
-            <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x">
-              {recommendations.map((rec) => (
-                <div
-                  key={rec.tmdbId}
-                  className="flex-shrink-0 w-28 snap-start group"
-                >
-                  <div className="w-28 aspect-[2/3] rounded-xl overflow-hidden bg-card mb-2 shadow-lg group-hover:shadow-coral/20 transition-all">
-                    <MoviePoster posterUrl={rec.posterUrl} title={rec.title} />
-                  </div>
-                  <p className="text-xs font-medium truncate">{rec.title}</p>
-                  <p className="text-cream-dim text-[10px]">
-                    {rec.year}{rec.rating ? ` · ${rec.rating.toFixed(1)}★` : ''}
-                  </p>
-                  <button
-                    onClick={() => handleAddRecommendation(rec)}
-                    className="text-danger text-[10px] hover:underline mt-0.5"
-                  >
-                    + Add to Watchlist
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : !recsLoading ? (
-            <p className="text-cream-dim text-xs">Complete swipe sessions to get personalised recommendations based on your matches.</p>
-          ) : (
-            <div className="flex items-center justify-center py-4">
-              <LoadingSpinner size="sm" />
-            </div>
-          )}
+      <div className="glass rounded-2xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-danger uppercase tracking-wider">For You</h3>
+          <button
+            onClick={loadRecommendations}
+            disabled={recsLoading}
+            className="text-cream-dim text-xs hover:text-cream transition-colors"
+          >
+            {recsLoading ? 'Loading...' : recommendations.length > 0 ? 'Refresh' : 'Get Recommendations'}
+          </button>
         </div>
-      )}
+        {recommendations.length > 0 ? (
+          <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x">
+            {recommendations.map((rec) => (
+              <div
+                key={rec.tmdbId}
+                className="flex-shrink-0 w-28 snap-start group"
+              >
+                <div className="w-28 aspect-[2/3] rounded-xl overflow-hidden bg-card mb-2 shadow-lg group-hover:shadow-coral/20 transition-all">
+                  <MoviePoster posterUrl={rec.posterUrl} title={rec.title} />
+                </div>
+                <p className="text-xs font-medium truncate">{rec.title}</p>
+                <p className="text-cream-dim text-[10px]">
+                  {rec.year}{rec.rating ? ` · ${rec.rating.toFixed(1)}★` : ''}
+                </p>
+                <button
+                  onClick={() => handleAddRecommendation(rec)}
+                  className="text-danger text-[10px] hover:underline mt-0.5"
+                >
+                  + Add to Watchlist
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : !recsLoading ? (
+          <p className="text-cream-dim text-xs">Complete swipe sessions to get personalised recommendations based on your matches.</p>
+        ) : (
+          <div className="flex items-center justify-center py-4">
+            <LoadingSpinner size="sm" />
+          </div>
+        )}
+      </div>
 
       {/* Search bar */}
       <div className="glass rounded-2xl p-4">
