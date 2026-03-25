@@ -10,6 +10,7 @@ import { connectSocket, getSocket } from '@/lib/socket';
 import { getBaseName } from '@/components/StreamingProviders';
 import MoodPicker, { MOOD_PRESETS, type MoodPreset } from '@/components/MoodPicker';
 import { DECADE_OPTIONS } from '@/lib/decades';
+import { useAuth } from '@/context/AuthContext';
 import type { Filters } from '@shared/types';
 
 const GENRE_OPTIONS = [
@@ -23,6 +24,8 @@ interface ProviderChip {
   logoUrl: string;
   displayPriority: number;
 }
+
+type ProviderIdMap = Record<string, number>;
 
 const PREFERRED_PROVIDERS = [
   'Netflix',
@@ -72,12 +75,14 @@ interface SwipeTabProps {
 
 export default function SwipeTab({ addToast }: SwipeTabProps) {
   const router = useRouter();
+  const { user } = useAuth();
 
   const [poolSize, setPoolSize] = useState<number>(0);
   const [poolSizeLoading, setPoolSizeLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [activeMood, setActiveMood] = useState<string | null>(null);
   const [streamingProviders, setStreamingProviders] = useState<ProviderChip[]>([]);
+  const [providerIdByBase, setProviderIdByBase] = useState<ProviderIdMap>({});
   const [providersExpanded, setProvidersExpanded] = useState(false);
   const [sessionLoading, setSessionLoading] = useState(false);
   const [soloLoading, setSoloLoading] = useState(false);
@@ -142,14 +147,39 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
           providerApi.list(),
         ]);
         setPoolSize(poolRes.data.size);
-        const raw = provRes.data.providers as { name: string; logoUrl: string; displayPriority?: number }[];
+        const raw = provRes.data.providers as { id: number; name: string; logoUrl: string; displayPriority?: number }[];
         const seen = new Map<string, ProviderChip>();
+        const idToBase = new Map<number, string>();
+        const baseToId: ProviderIdMap = {};
         for (const p of raw) {
           const base = getBaseName(p.name);
+          idToBase.set(p.id, base);
           const priority = p.displayPriority ?? 9999;
           const existing = seen.get(base);
           if (!existing || priority < existing.displayPriority) {
             seen.set(base, { name: base, logoUrl: p.logoUrl, displayPriority: priority });
+            baseToId[base] = p.id;
+          } else if (baseToId[base] == null) {
+            baseToId[base] = p.id;
+          }
+        }
+        setProviderIdByBase(baseToId);
+        if (
+          !localStorage.getItem('moviepicker_filters')
+          && user?.preferredStreamingProviderIds
+          && user.preferredStreamingProviderIds.length > 0
+        ) {
+          const names = Array.from(
+            new Set(
+              user.preferredStreamingProviderIds
+                .map((id) => idToBase.get(id))
+                .filter((n): n is string => !!n),
+            ),
+          );
+          if (names.length > 0) {
+            setFilters((prev) => (prev.streamingProviders && prev.streamingProviders.length > 0
+              ? prev
+              : { ...prev, streamingProviders: names }));
           }
         }
         const preferredRank = (name: string) => {
@@ -174,7 +204,7 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
       finally { setPoolSizeLoading(false); }
     };
     run();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (!groupSessionId) return;
@@ -255,6 +285,22 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
 
   const handleStartSolo = () => {
     setMoodPickerOpen(true);
+  };
+
+  const handleStartDiscover = () => {
+    const params = new URLSearchParams();
+    if (filters.genres && filters.genres.length > 0) params.set('genres', filters.genres.join(','));
+    if (filters.decade) params.set('decade', filters.decade);
+    if (filters.minRating > 0) params.set('minRating', String(filters.minRating));
+    if (batchSize != null) params.set('batchSize', String(batchSize));
+    const names = filters.streamingProviders ?? [];
+    if (names.length > 0) {
+      const ids = names.map((n) => providerIdByBase[n]).filter((n): n is number => typeof n === 'number' && n > 0);
+      if (ids.length > 0) params.set('providers', ids.join(','));
+    } else {
+      params.set('providers', 'none');
+    }
+    router.push(`/discover?${params.toString()}`);
   };
 
   const handleMoodPick = (preset: MoodPreset) => {
@@ -622,7 +668,7 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
           </div>
           {poolSize === 0 && !poolSizeLoading && (
             <p className="text-center text-xs text-cream-dim">
-              Add movies to your library first — they form the swipe deck.
+              Library is empty — Solo and Watch Together need your library. Try Discover to swipe TMDb directly.
             </p>
           )}
           <div className="flex gap-3">
@@ -631,13 +677,13 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
               whileTap={{ scale: 0.98 }}
               onClick={handleStartSolo}
               disabled={anyLoading || poolSize === 0 || poolSizeLoading}
-              className="flex-1 py-4 bg-coral text-charcoal font-semibold rounded-xl text-lg hover:bg-coral-dark transition-all shadow-md hover:shadow-coral/40 disabled:opacity-50"
+              className="flex-1 py-4 bg-coral text-charcoal font-semibold rounded-xl text-base hover:bg-coral-dark transition-all shadow-md hover:shadow-coral/40 disabled:opacity-50"
             >
               {soloLoading ? (
                 <span className="flex items-center justify-center gap-2">
                   <LoadingSpinner size="sm" /> Starting...
                 </span>
-              ) : 'Solo Mode'}
+              ) : 'Solo'}
             </motion.button>
 
             <motion.button
@@ -645,13 +691,23 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
               whileTap={{ scale: 0.98 }}
               onClick={handleCreateGroup}
               disabled={anyLoading || poolSize === 0 || poolSizeLoading}
-              className="flex-1 py-4 glass text-danger font-semibold rounded-xl text-lg outline outline-1 outline-coral hover:bg-card-hover transition-all btn-glow disabled:opacity-50"
+              className="flex-1 py-4 glass text-danger font-semibold rounded-xl text-base outline outline-1 outline-coral hover:bg-card-hover transition-all btn-glow disabled:opacity-50"
             >
               {sessionLoading ? (
                 <span className="flex items-center justify-center gap-2">
                   <LoadingSpinner size="sm" /> Creating...
                 </span>
-              ) : 'Watch Together'}
+              ) : 'Together'}
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={handleStartDiscover}
+              disabled={anyLoading}
+              className="flex-1 py-4 glass text-coral font-semibold rounded-xl text-base outline outline-1 outline-coral/60 hover:bg-card-hover transition-all disabled:opacity-50"
+            >
+              Discover
             </motion.button>
           </div>
         </div>

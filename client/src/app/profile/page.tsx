@@ -1,18 +1,39 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { authApi } from '@/lib/api';
+import { authApi, providerApi } from '@/lib/api';
+import { getBaseName } from '@/components/StreamingProviders';
+
+interface ProviderOption {
+  id: number;
+  name: string;
+  baseName: string;
+  logoUrl: string;
+  displayPriority: number;
+}
+
+const PREFERRED_PROVIDERS = [
+  'Netflix', 'Disney Plus', 'Amazon Prime Video', 'Prime Video', 'Max', 'HBO Max',
+  'Apple TV Plus', 'MUBI', 'Paramount Plus', 'NOW', 'BBC iPlayer', 'ITVX',
+  'Channel 4', 'Crunchyroll', 'Hulu', 'Peacock', 'Shudder', 'BritBox',
+];
 
 export default function ProfilePage() {
-  const { user, loading, logout, updateDisplayName } = useAuth();
+  const { user, loading, logout, updateDisplayName, updatePreferredProviders } = useAuth();
   const router = useRouter();
 
   const [name, setName] = useState('');
   const [savingName, setSavingName] = useState(false);
   const [nameMsg, setNameMsg] = useState('');
   const [nameError, setNameError] = useState('');
+
+  const [providerOptions, setProviderOptions] = useState<ProviderOption[]>([]);
+  const [providersLoading, setProvidersLoading] = useState(true);
+  const [savingProviders, setSavingProviders] = useState(false);
+  const [providersError, setProvidersError] = useState('');
+  const [providersExpanded, setProvidersExpanded] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -36,6 +57,62 @@ export default function ProfilePage() {
   useEffect(() => {
     if (user) setName(user.displayName);
   }, [user]);
+
+  useEffect(() => {
+    let cancelled = false;
+    providerApi.list()
+      .then((res) => {
+        if (cancelled) return;
+        const raw = res.data.providers as { id: number; name: string; logoUrl: string; displayPriority?: number }[];
+        const byBase = new Map<string, ProviderOption>();
+        for (const p of raw) {
+          const baseName = getBaseName(p.name);
+          const priority = p.displayPriority ?? 9999;
+          const existing = byBase.get(baseName);
+          if (!existing || priority < existing.displayPriority) {
+            byBase.set(baseName, { id: p.id, name: p.name, baseName, logoUrl: p.logoUrl, displayPriority: priority });
+          }
+        }
+        const preferredRank = (n: string) => {
+          const idx = PREFERRED_PROVIDERS.indexOf(n);
+          return idx === -1 ? Infinity : idx;
+        };
+        const sorted = Array.from(byBase.values()).sort((a, b) => {
+          const ap = PREFERRED_PROVIDERS.includes(a.baseName);
+          const bp = PREFERRED_PROVIDERS.includes(b.baseName);
+          if (ap !== bp) return ap ? -1 : 1;
+          if (ap) return preferredRank(a.baseName) - preferredRank(b.baseName);
+          return a.displayPriority - b.displayPriority;
+        });
+        setProviderOptions(sorted);
+      })
+      .catch(() => { /* ignore */ })
+      .finally(() => { if (!cancelled) setProvidersLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const selectedIds = useMemo(() => new Set(user?.preferredStreamingProviderIds || []), [user]);
+
+  const toggleProvider = async (id: number) => {
+    if (savingProviders) return;
+    setProvidersError('');
+    const current = user?.preferredStreamingProviderIds || [];
+    const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
+    setSavingProviders(true);
+    try {
+      await updatePreferredProviders(next);
+    } catch (err: unknown) {
+      const apiErr = err as { response?: { data?: { error?: string } } };
+      setProvidersError(apiErr.response?.data?.error || 'Failed to update');
+    } finally {
+      setSavingProviders(false);
+    }
+  };
+
+  const visibleProviders = providersExpanded
+    ? providerOptions
+    : providerOptions.filter((p) => PREFERRED_PROVIDERS.includes(p.baseName) || selectedIds.has(p.id));
+  const hiddenCount = providerOptions.length - visibleProviders.length;
 
   if (loading || !user) {
     return (
@@ -144,6 +221,56 @@ export default function ProfilePage() {
             </button>
           </div>
         </div>
+      </div>
+
+      <div className="glass rounded-2xl p-6 space-y-3 mb-6">
+        <div>
+          <h2 className="text-lg font-semibold">My streaming services</h2>
+          <p className="text-cream-dim text-xs mt-1">
+            Discover and swipe filters default to these. You can override per session from the filter panel.
+          </p>
+        </div>
+        {providersLoading ? (
+          <p className="text-cream-dim text-xs">Loading services…</p>
+        ) : providerOptions.length === 0 ? (
+          <p className="text-cream-dim text-xs">Could not load services. Try again later.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {visibleProviders.map((p) => {
+              const selected = selectedIds.has(p.id);
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => toggleProvider(p.id)}
+                  disabled={savingProviders}
+                  className={`flex items-center gap-1.5 pl-1 pr-3 py-1 rounded-full text-xs transition-all hover:-translate-y-0.5 disabled:opacity-60 ${
+                    selected ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
+                  }`}
+                >
+                  <img src={p.logoUrl} alt="" className="w-5 h-5 rounded" />
+                  <span>{p.baseName}</span>
+                </button>
+              );
+            })}
+            {hiddenCount > 0 && !providersExpanded && (
+              <button
+                onClick={() => setProvidersExpanded(true)}
+                className="px-3 py-1 rounded-full text-xs glass text-cream-dim hover:text-cream transition-colors"
+              >
+                +{hiddenCount} more
+              </button>
+            )}
+            {providersExpanded && (
+              <button
+                onClick={() => setProvidersExpanded(false)}
+                className="px-3 py-1 rounded-full text-xs glass text-cream-dim hover:text-cream transition-colors"
+              >
+                Show less
+              </button>
+            )}
+          </div>
+        )}
+        {providersError && <p className="text-danger text-xs">{providersError}</p>}
       </div>
 
       <div className="glass rounded-2xl p-6 space-y-3 mb-6">

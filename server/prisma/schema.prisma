@@ -17,6 +17,7 @@ model User {
   emailVerificationToken   String?   @map("email_verification_token")
   passwordResetToken       String?   @map("password_reset_token")
   passwordResetExpiresAt   DateTime? @map("password_reset_expires_at")
+  preferredStreamingProviderIds Int[]  @default([]) @map("preferred_streaming_provider_ids")
   createdAt                DateTime  @default(now()) @map("created_at")
 
   userMovies        UserMovie[]

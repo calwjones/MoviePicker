@@ -10,6 +10,7 @@ interface User {
   avatarUrl?: string;
   emailVerified?: boolean;
   isGuest?: boolean;
+  preferredStreamingProviderIds?: number[];
 }
 
 interface AuthContextType {
@@ -19,6 +20,7 @@ interface AuthContextType {
   register: (email: string, password: string, displayName: string) => Promise<void>;
   logout: () => void;
   updateDisplayName: (displayName: string) => Promise<void>;
+  updatePreferredProviders: (providerIds: number[]) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -87,8 +89,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser((prev) => (prev ? { ...prev, displayName: res.data.user.displayName } : prev));
   };
 
+  const updatePreferredProviders = async (providerIds: number[]) => {
+    const res = await authApi.updatePreferredProviders(providerIds);
+    setUser((prev) => (prev ? { ...prev, preferredStreamingProviderIds: res.data.user.preferredStreamingProviderIds } : prev));
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, updateDisplayName }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, updateDisplayName, updatePreferredProviders }}>
       {children}
     </AuthContext.Provider>
   );

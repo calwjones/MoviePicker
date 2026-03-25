@@ -65,7 +65,13 @@ router.post('/register', async (req: Request, res: Response) => {
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
 
     res.status(201).json({
-      user: { id: user.id, email: user.email, displayName: user.displayName, emailVerified: user.emailVerified },
+      user: {
+        id: user.id,
+        email: user.email,
+        displayName: user.displayName,
+        emailVerified: user.emailVerified,
+        preferredStreamingProviderIds: user.preferredStreamingProviderIds,
+      },
       token,
     });
   } catch (error) {
@@ -212,7 +218,13 @@ router.post('/login', async (req: Request, res: Response) => {
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
 
     res.json({
-      user: { id: user.id, email: user.email, displayName: user.displayName, emailVerified: user.emailVerified },
+      user: {
+        id: user.id,
+        email: user.email,
+        displayName: user.displayName,
+        emailVerified: user.emailVerified,
+        preferredStreamingProviderIds: user.preferredStreamingProviderIds,
+      },
       token,
     });
   } catch (error) {
@@ -259,11 +271,20 @@ router.post('/change-password', authenticate, async (req: AuthRequest, res: Resp
   }
 });
 
+const USER_SELECT = {
+  id: true,
+  email: true,
+  displayName: true,
+  avatarUrl: true,
+  emailVerified: true,
+  preferredStreamingProviderIds: true,
+} as const;
+
 router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.userId },
-      select: { id: true, email: true, displayName: true, avatarUrl: true, emailVerified: true },
+      select: USER_SELECT,
     });
     if (!user) {
       res.status(404).json({ error: 'User not found' });
@@ -277,20 +298,39 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
 
 router.patch('/me', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const { displayName } = req.body;
-    if (typeof displayName !== 'string') {
-      res.status(400).json({ error: 'Display name is required' });
+    const { displayName, preferredStreamingProviderIds } = req.body;
+    const data: { displayName?: string; preferredStreamingProviderIds?: number[] } = {};
+
+    if (displayName !== undefined) {
+      if (typeof displayName !== 'string') {
+        res.status(400).json({ error: 'Display name must be a string' });
+        return;
+      }
+      const trimmed = displayName.trim();
+      if (trimmed.length < 1 || trimmed.length > 50) {
+        res.status(400).json({ error: 'Display name must be 1-50 characters' });
+        return;
+      }
+      data.displayName = trimmed;
+    }
+
+    if (preferredStreamingProviderIds !== undefined) {
+      if (!Array.isArray(preferredStreamingProviderIds) || !preferredStreamingProviderIds.every((n) => typeof n === 'number' && Number.isFinite(n))) {
+        res.status(400).json({ error: 'preferredStreamingProviderIds must be an array of numbers' });
+        return;
+      }
+      data.preferredStreamingProviderIds = preferredStreamingProviderIds.map((n) => Math.trunc(n));
+    }
+
+    if (Object.keys(data).length === 0) {
+      res.status(400).json({ error: 'No fields to update' });
       return;
     }
-    const trimmed = displayName.trim();
-    if (trimmed.length < 1 || trimmed.length > 50) {
-      res.status(400).json({ error: 'Display name must be 1-50 characters' });
-      return;
-    }
+
     const user = await prisma.user.update({
       where: { id: req.userId },
-      data: { displayName: trimmed },
-      select: { id: true, email: true, displayName: true, avatarUrl: true, emailVerified: true },
+      data,
+      select: USER_SELECT,
     });
     res.json({ user });
   } catch (error) {

@@ -46,6 +46,8 @@ export const authApi = {
   me: () => api.get('/auth/me'),
   updateProfile: (displayName: string) =>
     api.patch('/auth/me', { displayName }),
+  updatePreferredProviders: (preferredStreamingProviderIds: number[]) =>
+    api.patch('/auth/me', { preferredStreamingProviderIds }),
   changePassword: (currentPassword: string, newPassword: string) =>
     api.post('/auth/change-password', { currentPassword, newPassword }),
   verifyEmail: (token: string) => api.get('/auth/verify', { params: { token } }),
@@ -142,11 +144,16 @@ export const browseApi = {
 };
 
 export const discoverApi = {
-  movies: (params: { genres?: string[]; minRating?: number; decade?: string; page?: number }) =>
+  movies: (params: { genres?: string[]; minRating?: number; decade?: string; page?: number; providers?: number[] | 'none' }) =>
     api.get('/discover', {
       params: {
         ...params,
         genres: params.genres && params.genres.length > 0 ? params.genres.join(',') : undefined,
+        providers: params.providers === 'none'
+          ? 'none'
+          : params.providers && params.providers.length > 0
+            ? params.providers.join(',')
+            : undefined,
       },
     }),
 };
