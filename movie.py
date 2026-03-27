@@ -147,11 +147,11 @@ clear_screen()
 if game_quit:
     print("👋 Game quit. See you next time!")
 elif not yes_movies:
-    print("😢 Looks like you didn't agree on any movies tonight.")
+    print("😢 Looks like you didn't agree on any movies today.")
 elif len(yes_movies) == 1:
     winner = yes_movies[0]
     print("🎉 You have a clear winner! 🎉")
-    print(f"\nTonight's movie is: {winner['title']}")
+    print(f"\nToday's movie is: {winner['title']}")
 else:
     print("--- 🏆 FINAL SHOWDOWN 🏆 ---")
     print("You agreed on multiple movies! Here are the finalists:\n")
@@ -167,4 +167,4 @@ else:
 
     winner = random.choice(yes_movies)
     print("\n🎉 The winner of the tiebreak is... 🎉")
-    print(f"\nTonight's movie is: {winner['title']}")
+    print(f"\nToday's movie is: {winner['title']}")

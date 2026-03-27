@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useAuthGuard } from '@/hooks/useAuthGuard';
@@ -8,8 +8,10 @@ import { sessionApi, swipeApi } from '@/lib/api';
 import { getErrorMessage } from '@/lib/errors';
 import { enqueueSwipe, flushQueue, hasQueuedSwipes } from '@/lib/swipeQueue';
 import SwipeView from '@/components/SwipeView';
-import MoviePoster from '@/components/MoviePoster';
+import InCinemaBadge from '@/components/InCinemaBadge';
 import ToastContainer from '@/components/ToastContainer';
+import ClientRouletteWheel from '@/components/ClientRouletteWheel';
+import MatchesRevealView from '@/components/MatchesRevealView';
 import { useToast } from '@/hooks/useToast';
 import type { SessionMovie, Movie, StreamingProvider } from '@shared/types';
 
@@ -29,6 +31,10 @@ export default function SoloSessionPage() {
   const [winner, setWinner] = useState<SessionMovie | null>(null);
   const [batchLoading, setBatchLoading] = useState(false);
   const [batchExhausted, setBatchExhausted] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const [revealIndex, setRevealIndex] = useState(-1);
+  const [rouletteOpen, setRouletteOpen] = useState(false);
+  const revealTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const { toasts, addToast, removeToast } = useToast();
 
   useEffect(() => {
@@ -76,6 +82,28 @@ export default function SoloSessionPage() {
       setLoading(false);
     }).catch(() => router.push('/dashboard'));
   }, [sessionId, user, authLoading, router]);
+
+  useEffect(() => {
+    return () => {
+      revealTimers.current.forEach(clearTimeout);
+      revealTimers.current = [];
+    };
+  }, []);
+
+  const startReveal = useCallback(() => {
+    revealTimers.current.forEach(clearTimeout);
+    setRevealed(true);
+    setRevealIndex(-1);
+    revealTimers.current = shortlist.map((_, i) =>
+      setTimeout(() => setRevealIndex(i), (i + 1) * 350),
+    );
+  }, [shortlist]);
+
+  const revealAll = useCallback(() => {
+    revealTimers.current.forEach(clearTimeout);
+    revealTimers.current = [];
+    setRevealIndex(shortlist.length - 1);
+  }, [shortlist.length]);
 
   const handleSwipe = useCallback(async (direction: 'left' | 'right') => {
     if (currentIndex >= movies.length || swiping) return;
@@ -143,6 +171,10 @@ export default function SoloSessionPage() {
       setCurrentIndex(0);
       setUndoStack([]);
       setDone(false);
+      setWinner(null);
+      setRouletteOpen(false);
+      setRevealed(false);
+      setRevealIndex(-1);
     } catch (err) {
       addToast(getErrorMessage(err, 'Failed to load more movies'), { variant: 'error' });
     } finally {
@@ -150,19 +182,27 @@ export default function SoloSessionPage() {
     }
   };
 
-  const handlePickForTonight = () => {
+  const handlePickForToday = () => {
     if (shortlist.length === 0) return;
-    const pick = shortlist[Math.floor(Math.random() * shortlist.length)];
+    if (shortlist.length === 1) {
+      setWinner(shortlist[0]);
+      return;
+    }
+    setRouletteOpen(true);
+  };
+
+  const handleRouletteResult = (pick: SessionMovie) => {
     setWinner(pick);
   };
 
   const handlePickAgain = () => {
-    if (shortlist.length === 0) return;
-    const eligible = shortlist.length > 1 && winner
-      ? shortlist.filter((m) => m.movieId !== winner.movieId)
-      : shortlist;
-    const pick = eligible[Math.floor(Math.random() * eligible.length)];
-    setWinner(pick);
+    setWinner(null);
+    if (shortlist.length > 1) setRouletteOpen(true);
+  };
+
+  const handleBackToShortlist = () => {
+    setWinner(null);
+    setRouletteOpen(false);
   };
 
   const handleDoneExit = async () => {
@@ -175,8 +215,14 @@ export default function SoloSessionPage() {
       movie={winner.movie}
       canPickAgain={shortlist.length > 1}
       onPickAgain={handlePickAgain}
-      onBack={() => setWinner(null)}
+      onBack={handleBackToShortlist}
       onDone={handleDoneExit}
+    />
+  ) : rouletteOpen && shortlist.length >= 2 ? (
+    <RouletteStage
+      shortlist={shortlist}
+      onResult={handleRouletteResult}
+      onBack={handleBackToShortlist}
     />
   ) : shortlist.length === 0 ? (
     <EmptyShortlist
@@ -188,13 +234,41 @@ export default function SoloSessionPage() {
       batchExhausted={batchExhausted}
     />
   ) : (
-    <ShortlistResults
-      shortlist={shortlist}
-      onPickForTonight={handlePickForTonight}
-      onAnotherBatch={handleAnotherBatch}
-      onDone={handleDoneExit}
-      batchLoading={batchLoading}
-      batchExhausted={batchExhausted}
+    <MatchesRevealView
+      items={shortlist.map((sm) => ({ id: sm.id, movie: sm.movie }))}
+      title="Swiping complete!"
+      counterLine={`You have ${shortlist.length} pick${shortlist.length === 1 ? '' : 's'}`}
+      revealCTA={shortlist.length === 1 ? 'Reveal Your Pick' : 'Reveal Picks'}
+      revealed={revealed}
+      revealIndex={revealIndex}
+      onStartReveal={startReveal}
+      onRevealAll={revealAll}
+      postRevealTitle="Your Shortlist"
+      actions={
+        <>
+          <button
+            onClick={handlePickForToday}
+            className="w-full py-4 bg-coral text-charcoal font-bold rounded-xl text-lg hover:bg-coral-dark transition-colors"
+          >
+            {shortlist.length >= 2 ? 'Spin the Roulette' : 'Pick one for today'}
+          </button>
+          {!batchExhausted && (
+            <button
+              onClick={handleAnotherBatch}
+              disabled={batchLoading}
+              className="w-full py-3 glass rounded-xl text-cream-dim font-medium hover:text-cream transition-colors disabled:opacity-50"
+            >
+              {batchLoading ? 'Loading…' : 'Another batch'}
+            </button>
+          )}
+          <button
+            onClick={handleDoneExit}
+            className="w-full py-2.5 text-cream-dim/70 text-sm hover:text-cream transition-colors"
+          >
+            Done
+          </button>
+        </>
+      }
     />
   );
 
@@ -217,69 +291,25 @@ export default function SoloSessionPage() {
   );
 }
 
-function ShortlistResults({
+function RouletteStage({
   shortlist,
-  onPickForTonight,
-  onAnotherBatch,
-  onDone,
-  batchLoading,
-  batchExhausted,
+  onResult,
+  onBack,
 }: {
   shortlist: SessionMovie[];
-  onPickForTonight: () => void;
-  onAnotherBatch: () => void;
-  onDone: () => void;
-  batchLoading: boolean;
-  batchExhausted: boolean;
+  onResult: (sm: SessionMovie) => void;
+  onBack: () => void;
 }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="glass rounded-2xl p-6 space-y-4 w-full max-w-md lg:max-w-lg text-left"
-    >
-      <div>
-        <h2 className="text-lg font-semibold font-display">Your shortlist</h2>
-        <p className="text-cream-dim text-xs mt-1">
-          {shortlist.length} movie{shortlist.length === 1 ? '' : 's'} right-swiped
-        </p>
-      </div>
-
-      <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-        {shortlist.map((sm) => (
-          <div key={sm.id} className="space-y-2">
-            <div className="aspect-[2/3] rounded-xl overflow-hidden bg-card shadow-lg">
-              <MoviePoster posterUrl={sm.movie.posterUrl} title={sm.movie.title} />
-            </div>
-            <p className="text-xs font-medium truncate text-cream">{sm.movie.title}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <button
-          onClick={onPickForTonight}
-          className="w-full py-3 bg-coral text-charcoal font-semibold rounded-xl text-sm hover:bg-coral-dark transition-colors"
-        >
-          Pick one for tonight
-        </button>
-        {!batchExhausted && (
-          <button
-            onClick={onAnotherBatch}
-            disabled={batchLoading}
-            className="w-full py-2.5 glass rounded-xl text-cream-dim text-sm hover:text-cream transition-colors disabled:opacity-50"
-          >
-            {batchLoading ? 'Loading…' : 'Another batch'}
-          </button>
-        )}
-        <button
-          onClick={onDone}
-          className="w-full py-2.5 text-cream-dim/70 text-xs hover:text-cream transition-colors"
-        >
-          Done
-        </button>
-      </div>
-    </motion.div>
+    <div className="w-full flex flex-col items-center">
+      <ClientRouletteWheel movies={shortlist} onResult={onResult} />
+      <button
+        onClick={onBack}
+        className="mt-4 py-2.5 px-6 text-cream-dim/70 text-sm hover:text-cream transition-colors"
+      >
+        Back to shortlist
+      </button>
+    </div>
   );
 }
 
@@ -302,22 +332,25 @@ function EmptyShortlist({
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="glass rounded-2xl p-6 space-y-4 w-full max-w-sm text-left"
+      className="flex flex-col items-center text-center w-full max-w-sm"
     >
-      <div>
-        <h2 className="text-lg font-semibold font-display">You skipped everything</h2>
-        <p className="text-cream-dim text-xs mt-1">
-          {batchExhausted
-            ? 'No more movies match these filters.'
-            : 'Try another batch, or adjust your filters from the dashboard.'}
-        </p>
-      </div>
-      <div className="flex flex-col gap-2">
+      <h2
+        className="text-3xl font-bold mb-2"
+        style={{ fontFamily: 'var(--font-playfair)' }}
+      >
+        You skipped everything
+      </h2>
+      <p className="text-cream-dim text-lg mb-8">
+        {batchExhausted
+          ? 'No more movies match these filters.'
+          : 'Try another batch, or adjust your filters from the dashboard.'}
+      </p>
+      <div className="flex flex-col gap-3 w-full">
         {!batchExhausted && (
           <button
             onClick={onAnotherBatch}
             disabled={batchLoading}
-            className="w-full py-3 bg-coral text-charcoal font-semibold rounded-xl text-sm hover:bg-coral-dark transition-colors disabled:opacity-50"
+            className="w-full py-4 bg-coral text-charcoal font-bold rounded-xl text-lg hover:bg-coral-dark transition-colors disabled:opacity-50"
           >
             {batchLoading ? 'Loading…' : 'Another batch'}
           </button>
@@ -325,14 +358,14 @@ function EmptyShortlist({
         {undoCount > 0 && (
           <button
             onClick={onUndo}
-            className="w-full py-2.5 glass rounded-xl text-cream-dim text-sm hover:text-cream transition-colors"
+            className="w-full py-3 glass rounded-xl text-cream-dim font-medium hover:text-cream transition-colors"
           >
             Undo last swipe
           </button>
         )}
         <button
           onClick={onDone}
-          className="w-full py-2.5 text-cream-dim/70 text-xs hover:text-cream transition-colors"
+          className="w-full py-2.5 text-cream-dim/70 text-sm hover:text-cream transition-colors"
         >
           Done
         </button>
@@ -358,12 +391,12 @@ function WinnerCard({
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.9, y: 20 }}
+      initial={{ opacity: 0, scale: 0.8, y: 30 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{ type: 'spring', damping: 15 }}
-      className="w-full max-w-sm text-left"
+      className="w-full max-w-sm"
     >
-      <div className="glass rounded-3xl overflow-hidden">
+      <div className="glass rounded-3xl overflow-hidden match-pulse">
         <div className="aspect-[2/3] relative">
           {movie.posterUrl ? (
             <div
@@ -377,14 +410,21 @@ function WinnerCard({
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-card to-transparent" />
           <div className="absolute top-4 left-4 px-3 py-1 bg-coral rounded-full">
-            <span className="text-charcoal text-xs font-bold">TONIGHT&apos;S PICK</span>
+            <span className="text-charcoal text-xs font-bold">TODAY&apos;S PICK</span>
           </div>
+          {movie.inCinema && (
+            <div className="absolute top-4 right-4">
+              <InCinemaBadge />
+            </div>
+          )}
         </div>
 
         <div className="h-4 ticket-edge" />
 
         <div className="p-6">
-          <h2 className="text-2xl font-bold mb-2 font-display">{movie.title}</h2>
+          <h2 className="text-2xl font-bold mb-2" style={{ fontFamily: 'var(--font-playfair)' }}>
+            {movie.title}
+          </h2>
           <div className="flex items-center gap-3 text-cream-dim text-sm mb-3">
             <span>{movie.year}</span>
             {movie.runtime && <span>{movie.runtime} min</span>}
@@ -407,24 +447,24 @@ function WinnerCard({
         </div>
       </div>
 
-      <div className="mt-6 space-y-2">
+      <div className="mt-6 flex flex-col gap-2">
         {canPickAgain && (
           <button
             onClick={onPickAgain}
-            className="w-full py-3 bg-coral text-charcoal font-semibold rounded-xl text-sm hover:bg-coral-dark transition-colors"
+            className="w-full py-3 bg-coral text-charcoal font-semibold rounded-xl hover:bg-coral-dark transition-colors"
           >
             Pick again
           </button>
         )}
         <button
           onClick={onBack}
-          className="w-full py-3 glass rounded-xl text-cream-dim text-sm hover:text-cream transition-colors"
+          className="w-full py-3 glass rounded-xl text-cream-dim font-medium hover:text-cream transition-colors"
         >
           Back to shortlist
         </button>
         <button
           onClick={onDone}
-          className="w-full py-2.5 text-cream-dim/70 text-xs hover:text-cream transition-colors"
+          className="w-full py-2.5 text-cream-dim/70 text-sm hover:text-cream transition-colors"
         >
           Done
         </button>

@@ -9,11 +9,17 @@ import { getErrorMessage } from '@/lib/errors';
 import { connectSocket, getSocket } from '@/lib/socket';
 import { enqueueSwipe, flushQueue, hasQueuedSwipes } from '@/lib/swipeQueue';
 import SwipeView from '@/components/SwipeView';
-import MoviePoster from '@/components/MoviePoster';
+import InCinemaBadge from '@/components/InCinemaBadge';
 import ToastContainer from '@/components/ToastContainer';
+import ClientRouletteWheel from '@/components/ClientRouletteWheel';
+import MatchesRevealView from '@/components/MatchesRevealView';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/useToast';
 import type { SessionMovie, Movie, StreamingProvider, Match } from '@shared/types';
+
+function matchToSessionMovie(m: Match): SessionMovie {
+  return { id: m.id, movieId: m.movieId, movie: m.movie, user1Swipe: null, user2Swipe: null };
+}
 
 interface SessionWithMovies {
   movies: SessionMovie[];
@@ -40,9 +46,35 @@ export default function SessionPage() {
   const [winner, setWinner] = useState<Match | null>(null);
   const [batchLoading, setBatchLoading] = useState(false);
   const [batchExhausted, setBatchExhausted] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const [revealIndex, setRevealIndex] = useState(-1);
+  const [rouletteOpen, setRouletteOpen] = useState(false);
+  const revealTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const { toasts, addToast, removeToast } = useToast();
   const hasConnectedRef = useRef(false);
   const wasPartnerOnlineRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      revealTimers.current.forEach(clearTimeout);
+      revealTimers.current = [];
+    };
+  }, []);
+
+  const startReveal = useCallback(() => {
+    revealTimers.current.forEach(clearTimeout);
+    setRevealed(true);
+    setRevealIndex(-1);
+    revealTimers.current = matches.map((_, i) =>
+      setTimeout(() => setRevealIndex(i), (i + 1) * 350),
+    );
+  }, [matches]);
+
+  const revealAll = useCallback(() => {
+    revealTimers.current.forEach(clearTimeout);
+    revealTimers.current = [];
+    setRevealIndex(matches.length - 1);
+  }, [matches.length]);
 
   const applySessionBatch = useCallback((session: SessionWithMovies, hostFlag: boolean) => {
     const swipeField = hostFlag ? 'user1Swipe' : 'user2Swipe';
@@ -62,6 +94,9 @@ export default function SessionPage() {
     setWinner(null);
     setMatches([]);
     setMatchesFetched(false);
+    setRouletteOpen(false);
+    setRevealed(false);
+    setRevealIndex(-1);
     setPartnerProgress(total > 0 ? Math.round((partnerSwipedCount / total) * 100) : 0);
   }, []);
 
@@ -252,19 +287,28 @@ export default function SessionPage() {
     }
   };
 
-  const handlePickForTonight = () => {
+  const handlePickForToday = () => {
     if (matches.length === 0) return;
-    const pick = matches[Math.floor(Math.random() * matches.length)];
-    setWinner(pick);
+    if (matches.length === 1) {
+      setWinner(matches[0]);
+      return;
+    }
+    setRouletteOpen(true);
+  };
+
+  const handleRouletteResult = (sm: SessionMovie) => {
+    const match = matches.find((m) => m.id === sm.id) ?? null;
+    if (match) setWinner(match);
   };
 
   const handlePickAgain = () => {
-    if (matches.length === 0) return;
-    const eligible = matches.length > 1 && winner
-      ? matches.filter((m) => m.id !== winner.id)
-      : matches;
-    const pick = eligible[Math.floor(Math.random() * eligible.length)];
-    setWinner(pick);
+    setWinner(null);
+    if (matches.length > 1) setRouletteOpen(true);
+  };
+
+  const handleBackToShortlist = () => {
+    setWinner(null);
+    setRouletteOpen(false);
   };
 
   const handleDoneExit = () => {
@@ -276,8 +320,14 @@ export default function SessionPage() {
       movie={winner.movie}
       canPickAgain={matches.length > 1}
       onPickAgain={handlePickAgain}
-      onBack={() => setWinner(null)}
+      onBack={handleBackToShortlist}
       onDone={handleDoneExit}
+    />
+  ) : rouletteOpen && matches.length >= 2 ? (
+    <GroupRouletteStage
+      matches={matches}
+      onResult={handleRouletteResult}
+      onBack={handleBackToShortlist}
     />
   ) : sessionComplete && !matchesFetched ? (
     <div className="flex flex-col items-center gap-3">
@@ -285,14 +335,41 @@ export default function SessionPage() {
       <p className="text-cream-dim text-sm">Loading matches…</p>
     </div>
   ) : sessionComplete && matches.length > 0 ? (
-    <MatchesResults
-      matches={matches}
-      isHost={isHost}
-      onPickForTonight={handlePickForTonight}
-      onAnotherBatch={handleAnotherBatch}
-      onDone={handleDoneExit}
-      batchLoading={batchLoading}
-      batchExhausted={batchExhausted}
+    <MatchesRevealView
+      items={matches.map((m) => ({ id: m.id, movie: m.movie }))}
+      title="Swiping complete!"
+      counterLine={`You have ${matches.length} match${matches.length === 1 ? '' : 'es'} you both liked`}
+      revealCTA={matches.length === 1 ? 'Reveal Your Match' : 'Reveal Matches'}
+      revealed={revealed}
+      revealIndex={revealIndex}
+      onStartReveal={startReveal}
+      onRevealAll={revealAll}
+      postRevealTitle="Your Matches"
+      actions={
+        <>
+          <button
+            onClick={handlePickForToday}
+            className="w-full py-4 bg-coral text-charcoal font-bold rounded-xl text-lg hover:bg-coral-dark transition-colors"
+          >
+            {matches.length >= 2 ? 'Spin the Roulette' : 'Pick one for today'}
+          </button>
+          {isHost && !batchExhausted && (
+            <button
+              onClick={handleAnotherBatch}
+              disabled={batchLoading}
+              className="w-full py-3 glass rounded-xl text-cream-dim font-medium hover:text-cream transition-colors disabled:opacity-50"
+            >
+              {batchLoading ? 'Loading…' : 'Another batch'}
+            </button>
+          )}
+          <button
+            onClick={handleDoneExit}
+            className="w-full py-2.5 text-cream-dim/70 text-sm hover:text-cream transition-colors"
+          >
+            Done
+          </button>
+        </>
+      }
     />
   ) : sessionComplete ? (
     <NoMatches
@@ -345,9 +422,15 @@ function WaitingForPartner({
   onUndo: () => void;
 }) {
   return (
-    <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
-      <h2 className="text-3xl font-bold mb-4 font-display">All done!</h2>
-      <p className="text-cream-dim mb-2">Waiting for your partner to finish swiping…</p>
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="flex flex-col items-center text-center"
+    >
+      <h2 className="text-3xl font-bold mb-4" style={{ fontFamily: 'var(--font-playfair)' }}>
+        All done!
+      </h2>
+      <p className="text-cream-dim text-lg mb-2">Waiting for your partner to finish swiping…</p>
       <div className="w-48 h-2 bg-card rounded-full mx-auto mt-4 overflow-hidden">
         <motion.div
           className="h-full bg-coral rounded-full"
@@ -369,71 +452,28 @@ function WaitingForPartner({
   );
 }
 
-function MatchesResults({
+function GroupRouletteStage({
   matches,
-  isHost,
-  onPickForTonight,
-  onAnotherBatch,
-  onDone,
-  batchLoading,
-  batchExhausted,
+  onResult,
+  onBack,
 }: {
   matches: Match[];
-  isHost: boolean;
-  onPickForTonight: () => void;
-  onAnotherBatch: () => void;
-  onDone: () => void;
-  batchLoading: boolean;
-  batchExhausted: boolean;
+  onResult: (sm: SessionMovie) => void;
+  onBack: () => void;
 }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="glass rounded-2xl p-6 space-y-4 w-full max-w-md lg:max-w-lg text-left"
-    >
-      <div>
-        <h2 className="text-lg font-semibold font-display">Your matches</h2>
-        <p className="text-cream-dim text-xs mt-1">
-          {matches.length} movie{matches.length === 1 ? '' : 's'} you both liked
-        </p>
-      </div>
-
-      <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-        {matches.map((m) => (
-          <div key={m.id} className="space-y-2">
-            <div className="aspect-[2/3] rounded-xl overflow-hidden bg-card shadow-lg">
-              <MoviePoster posterUrl={m.movie.posterUrl} title={m.movie.title} />
-            </div>
-            <p className="text-xs font-medium truncate text-cream">{m.movie.title}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <button
-          onClick={onPickForTonight}
-          className="w-full py-3 bg-coral text-charcoal font-semibold rounded-xl text-sm hover:bg-coral-dark transition-colors"
-        >
-          Pick one for tonight
-        </button>
-        {isHost && !batchExhausted && (
-          <button
-            onClick={onAnotherBatch}
-            disabled={batchLoading}
-            className="w-full py-2.5 glass rounded-xl text-cream-dim text-sm hover:text-cream transition-colors disabled:opacity-50"
-          >
-            {batchLoading ? 'Loading…' : 'Another batch'}
-          </button>
-        )}
-        <button
-          onClick={onDone}
-          className="w-full py-2.5 text-cream-dim/70 text-xs hover:text-cream transition-colors"
-        >
-          Done
-        </button>
-      </div>
-    </motion.div>
+    <div className="w-full flex flex-col items-center">
+      <ClientRouletteWheel
+        movies={matches.map(matchToSessionMovie)}
+        onResult={onResult}
+      />
+      <button
+        onClick={onBack}
+        className="mt-4 py-2.5 px-6 text-cream-dim/70 text-sm hover:text-cream transition-colors"
+      >
+        Back to matches
+      </button>
+    </div>
   );
 }
 
@@ -454,31 +494,31 @@ function NoMatches({
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="glass rounded-2xl p-6 space-y-4 w-full max-w-sm text-left"
+      className="flex flex-col items-center text-center w-full max-w-sm"
     >
-      <div>
-        <h2 className="text-lg font-semibold font-display">No matches this batch</h2>
-        <p className="text-cream-dim text-xs mt-1">
-          {isHost
-            ? batchExhausted
-              ? 'No more movies match your filters.'
-              : 'Pull in another batch, or call it a night.'
-            : 'Waiting on your partner to pull another batch or call it.'}
-        </p>
-      </div>
-      <div className="flex flex-col gap-2">
+      <h2 className="text-3xl font-bold mb-2" style={{ fontFamily: 'var(--font-playfair)' }}>
+        No exact matches
+      </h2>
+      <p className="text-cream-dim text-lg mb-8">
+        {isHost
+          ? batchExhausted
+            ? 'No more movies match your filters.'
+            : 'Pull in another batch, or call it a night.'
+          : 'Waiting on your partner to pull another batch or call it.'}
+      </p>
+      <div className="flex flex-col gap-3 w-full">
         {isHost && !batchExhausted && (
           <button
             onClick={onAnotherBatch}
             disabled={batchLoading}
-            className="w-full py-3 bg-coral text-charcoal font-semibold rounded-xl text-sm hover:bg-coral-dark transition-colors disabled:opacity-50"
+            className="w-full py-4 bg-coral text-charcoal font-bold rounded-xl text-lg hover:bg-coral-dark transition-colors disabled:opacity-50"
           >
             {batchLoading ? 'Loading…' : 'Another batch'}
           </button>
         )}
         <button
           onClick={onDone}
-          className="w-full py-2.5 text-cream-dim/70 text-xs hover:text-cream transition-colors"
+          className="w-full py-2.5 text-cream-dim/70 text-sm hover:text-cream transition-colors"
         >
           Done
         </button>
@@ -504,12 +544,12 @@ function WinnerCard({
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.9, y: 20 }}
+      initial={{ opacity: 0, scale: 0.8, y: 30 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{ type: 'spring', damping: 15 }}
-      className="w-full max-w-sm text-left"
+      className="w-full max-w-sm"
     >
-      <div className="glass rounded-3xl overflow-hidden">
+      <div className="glass rounded-3xl overflow-hidden match-pulse">
         <div className="aspect-[2/3] relative">
           {movie.posterUrl ? (
             <div
@@ -523,14 +563,21 @@ function WinnerCard({
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-card to-transparent" />
           <div className="absolute top-4 left-4 px-3 py-1 bg-coral rounded-full">
-            <span className="text-charcoal text-xs font-bold">TONIGHT&apos;S PICK</span>
+            <span className="text-charcoal text-xs font-bold">TODAY&apos;S PICK</span>
           </div>
+          {movie.inCinema && (
+            <div className="absolute top-4 right-4">
+              <InCinemaBadge />
+            </div>
+          )}
         </div>
 
         <div className="h-4 ticket-edge" />
 
         <div className="p-6">
-          <h2 className="text-2xl font-bold mb-2 font-display">{movie.title}</h2>
+          <h2 className="text-2xl font-bold mb-2" style={{ fontFamily: 'var(--font-playfair)' }}>
+            {movie.title}
+          </h2>
           <div className="flex items-center gap-3 text-cream-dim text-sm mb-3">
             <span>{movie.year}</span>
             {movie.runtime && <span>{movie.runtime} min</span>}
@@ -553,24 +600,24 @@ function WinnerCard({
         </div>
       </div>
 
-      <div className="mt-6 space-y-2">
+      <div className="mt-6 flex flex-col gap-2">
         {canPickAgain && (
           <button
             onClick={onPickAgain}
-            className="w-full py-3 bg-coral text-charcoal font-semibold rounded-xl text-sm hover:bg-coral-dark transition-colors"
+            className="w-full py-3 bg-coral text-charcoal font-semibold rounded-xl hover:bg-coral-dark transition-colors"
           >
             Pick again
           </button>
         )}
         <button
           onClick={onBack}
-          className="w-full py-3 glass rounded-xl text-cream-dim text-sm hover:text-cream transition-colors"
+          className="w-full py-3 glass rounded-xl text-cream-dim font-medium hover:text-cream transition-colors"
         >
           Back to matches
         </button>
         <button
           onClick={onDone}
-          className="w-full py-2.5 text-cream-dim/70 text-xs hover:text-cream transition-colors"
+          className="w-full py-2.5 text-cream-dim/70 text-sm hover:text-cream transition-colors"
         >
           Done
         </button>

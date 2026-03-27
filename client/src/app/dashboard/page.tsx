@@ -2,18 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/useToast';
 import ToastContainer from '@/components/ToastContainer';
 import BrowseTab from './components/BrowseTab';
 import LibraryTab from './components/LibraryTab';
-import DiscoverTab from './components/DiscoverTab';
 import SwipeTab from './components/SwipeTab';
 import HistoryTab from './components/HistoryTab';
 import OnboardingModal from '@/components/OnboardingModal';
 
-type Tab = 'browse' | 'library' | 'discover' | 'swipe' | 'history';
+type Tab = 'browse' | 'library' | 'swipe' | 'history';
 
 export default function DashboardPage() {
   const { user, loading: authLoading, logout } = useAuth();
@@ -43,7 +42,7 @@ export default function DashboardPage() {
 
   const handleOnboardingPath = (path: 'together' | 'solo' | 'discover') => {
     dismissOnboarding();
-    if (path === 'discover') setTab('discover');
+    if (path === 'discover') router.push('/discover');
     else setTab('swipe');
   };
 
@@ -55,13 +54,13 @@ export default function DashboardPage() {
     );
   }
 
-  const tabs: Tab[] = ['browse', 'library', 'discover', 'swipe', 'history'];
+  const tabs: Tab[] = ['browse', 'library', 'swipe', 'history'];
 
   return (
     <div className="min-h-dvh px-6 py-8 w-full max-w-5xl mx-auto lg:px-12 flex flex-col items-stretch">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl font-bold font-display">
-          Movie<span className="text-danger">Picker</span>
+          Match<span className="text-coral">sticked</span>
         </h1>
         <div className="flex items-center gap-3">
           {user && !user.isGuest && (
@@ -101,7 +100,6 @@ export default function DashboardPage() {
       <AnimatePresence mode="wait">
         {tab === 'browse' && <BrowseTab key="browse" addToast={addToast} />}
         {tab === 'library' && <LibraryTab key="library" addToast={addToast} />}
-        {tab === 'discover' && <DiscoverTab key="discover" addToast={addToast} />}
         {tab === 'swipe' && <SwipeTab key="swipe" addToast={addToast} />}
         {tab === 'history' && <HistoryTab key="history" addToast={addToast} />}
       </AnimatePresence>
