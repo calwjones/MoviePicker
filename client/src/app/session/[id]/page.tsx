@@ -13,9 +13,10 @@ import InCinemaBadge from '@/components/InCinemaBadge';
 import ToastContainer from '@/components/ToastContainer';
 import ClientRouletteWheel from '@/components/ClientRouletteWheel';
 import MatchesRevealView from '@/components/MatchesRevealView';
+import StreamingProvidersList from '@/components/StreamingProviders';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/useToast';
-import type { SessionMovie, Movie, StreamingProvider, Match } from '@shared/types';
+import type { SessionMovie, Movie, Match } from '@shared/types';
 
 function matchToSessionMovie(m: Match): SessionMovie {
   return { id: m.id, movieId: m.movieId, movie: m.movie, user1Swipe: null, user2Swipe: null };
@@ -49,6 +50,7 @@ export default function SessionPage() {
   const [revealed, setRevealed] = useState(false);
   const [revealIndex, setRevealIndex] = useState(-1);
   const [rouletteOpen, setRouletteOpen] = useState(false);
+  const [previousPickIds, setPreviousPickIds] = useState<string[]>([]);
   const revealTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const { toasts, addToast, removeToast } = useToast();
   const hasConnectedRef = useRef(false);
@@ -97,6 +99,7 @@ export default function SessionPage() {
     setRouletteOpen(false);
     setRevealed(false);
     setRevealIndex(-1);
+    setPreviousPickIds([]);
     setPartnerProgress(total > 0 ? Math.round((partnerSwipedCount / total) * 100) : 0);
   }, []);
 
@@ -288,9 +291,10 @@ export default function SessionPage() {
   };
 
   const handlePickForToday = () => {
-    if (matches.length === 0) return;
-    if (matches.length === 1) {
-      setWinner(matches[0]);
+    const remaining = matches.filter((m) => !previousPickIds.includes(m.id));
+    if (remaining.length === 0) return;
+    if (remaining.length === 1) {
+      setWinner(remaining[0]);
       return;
     }
     setRouletteOpen(true);
@@ -302,30 +306,42 @@ export default function SessionPage() {
   };
 
   const handlePickAgain = () => {
+    if (!winner) return;
+    const nextExcluded = [...previousPickIds, winner.id];
+    setPreviousPickIds(nextExcluded);
     setWinner(null);
-    if (matches.length > 1) setRouletteOpen(true);
+    const remaining = matches.filter((m) => !nextExcluded.includes(m.id));
+    if (remaining.length === 1) {
+      setWinner(remaining[0]);
+      return;
+    }
+    if (remaining.length >= 2) setRouletteOpen(true);
   };
 
   const handleBackToShortlist = () => {
     setWinner(null);
     setRouletteOpen(false);
+    setPreviousPickIds([]);
   };
 
   const handleDoneExit = () => {
     router.push('/dashboard');
   };
 
+  const rouletteMatches = matches.filter((m) => !previousPickIds.includes(m.id));
+  const canPickAgain = matches.length - previousPickIds.length > 1;
+
   const doneContent = winner ? (
     <WinnerCard
       movie={winner.movie}
-      canPickAgain={matches.length > 1}
+      canPickAgain={canPickAgain}
       onPickAgain={handlePickAgain}
       onBack={handleBackToShortlist}
       onDone={handleDoneExit}
     />
-  ) : rouletteOpen && matches.length >= 2 ? (
+  ) : rouletteOpen && rouletteMatches.length >= 2 ? (
     <GroupRouletteStage
-      matches={matches}
+      matches={rouletteMatches}
       onResult={handleRouletteResult}
       onBack={handleBackToShortlist}
     />
@@ -540,8 +556,6 @@ function WinnerCard({
   onBack: () => void;
   onDone: () => void;
 }) {
-  const streaming = (movie.streamingProviders ?? []).filter((p: StreamingProvider) => p.type === 'stream');
-
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.8, y: 30 }}
@@ -561,7 +575,7 @@ function WinnerCard({
               <span className="text-cream-dim text-lg">{movie.title}</span>
             </div>
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-card to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-card/70 to-transparent" />
           <div className="absolute top-4 left-4 px-3 py-1 bg-coral rounded-full">
             <span className="text-charcoal text-xs font-bold">TODAY&apos;S PICK</span>
           </div>
@@ -586,15 +600,9 @@ function WinnerCard({
           {movie.director && (
             <p className="text-cream-dim text-sm mb-3">Directed by {movie.director}</p>
           )}
-          {streaming.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-3">
-              {streaming.map((p, i) => (
-                <div key={i} className="flex items-center gap-1.5 glass rounded-lg px-2 py-1">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={p.logoUrl} alt={p.name} className="w-5 h-5 rounded" />
-                  <span className="text-xs text-cream-dim">{p.name}</span>
-                </div>
-              ))}
+          {movie.streamingProviders && movie.streamingProviders.length > 0 && (
+            <div className="mt-3">
+              <StreamingProvidersList providers={movie.streamingProviders} />
             </div>
           )}
         </div>

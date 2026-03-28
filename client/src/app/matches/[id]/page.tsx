@@ -6,9 +6,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { useAuthGuard } from '@/hooks/useAuthGuard';
 import { swipeApi } from '@/lib/api';
-import type { Movie, StreamingProvider } from '@shared/types';
+import type { Movie } from '@shared/types';
 import SkeletonList from '@/components/SkeletonList';
 import InCinemaBadge from '@/components/InCinemaBadge';
+import StreamingProvidersList from '@/components/StreamingProviders';
 import GuestConvertModal from '@/components/GuestConvertModal';
 
 interface Match {
@@ -218,7 +219,7 @@ export default function MatchesPage() {
                   <span className="text-cream-dim text-lg">{movie.title}</span>
                 </div>
               )}
-              <div className="absolute inset-0 bg-gradient-to-t from-card to-transparent" />
+              <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-card/70 to-transparent" />
               <div className="absolute top-4 left-4 px-3 py-1 bg-coral rounded-full">
                 <span className="text-charcoal text-xs font-bold">YOUR PICK</span>
               </div>
@@ -247,14 +248,9 @@ export default function MatchesPage() {
                 <p className="text-cream-dim text-sm mb-3">Directed by {movie.director}</p>
               )}
 
-              {(movie.streamingProviders as StreamingProvider[]).filter((p) => p.type === 'stream').length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {(movie.streamingProviders as StreamingProvider[]).filter((p) => p.type === 'stream').map((p, i) => (
-                    <div key={i} className="flex items-center gap-1.5 glass rounded-lg px-2 py-1">
-                      <img src={p.logoUrl} alt={p.name} className="w-5 h-5 rounded" />
-                      <span className="text-xs text-cream-dim">{p.name}</span>
-                    </div>
-                  ))}
+              {movie.streamingProviders && movie.streamingProviders.length > 0 && (
+                <div className="mt-3">
+                  <StreamingProvidersList providers={movie.streamingProviders} />
                 </div>
               )}
             </div>

@@ -11,8 +11,9 @@ import InCinemaBadge from '@/components/InCinemaBadge';
 import ToastContainer from '@/components/ToastContainer';
 import ClientRouletteWheel from '@/components/ClientRouletteWheel';
 import MatchesRevealView from '@/components/MatchesRevealView';
+import StreamingProvidersList from '@/components/StreamingProviders';
 import { useToast } from '@/hooks/useToast';
-import type { SessionMovie, Movie, SearchResult, StreamingProvider } from '@shared/types';
+import type { SessionMovie, Movie, SearchResult } from '@shared/types';
 
 function toAdapterMovie(r: SearchResult): Movie {
   return {
@@ -88,6 +89,7 @@ function DiscoverSwipePageInner() {
   const [revealed, setRevealed] = useState(false);
   const [revealIndex, setRevealIndex] = useState(-1);
   const [rouletteOpen, setRouletteOpen] = useState(false);
+  const [previousPickIds, setPreviousPickIds] = useState<string[]>([]);
   const revealTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const [addedTmdbIds, setAddedTmdbIds] = useState<Set<number>>(new Set());
@@ -226,6 +228,7 @@ function DiscoverSwipePageInner() {
       setRouletteOpen(false);
       setRevealed(false);
       setRevealIndex(-1);
+      setPreviousPickIds([]);
     } catch (err) {
       addToast(getErrorMessage(err, 'Failed to load more movies'), { variant: 'error' });
     } finally {
@@ -248,9 +251,10 @@ function DiscoverSwipePageInner() {
   };
 
   const handlePickForToday = () => {
-    if (shortlist.length === 0) return;
-    if (shortlist.length === 1) {
-      const pick = shortlist[0];
+    const remaining = shortlist.filter((sm) => !previousPickIds.includes(sm.id));
+    if (remaining.length === 0) return;
+    if (remaining.length === 1) {
+      const pick = remaining[0];
       setWinner(pick);
       setWinnerFull(null);
       loadWinnerFull(pick);
@@ -266,17 +270,26 @@ function DiscoverSwipePageInner() {
   };
 
   const handlePickAgain = () => {
+    if (!winner) return;
+    const nextExcluded = [...previousPickIds, winner.id];
+    setPreviousPickIds(nextExcluded);
     setWinner(null);
     setWinnerFull(null);
-    if (shortlist.length > 1) {
-      setRouletteOpen(true);
+    const remaining = shortlist.filter((sm) => !nextExcluded.includes(sm.id));
+    if (remaining.length === 1) {
+      const pick = remaining[0];
+      setWinner(pick);
+      loadWinnerFull(pick);
+      return;
     }
+    if (remaining.length >= 2) setRouletteOpen(true);
   };
 
   const handleBackToShortlist = () => {
     setWinner(null);
     setWinnerFull(null);
     setRouletteOpen(false);
+    setPreviousPickIds([]);
   };
 
   const handleAddToWatchlist = async (tmdbId: number) => {
@@ -305,6 +318,9 @@ function DiscoverSwipePageInner() {
     }
   };
 
+  const rouletteShortlist = shortlist.filter((sm) => !previousPickIds.includes(sm.id));
+  const canPickAgain = shortlist.length - previousPickIds.length > 1;
+
   const doneContent = winner ? (
     <DiscoverWinnerCard
       sm={winner}
@@ -312,15 +328,15 @@ function DiscoverSwipePageInner() {
       loading={winnerLoading}
       added={addedTmdbIds.has(winner.movie.tmdbId ?? -1)}
       adding={addingTmdbId === winner.movie.tmdbId}
-      canPickAgain={shortlist.length > 1}
+      canPickAgain={canPickAgain}
       onAdd={() => winner.movie.tmdbId && handleAddToWatchlist(winner.movie.tmdbId)}
       onPickAgain={handlePickAgain}
       onBack={handleBackToShortlist}
       onDone={handleDoneExit}
     />
-  ) : rouletteOpen && shortlist.length >= 2 ? (
+  ) : rouletteOpen && rouletteShortlist.length >= 2 ? (
     <DiscoverRouletteStage
-      shortlist={shortlist}
+      shortlist={rouletteShortlist}
       onResult={handleRouletteResult}
       onBack={handleBackToShortlist}
     />
@@ -544,7 +560,6 @@ function DiscoverWinnerCard({
   onDone: () => void;
 }) {
   const movie = full ?? sm.movie;
-  const streaming = (movie.streamingProviders ?? []).filter((p: StreamingProvider) => p.type === 'stream');
 
   return (
     <motion.div
@@ -565,7 +580,7 @@ function DiscoverWinnerCard({
               <span className="text-cream-dim text-lg">{movie.title}</span>
             </div>
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-card to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-card/70 to-transparent" />
           <div className="absolute top-4 left-4 px-3 py-1 bg-coral rounded-full">
             <span className="text-charcoal text-xs font-bold">TODAY&apos;S PICK</span>
           </div>
@@ -591,15 +606,9 @@ function DiscoverWinnerCard({
           {loading && !full && (
             <p className="text-cream-dim text-xs animate-pulse">Loading details…</p>
           )}
-          {streaming.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-3">
-              {streaming.map((p, i) => (
-                <div key={i} className="flex items-center gap-1.5 glass rounded-lg px-2 py-1">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={p.logoUrl} alt={p.name} className="w-5 h-5 rounded" />
-                  <span className="text-xs text-cream-dim">{p.name}</span>
-                </div>
-              ))}
+          {movie.streamingProviders && movie.streamingProviders.length > 0 && (
+            <div className="mt-3">
+              <StreamingProvidersList providers={movie.streamingProviders} />
             </div>
           )}
         </div>

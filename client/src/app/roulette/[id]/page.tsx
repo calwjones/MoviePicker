@@ -375,7 +375,7 @@ export default function RoulettePage() {
                       <span className="text-cream-dim text-lg">{winner.title}</span>
                     </div>
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-card to-transparent" />
+                  <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-card/70 to-transparent" />
                   <div className="absolute top-4 left-4 px-3 py-1 bg-coral rounded-full">
                     <span className="text-charcoal text-xs font-bold">YOUR PICK</span>
                   </div>

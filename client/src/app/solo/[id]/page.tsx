@@ -12,8 +12,9 @@ import InCinemaBadge from '@/components/InCinemaBadge';
 import ToastContainer from '@/components/ToastContainer';
 import ClientRouletteWheel from '@/components/ClientRouletteWheel';
 import MatchesRevealView from '@/components/MatchesRevealView';
+import StreamingProvidersList from '@/components/StreamingProviders';
 import { useToast } from '@/hooks/useToast';
-import type { SessionMovie, Movie, StreamingProvider } from '@shared/types';
+import type { SessionMovie, Movie } from '@shared/types';
 
 export default function SoloSessionPage() {
   const { id: sessionId } = useParams<{ id: string }>();
@@ -34,6 +35,7 @@ export default function SoloSessionPage() {
   const [revealed, setRevealed] = useState(false);
   const [revealIndex, setRevealIndex] = useState(-1);
   const [rouletteOpen, setRouletteOpen] = useState(false);
+  const [previousPickIds, setPreviousPickIds] = useState<string[]>([]);
   const revealTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const { toasts, addToast, removeToast } = useToast();
 
@@ -175,6 +177,7 @@ export default function SoloSessionPage() {
       setRouletteOpen(false);
       setRevealed(false);
       setRevealIndex(-1);
+      setPreviousPickIds([]);
     } catch (err) {
       addToast(getErrorMessage(err, 'Failed to load more movies'), { variant: 'error' });
     } finally {
@@ -183,9 +186,10 @@ export default function SoloSessionPage() {
   };
 
   const handlePickForToday = () => {
-    if (shortlist.length === 0) return;
-    if (shortlist.length === 1) {
-      setWinner(shortlist[0]);
+    const remaining = shortlist.filter((sm) => !previousPickIds.includes(sm.id));
+    if (remaining.length === 0) return;
+    if (remaining.length === 1) {
+      setWinner(remaining[0]);
       return;
     }
     setRouletteOpen(true);
@@ -196,13 +200,22 @@ export default function SoloSessionPage() {
   };
 
   const handlePickAgain = () => {
+    if (!winner) return;
+    const nextExcluded = [...previousPickIds, winner.id];
+    setPreviousPickIds(nextExcluded);
     setWinner(null);
-    if (shortlist.length > 1) setRouletteOpen(true);
+    const remaining = shortlist.filter((sm) => !nextExcluded.includes(sm.id));
+    if (remaining.length === 1) {
+      setWinner(remaining[0]);
+      return;
+    }
+    if (remaining.length >= 2) setRouletteOpen(true);
   };
 
   const handleBackToShortlist = () => {
     setWinner(null);
     setRouletteOpen(false);
+    setPreviousPickIds([]);
   };
 
   const handleDoneExit = async () => {
@@ -210,17 +223,20 @@ export default function SoloSessionPage() {
     router.push('/dashboard');
   };
 
+  const rouletteMovies = shortlist.filter((sm) => !previousPickIds.includes(sm.id));
+  const canPickAgain = shortlist.length - previousPickIds.length > 1;
+
   const doneContent = winner ? (
     <WinnerCard
       movie={winner.movie}
-      canPickAgain={shortlist.length > 1}
+      canPickAgain={canPickAgain}
       onPickAgain={handlePickAgain}
       onBack={handleBackToShortlist}
       onDone={handleDoneExit}
     />
-  ) : rouletteOpen && shortlist.length >= 2 ? (
+  ) : rouletteOpen && rouletteMovies.length >= 2 ? (
     <RouletteStage
-      shortlist={shortlist}
+      shortlist={rouletteMovies}
       onResult={handleRouletteResult}
       onBack={handleBackToShortlist}
     />
@@ -387,8 +403,6 @@ function WinnerCard({
   onBack: () => void;
   onDone: () => void;
 }) {
-  const streaming = (movie.streamingProviders ?? []).filter((p: StreamingProvider) => p.type === 'stream');
-
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.8, y: 30 }}
@@ -408,7 +422,7 @@ function WinnerCard({
               <span className="text-cream-dim text-lg">{movie.title}</span>
             </div>
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-card to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-card/70 to-transparent" />
           <div className="absolute top-4 left-4 px-3 py-1 bg-coral rounded-full">
             <span className="text-charcoal text-xs font-bold">TODAY&apos;S PICK</span>
           </div>
@@ -433,15 +447,9 @@ function WinnerCard({
           {movie.director && (
             <p className="text-cream-dim text-sm mb-3">Directed by {movie.director}</p>
           )}
-          {streaming.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-3">
-              {streaming.map((p, i) => (
-                <div key={i} className="flex items-center gap-1.5 glass rounded-lg px-2 py-1">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={p.logoUrl} alt={p.name} className="w-5 h-5 rounded" />
-                  <span className="text-xs text-cream-dim">{p.name}</span>
-                </div>
-              ))}
+          {movie.streamingProviders && movie.streamingProviders.length > 0 && (
+            <div className="mt-3">
+              <StreamingProvidersList providers={movie.streamingProviders} />
             </div>
           )}
         </div>

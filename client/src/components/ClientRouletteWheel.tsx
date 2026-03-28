@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import type { SessionMovie } from '@shared/types';
 
 const SEGMENT_FILLS = ['#1A1A1A', '#222222', '#1E1E1E'];
@@ -24,7 +24,7 @@ export default function ClientRouletteWheel({
   const [rotation, setRotation] = useState(0);
   const [spinsLeft, setSpinsLeft] = useState(maxSpins);
   const [canvasSize, setCanvasSize] = useState(320);
-  const [landed, setLanded] = useState<SessionMovie | null>(null);
+  const [hasLanded, setHasLanded] = useState(false);
   const animationRef = useRef<number>(0);
   const rotationRef = useRef(0);
 
@@ -198,7 +198,7 @@ export default function ClientRouletteWheel({
   const spin = () => {
     if (spinning || movies.length === 0 || spinsLeft <= 0) return;
     setSpinning(true);
-    setLanded(null);
+    setHasLanded(false);
 
     const winnerIndex = Math.floor(Math.random() * movies.length);
     const segmentAngle = (2 * Math.PI) / movies.length;
@@ -227,17 +227,12 @@ export default function ClientRouletteWheel({
         setSpinning(false);
         setSpinsLeft((s) => s - 1);
         const result = movies[winnerIndex];
-        setLanded(result);
+        setHasLanded(true);
         onResult(result);
       }
     };
 
     animationRef.current = requestAnimationFrame(animate);
-  };
-
-  const handleRespin = () => {
-    setLanded(null);
-    setTimeout(spin, 50);
   };
 
   return (
@@ -269,35 +264,19 @@ export default function ClientRouletteWheel({
         />
       </div>
 
-      <AnimatePresence mode="wait">
-        {!landed && (
-          <motion.button
-            key="spin"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={spin}
-            disabled={spinning || spinsLeft <= 0}
-            className="py-4 px-16 bg-coral text-charcoal font-bold rounded-xl text-lg hover:bg-coral-dark transition-all disabled:opacity-40"
-            style={{ boxShadow: spinning ? 'none' : '0 0 20px rgba(161, 47, 10, 0.2)' }}
-          >
-            {spinning ? 'Spinning…' : spinsLeft <= 0 ? 'No spins left' : 'SPIN'}
-          </motion.button>
-        )}
-      </AnimatePresence>
-
-      {landed && spinsLeft > 0 && (
+      {!hasLanded && (
         <motion.button
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={handleRespin}
-          className="mt-2 py-2 px-6 glass rounded-xl text-cream-dim text-sm font-medium"
+          key="spin"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={spin}
+          disabled={spinning || spinsLeft <= 0}
+          className="py-4 px-16 bg-coral text-charcoal font-bold rounded-xl text-lg hover:bg-coral-dark transition-all disabled:opacity-40"
+          style={{ boxShadow: spinning ? 'none' : '0 0 20px rgba(161, 47, 10, 0.2)' }}
         >
-          Re-spin
+          {spinning ? 'Spinning…' : spinsLeft <= 0 ? 'No spins left' : 'SPIN'}
         </motion.button>
       )}
 
