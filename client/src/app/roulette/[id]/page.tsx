@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAuth } from '@/context/AuthContext';
+import { useAuthGuard } from '@/hooks/useAuthGuard';
 import { swipeApi } from '@/lib/api';
 import { connectSocket, getSocket } from '@/lib/socket';
 import StreamingProvidersList from '@/components/StreamingProviders';
@@ -32,7 +32,7 @@ const SEGMENT_FILLS = ['#1A1A1A', '#222222', '#1E1E1E'];
 
 export default function RoulettePage() {
   const { id: sessionId } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuthGuard();
   const router = useRouter();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -51,12 +51,6 @@ export default function RoulettePage() {
   useEffect(() => { matchesRef.current = matches; }, [matches]);
 
   useEffect(() => {
-    if (!user) {
-      router.push('/auth?mode=login');
-    }
-  }, [user, router]);
-
-  useEffect(() => {
     const updateSize = () => {
       const width = window.innerWidth >= 1024
         ? Math.min(window.innerWidth * 0.35, 500)
@@ -69,14 +63,14 @@ export default function RoulettePage() {
   }, []);
 
   useEffect(() => {
-    if (!sessionId || !user) return;
+    if (!sessionId || !user || authLoading) return;
     swipeApi.matches(sessionId).then((res) => {
       setMatches(res.data.matches);
       setLoading(false);
     }).catch(() => {
       router.push('/dashboard');
     });
-  }, [sessionId, user, router]);
+  }, [sessionId, user, authLoading, router]);
 
   // Socket: join session and listen for roulette results
   useEffect(() => {
@@ -99,7 +93,7 @@ export default function RoulettePage() {
       const currentMod = ((currentRotation % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
       let extra = desiredMod - currentMod;
       if (extra < 0) extra += 2 * Math.PI;
-      const totalSpins = 5 + Math.random() * 3;
+      const totalSpins = 5 + Math.floor(Math.random() * 4);
       const targetRotation = currentRotation + totalSpins * 2 * Math.PI + extra;
 
       const startRotation = currentRotation;

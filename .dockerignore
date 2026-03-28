@@ -1,8 +1,37 @@
+# Dependencies
 node_modules
 client/node_modules
 server/node_modules
+
+# Build artifacts
 client/.next
 server/dist
+
+# Git
 .git
+.gitignore
+
+# Environment (secrets must come from runtime env, not baked into image)
+.env
+.env.local
+.env.production
+**/.env
+
+# Tests
+client/src/__tests__
+server/src/__tests__
+coverage
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode
+.idea
+
+# Logs
+*.log
+npm-debug.log*
+
+# Docs
 *.md
 docs/

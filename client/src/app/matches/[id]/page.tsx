@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAuth } from '@/context/AuthContext';
+import { useAuthGuard } from '@/hooks/useAuthGuard';
 import { swipeApi } from '@/lib/api';
 import type { Movie, StreamingProvider } from '@shared/types';
 import SkeletonList from '@/components/SkeletonList';
@@ -22,7 +22,7 @@ interface Compromise {
 
 export default function MatchesPage() {
   const { id: sessionId } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuthGuard();
   const router = useRouter();
   const [matches, setMatches] = useState<Match[]>([]);
   const [compromises, setCompromises] = useState<Compromise[]>([]);
@@ -39,13 +39,7 @@ export default function MatchesPage() {
   }, []);
 
   useEffect(() => {
-    if (!user) {
-      router.push('/auth?mode=login');
-    }
-  }, [user, router]);
-
-  useEffect(() => {
-    if (!sessionId || !user) return;
+    if (!sessionId || !user || authLoading) return;
     swipeApi.matches(sessionId).then((res) => {
       setMatches(res.data.matches);
       setCompromises(res.data.compromises || []);
@@ -53,7 +47,7 @@ export default function MatchesPage() {
     }).catch(() => {
       router.replace('/dashboard');
     });
-  }, [sessionId, user, router]);
+  }, [sessionId, user, authLoading, router]);
 
   const startReveal = () => {
     setRevealed(true);

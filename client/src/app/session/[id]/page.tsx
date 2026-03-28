@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { useAuth } from '@/context/AuthContext';
+import { useAuthGuard } from '@/hooks/useAuthGuard';
 import { sessionApi, swipeApi } from '@/lib/api';
 import { connectSocket, getSocket } from '@/lib/socket';
 import SwipeView from '@/components/SwipeView';
@@ -11,7 +11,7 @@ import type { SessionMovie } from '@shared/types';
 
 export default function SessionPage() {
   const { id: sessionId } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuthGuard();
   const router = useRouter();
   const [movies, setMovies] = useState<SessionMovie[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -24,16 +24,17 @@ export default function SessionPage() {
   const [undoStack, setUndoStack] = useState<{ index: number; movieId: string; direction: string }[]>([]);
 
   useEffect(() => {
-    if (!user) router.push('/auth?mode=login');
-  }, [user, router]);
-
-  useEffect(() => {
-    if (!sessionId || !user) return;
+    if (!sessionId || !user || authLoading) return;
     sessionApi.get(sessionId).then((res) => {
       const { session, isUser1: iu1 } = res.data;
       const swipeField = iu1 ? 'user1Swipe' : 'user2Swipe';
       const unswiped = session.movies.filter((m: SessionMovie) => m[swipeField] === null);
       const swiped = session.movies.filter((m: SessionMovie) => m[swipeField] !== null);
+      // Shuffle unswiped movies — DB returns them in UUID order (consistent but not random)
+      for (let i = unswiped.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [unswiped[i], unswiped[j]] = [unswiped[j], unswiped[i]];
+      }
       setMovies(unswiped);
       setCurrentIndex(0);
       const otherField = iu1 ? 'user2Swipe' : 'user1Swipe';
@@ -43,7 +44,7 @@ export default function SessionPage() {
       if (unswiped.length === 0 && swiped.length > 0) setDone(true);
       setLoading(false);
     }).catch(() => router.push('/dashboard'));
-  }, [sessionId, user, router]);
+  }, [sessionId, user, authLoading, router]);
 
   useEffect(() => {
     if (!sessionId) return;
