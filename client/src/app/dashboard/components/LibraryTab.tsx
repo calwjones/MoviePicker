@@ -11,6 +11,7 @@ import InCinemaBadge from '@/components/InCinemaBadge';
 import ConfirmModal from '@/components/ConfirmModal';
 import RecDetailSheet from '@/components/RecDetailSheet';
 import MovieDetailModal from '@/components/MovieDetailModal';
+import LetterboxdImport from '@/components/LetterboxdImport';
 import { DECADE_OPTIONS } from '@/lib/decades';
 import type { Movie, UserMovie, SearchResult } from '@shared/types';
 
@@ -815,15 +816,14 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
         )}
 
         {/* Letterboxd import */}
-        <div className="mt-3 pt-3 border-t border-cream-dim/10">
+        <div className="mt-3 pt-3 border-t border-cream-dim/10 space-y-3">
+          <LetterboxdImport mode="library" onSuccess={() => loadWatchlist()} />
+
           <button
             onClick={() => setImportOpen((v) => !v)}
-            className="text-cream-dim text-xs hover:text-cream transition-colors flex items-center gap-1.5"
+            className="text-cream-dim/70 text-xs hover:text-cream transition-colors"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5m0 0l5 5m-5-5v12" />
-            </svg>
-            {importOpen ? 'Hide Letterboxd import' : 'Import from Letterboxd'}
+            {importOpen ? 'Hide CSV import' : 'Import from a Letterboxd CSV export instead'}
           </button>
 
           <AnimatePresence>
@@ -834,10 +834,7 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
                 exit={{ height: 0, opacity: 0 }}
                 className="overflow-hidden"
               >
-                <div className="pt-3">
-                  <p className="text-cream-dim text-xs mb-2">
-                    Pulls your Letterboxd watchlist, ratings, and watched history in one go.
-                  </p>
+                <div className="pt-2">
                   <ol className="text-cream-dim text-xs mb-3 space-y-1 list-decimal list-inside">
                     <li>
                       Open{' '}

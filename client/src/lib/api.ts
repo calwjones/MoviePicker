@@ -87,6 +87,7 @@ export const importApi = {
     form.append('file', file);
     return api.post('/import/watched', form);
   },
+  letterboxd: (username: string) => api.post('/import/letterboxd', { username }),
 };
 
 export const sessionApi = {

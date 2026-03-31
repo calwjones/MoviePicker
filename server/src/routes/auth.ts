@@ -278,6 +278,7 @@ const USER_SELECT = {
   avatarUrl: true,
   emailVerified: true,
   preferredStreamingProviderIds: true,
+  letterboxdUsername: true,
 } as const;
 
 router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {

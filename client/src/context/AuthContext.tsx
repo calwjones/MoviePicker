@@ -11,6 +11,7 @@ interface User {
   emailVerified?: boolean;
   isGuest?: boolean;
   preferredStreamingProviderIds?: number[];
+  letterboxdUsername?: string | null;
 }
 
 interface AuthContextType {
@@ -21,6 +22,7 @@ interface AuthContextType {
   logout: () => void;
   updateDisplayName: (displayName: string) => Promise<void>;
   updatePreferredProviders: (providerIds: number[]) => Promise<void>;
+  setLetterboxdUsername: (username: string | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -94,8 +96,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser((prev) => (prev ? { ...prev, preferredStreamingProviderIds: res.data.user.preferredStreamingProviderIds } : prev));
   };
 
+  const setLetterboxdUsername = useCallback((username: string | null) => {
+    setUser((prev) => (prev ? { ...prev, letterboxdUsername: username } : prev));
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, updateDisplayName, updatePreferredProviders }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, updateDisplayName, updatePreferredProviders, setLetterboxdUsername }}>
       {children}
     </AuthContext.Provider>
   );
