@@ -6,6 +6,8 @@ import { findOrCreateMovie } from '../services/tmdb';
 import { prisma } from '../app';
 import {
   assertProfileExists,
+  createCookieJar,
+  createSessionNumber,
   fetchRated,
   fetchWatchlist,
   withScrapeSlot,
@@ -250,11 +252,11 @@ router.post('/letterboxd', authenticate, async (req: AuthRequest, res: Response)
     let rated: RatedEntry[] = [];
     try {
       await withScrapeSlot(async () => {
-        await assertProfileExists(username);
-        [watchlist, rated] = await Promise.all([
-          fetchWatchlist(username),
-          fetchRated(username),
-        ]);
+        const jar = createCookieJar();
+        const sessionNumber = createSessionNumber();
+        await assertProfileExists(username, jar, sessionNumber);
+        watchlist = await fetchWatchlist(username, jar, sessionNumber);
+        rated = await fetchRated(username, jar, sessionNumber);
       });
     } catch (err) {
       if (err instanceof LetterboxdProfileNotFound) {

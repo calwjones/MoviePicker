@@ -3,6 +3,50 @@ import * as cheerio from 'cheerio';
 const LETTERBOXD_BASE = 'https://letterboxd.com';
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 const PAGE_CAP = 50;
+const INTER_REQUEST_DELAY_MS = 250;
+
+class CookieJar {
+  private cookies = new Map<string, string>();
+
+  absorb(headers: Headers): void {
+    const raw = typeof headers.getSetCookie === 'function'
+      ? headers.getSetCookie()
+      : ([headers.get('set-cookie')].filter(Boolean) as string[]);
+    for (const line of raw) {
+      const firstSemi = line.indexOf(';');
+      const pair = firstSemi >= 0 ? line.slice(0, firstSemi) : line;
+      const eq = pair.indexOf('=');
+      if (eq < 0) continue;
+      const name = pair.slice(0, eq).trim();
+      const value = pair.slice(eq + 1).trim();
+      if (name) this.cookies.set(name, value);
+    }
+  }
+
+  header(): string | undefined {
+    if (this.cookies.size === 0) return undefined;
+    return [...this.cookies.entries()].map(([k, v]) => `${k}=${v}`).join('; ');
+  }
+}
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+const SCRAPER_API_KEY = process.env.SCRAPER_API_KEY;
+
+function buildRequestUrl(targetUrl: string, sessionNumber: number): string {
+  if (!SCRAPER_API_KEY) return targetUrl;
+  const params = new URLSearchParams({
+    api_key: SCRAPER_API_KEY,
+    url: targetUrl,
+    keep_headers: 'true',
+    session_number: String(sessionNumber),
+  });
+  return `http://api.scraperapi.com/?${params.toString()}`;
+}
+
+function newSessionNumber(): number {
+  return Math.floor(Math.random() * 1_000_000);
+}
 
 export class LetterboxdProfileNotFound extends Error {
   code = 'profile_not_found' as const;
@@ -63,17 +107,32 @@ export async function withScrapeSlot<T>(task: () => Promise<T>): Promise<T> {
   }
 }
 
-async function fetchPage(url: string): Promise<string> {
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': USER_AGENT,
-      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Accept-Encoding': 'gzip, deflate, br',
-      'Cache-Control': 'no-cache',
-      Pragma: 'no-cache',
-    },
-  });
+interface FetchOpts {
+  referer?: string;
+  jar?: CookieJar;
+  sessionNumber?: number;
+}
+
+async function fetchPage(url: string, opts: FetchOpts = {}): Promise<string> {
+  const headers: Record<string, string> = {
+    'User-Agent': USER_AGENT,
+    Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Upgrade-Insecure-Requests': '1',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': opts.referer ? 'same-origin' : 'none',
+    'Sec-Fetch-User': '?1',
+  };
+  if (opts.referer) headers.Referer = opts.referer;
+  const cookieHeader = opts.jar?.header();
+  if (cookieHeader) headers.Cookie = cookieHeader;
+
+  const requestUrl = buildRequestUrl(url, opts.sessionNumber ?? 0);
+  const res = await fetch(requestUrl, { headers });
+  opts.jar?.absorb(res.headers);
+
   if (res.status === 404) {
     throw { kind: 'not_found' as const };
   }
@@ -87,10 +146,10 @@ async function fetchPage(url: string): Promise<string> {
   return res.text();
 }
 
-export async function assertProfileExists(username: string): Promise<void> {
+export async function assertProfileExists(username: string, jar?: CookieJar, sessionNumber?: number): Promise<void> {
   const url = `${LETTERBOXD_BASE}/${username}/`;
   try {
-    const html = await fetchPage(url);
+    const html = await fetchPage(url, { jar, sessionNumber });
     const $ = cheerio.load(html);
     const body = $('body').text().toLowerCase();
     if (body.includes('this member has set their profile to private')) {
@@ -104,96 +163,130 @@ export async function assertProfileExists(username: string): Promise<void> {
   }
 }
 
+function parseItemName(raw: string): { title: string; year: number | null } {
+  const trimmed = raw.trim();
+  const yearMatch = /^(.+?)\s+\((\d{4})\)\s*$/.exec(trimmed);
+  if (yearMatch) return { title: yearMatch[1].trim(), year: parseInt(yearMatch[2], 10) };
+  return { title: trimmed, year: null };
+}
+
 export function parseFilmPage(html: string, url: string): FilmEntry[] {
   const $ = cheerio.load(html);
-  const tiles = $('li.poster-container div.film-poster');
+  const tiles = $('li.griditem [data-component-class="LazyPoster"]');
   if (tiles.length === 0) return [];
 
   const out: FilmEntry[] = [];
   tiles.each((_, el) => {
     const $el = $(el);
-    const slug = ($el.attr('data-film-slug') || $el.attr('data-target-link') || '').replace(/^\/film\//, '').replace(/\/$/, '');
+    const slug = ($el.attr('data-item-slug') || '').trim();
     if (!slug) return;
-    const title = $el.find('img').attr('alt')?.trim() || '';
-    const yearAttr = $el.attr('data-film-release-year');
-    const year = yearAttr && /^\d{4}$/.test(yearAttr) ? parseInt(yearAttr, 10) : null;
-    if (!title) {
-      const snippet = $.html($el).slice(0, 400);
-      console.error('[letterboxd] missing title on tile', { url, selector: 'div.film-poster img[alt]', snippet });
-      return;
-    }
+    const { title, year } = parseItemName($el.attr('data-item-name') || '');
+    if (!title) return;
     out.push({ slug, title, year });
   });
+  void url;
   return out;
 }
 
 export function parseRatedPage(html: string, url: string): RatedEntry[] {
   const $ = cheerio.load(html);
-  const tiles = $('li.poster-container');
+  const tiles = $('li.griditem');
   if (tiles.length === 0) return [];
 
   const out: RatedEntry[] = [];
+  let firstTileHtml: string | null = null;
+  let ratingsFound = 0;
+
   tiles.each((_, el) => {
     const $tile = $(el);
-    const $poster = $tile.find('div.film-poster');
-    const slug = ($poster.attr('data-film-slug') || $poster.attr('data-target-link') || '').replace(/^\/film\//, '').replace(/\/$/, '');
+    const $poster = $tile.find('[data-component-class="LazyPoster"]').first();
+    const slug = ($poster.attr('data-item-slug') || '').trim();
     if (!slug) return;
-    const title = $poster.find('img').attr('alt')?.trim() || '';
-    const yearAttr = $poster.attr('data-film-release-year');
-    const year = yearAttr && /^\d{4}$/.test(yearAttr) ? parseInt(yearAttr, 10) : null;
+    const { title, year } = parseItemName($poster.attr('data-item-name') || '');
+    if (!title) return;
 
     let rating: number | null = null;
-    const ratingClass = $tile.find('.rating').first().attr('class') || '';
-    const ratedMatch = /rated-(\d{1,2})/.exec(ratingClass);
-    if (ratedMatch) {
-      const halfStars = parseInt(ratedMatch[1], 10);
+    const ratedClassEl = $tile.find('[class*="rated-"]').first().attr('class') || '';
+    const ratedAttr = ratedClassEl || $tile.find('.rating').first().attr('class') || '';
+    const halfMatch = /rated-(\d{1,2})/.exec(ratedAttr);
+    if (halfMatch) {
+      const halfStars = parseInt(halfMatch[1], 10);
       if (halfStars >= 1 && halfStars <= 10) rating = halfStars / 2;
     }
-    if (rating === null) {
-      const ratingText = $tile.find('.rating').first().text().trim();
-      const starMatch = /^([\u2605]+)([\u00BD]?)$/.exec(ratingText);
-      if (starMatch) {
-        const stars = starMatch[1].length + (starMatch[2] ? 0.5 : 0);
-        if (stars > 0 && stars <= 5) rating = stars;
-      }
-    }
 
-    if (!title) {
-      const snippet = $.html($poster).slice(0, 400);
-      console.error('[letterboxd] missing title on rated tile', { url, selector: 'div.film-poster img[alt]', snippet });
-      return;
-    }
+    if (rating !== null) ratingsFound++;
+    if (firstTileHtml === null) firstTileHtml = $.html($tile).slice(0, 1500);
     out.push({ slug, title, year, rating });
   });
+
+  if (out.length > 0 && ratingsFound === 0 && firstTileHtml) {
+    console.warn('[letterboxd] tiles parsed but no ratings detected', { url, firstTile: firstTileHtml });
+  }
+
   return out;
 }
 
 async function walkPages<T>(
   buildUrl: (page: number) => string,
   parse: (html: string, url: string) => T[],
+  initialReferer: string,
+  jar?: CookieJar,
+  sessionNumber?: number,
 ): Promise<T[]> {
   const out: T[] = [];
+  let referer = initialReferer;
   for (let page = 1; page <= PAGE_CAP; page++) {
     const url = buildUrl(page);
-    const html = await fetchPage(url);
+    if (page > 1) await sleep(INTER_REQUEST_DELAY_MS);
+    const html = await fetchPage(url, { referer, jar, sessionNumber });
     const entries = parse(html, url);
-    if (entries.length === 0) break;
+    if (entries.length === 0) {
+      if (page === 1) {
+        const snippet = html.slice(0, 800).replace(/\s+/g, ' ');
+        console.error('[letterboxd] page 1 parsed 0 entries', {
+          url,
+          proxy: !!SCRAPER_API_KEY,
+          htmlLength: html.length,
+          snippet,
+        });
+      }
+      break;
+    }
     out.push(...entries);
     if (entries.length < 20) break;
+    referer = url;
   }
   return out;
 }
 
-export async function fetchWatchlist(username: string): Promise<FilmEntry[]> {
+export async function fetchWatchlist(username: string, jar?: CookieJar, sessionNumber?: number): Promise<FilmEntry[]> {
   return walkPages(
     (p) => `${LETTERBOXD_BASE}/${username}/watchlist/page/${p}/`,
     parseFilmPage,
+    `${LETTERBOXD_BASE}/${username}/`,
+    jar,
+    sessionNumber,
   );
 }
 
-export async function fetchRated(username: string): Promise<RatedEntry[]> {
+export async function fetchRated(username: string, jar?: CookieJar, sessionNumber?: number): Promise<RatedEntry[]> {
   return walkPages(
     (p) => `${LETTERBOXD_BASE}/${username}/films/by/entry-rating/page/${p}/`,
     parseRatedPage,
+    `${LETTERBOXD_BASE}/${username}/`,
+    jar,
+    sessionNumber,
   );
+}
+
+export function createCookieJar(): CookieJar {
+  return new CookieJar();
+}
+
+export function createSessionNumber(): number {
+  return newSessionNumber();
+}
+
+export function isProxyEnabled(): boolean {
+  return !!SCRAPER_API_KEY;
 }
