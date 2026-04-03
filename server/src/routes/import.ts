@@ -255,8 +255,10 @@ router.post('/letterboxd', authenticate, async (req: AuthRequest, res: Response)
         const jar = createCookieJar();
         const sessionNumber = createSessionNumber();
         await assertProfileExists(username, jar, sessionNumber);
-        watchlist = await fetchWatchlist(username, jar, sessionNumber);
-        rated = await fetchRated(username, jar, sessionNumber);
+        [watchlist, rated] = await Promise.all([
+          fetchWatchlist(username, jar, sessionNumber),
+          fetchRated(username, jar, sessionNumber),
+        ]);
       });
     } catch (err) {
       if (err instanceof LetterboxdProfileNotFound) {
@@ -295,58 +297,63 @@ router.post('/letterboxd', authenticate, async (req: AuthRequest, res: Response)
 
     const results = { imported: 0, skipped: 0, failed: 0, total: bySlug.size, errors: [] as string[] };
     const userId = req.userId!;
+    const entries = Array.from(bySlug.values());
+    const CHUNK_SIZE = 15;
 
-    for (const [, entry] of bySlug) {
-      try {
-        const movie = await findOrCreateMovie(entry.title, entry.year ?? undefined);
-        if (!movie) {
-          results.failed++;
-          results.errors.push(`"${entry.title}" (${entry.year ?? '?'}) — not found on TMDb`);
-          continue;
-        }
-
-        if (entry.watched) {
-          await prisma.userMovie.upsert({
-            where: { userId_movieId: { userId, movieId: movie.id } },
-            update: {
-              onWatchlist: false,
-              watched: true,
-              userRating: entry.rating,
-              source: 'letterboxd_username',
-            },
-            create: {
-              userId,
-              movieId: movie.id,
-              onWatchlist: false,
-              watched: true,
-              userRating: entry.rating,
-              source: 'letterboxd_username',
-            },
-          });
-        } else {
-          const existing = await prisma.userMovie.findUnique({
-            where: { userId_movieId: { userId, movieId: movie.id } },
-          });
-          if (existing?.watched) {
-            results.skipped++;
-            continue;
+    for (let i = 0; i < entries.length; i += CHUNK_SIZE) {
+      const chunk = entries.slice(i, i + CHUNK_SIZE);
+      await Promise.all(chunk.map(async (entry) => {
+        try {
+          const movie = await findOrCreateMovie(entry.title, entry.year ?? undefined);
+          if (!movie) {
+            results.failed++;
+            results.errors.push(`"${entry.title}" (${entry.year ?? '?'}) — not found on TMDb`);
+            return;
           }
-          await prisma.userMovie.upsert({
-            where: { userId_movieId: { userId, movieId: movie.id } },
-            update: { onWatchlist: true, source: 'letterboxd_username' },
-            create: {
-              userId,
-              movieId: movie.id,
-              onWatchlist: true,
-              source: 'letterboxd_username',
-            },
-          });
+
+          if (entry.watched) {
+            await prisma.userMovie.upsert({
+              where: { userId_movieId: { userId, movieId: movie.id } },
+              update: {
+                onWatchlist: false,
+                watched: true,
+                userRating: entry.rating,
+                source: 'letterboxd_username',
+              },
+              create: {
+                userId,
+                movieId: movie.id,
+                onWatchlist: false,
+                watched: true,
+                userRating: entry.rating,
+                source: 'letterboxd_username',
+              },
+            });
+          } else {
+            const existing = await prisma.userMovie.findUnique({
+              where: { userId_movieId: { userId, movieId: movie.id } },
+            });
+            if (existing?.watched) {
+              results.skipped++;
+              return;
+            }
+            await prisma.userMovie.upsert({
+              where: { userId_movieId: { userId, movieId: movie.id } },
+              update: { onWatchlist: true, source: 'letterboxd_username' },
+              create: {
+                userId,
+                movieId: movie.id,
+                onWatchlist: true,
+                source: 'letterboxd_username',
+              },
+            });
+          }
+          results.imported++;
+        } catch {
+          results.failed++;
+          results.errors.push(`"${entry.title}" — processing error`);
         }
-        results.imported++;
-      } catch {
-        results.failed++;
-        results.errors.push(`"${entry.title}" — processing error`);
-      }
+      }));
     }
 
     await prisma.user.update({
