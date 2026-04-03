@@ -16,6 +16,8 @@ interface TmdbSearchResult {
   overview?: string;
   genre_ids?: number[];
   vote_average?: number;
+  vote_count?: number;
+  popularity?: number;
 }
 
 interface TmdbMovieDetail {
