@@ -26,33 +26,44 @@ const POOL_PAGES = 3;
 const TOP_RATED_POOL_PAGES = 6;
 const TOP_RATED_PAGE_WINDOW = 20;
 const PERSONALISED_HISTORY_FLOOR = 5;
-const EDITORIAL_CACHE_TTL_MS = 60 * 60 * 1000;
+const EDITORIAL_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const EDITORIAL_PICK_COUNT = 3;
 const GENRE_POOL_SIZE = 6;
 const GENRE_PICK_COUNT = 3;
 
 const editorialCache = new Map<string, { results: TmdbSearchResult[]; expires: number }>();
-
-function getCached(key: string): TmdbSearchResult[] | null {
-  const entry = editorialCache.get(key);
-  if (!entry) return null;
-  if (Date.now() > entry.expires) {
-    editorialCache.delete(key);
-    return null;
-  }
-  return entry.results;
-}
+const inflightRefresh = new Map<string, Promise<TmdbSearchResult[]>>();
 
 function setCached(key: string, results: TmdbSearchResult[]): void {
   editorialCache.set(key, { results, expires: Date.now() + EDITORIAL_CACHE_TTL_MS });
 }
 
+function refresh(key: string, loader: () => Promise<TmdbSearchResult[]>, fallback: TmdbSearchResult[] | null): Promise<TmdbSearchResult[]> {
+  const existing = inflightRefresh.get(key);
+  if (existing) return existing;
+  const promise = loader()
+    .then((results) => {
+      if (results.length > 0) setCached(key, results);
+      return results;
+    })
+    .catch((err) => {
+      console.error(`[browse] cache refresh failed for ${key}`, err);
+      return fallback ?? [];
+    })
+    .finally(() => inflightRefresh.delete(key));
+  inflightRefresh.set(key, promise);
+  return promise;
+}
+
 async function fetchCached(key: string, loader: () => Promise<TmdbSearchResult[]>): Promise<TmdbSearchResult[]> {
-  const cached = getCached(key);
-  if (cached) return cached;
-  const results = await loader();
-  if (results.length > 0) setCached(key, results);
-  return results;
+  const entry = editorialCache.get(key);
+  if (entry) {
+    if (Date.now() > entry.expires) {
+      void refresh(key, loader, entry.results);
+    }
+    return entry.results;
+  }
+  return refresh(key, loader, null);
 }
 
 async function fetchPages(
@@ -301,5 +312,11 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+export async function warmBrowseCache(): Promise<void> {
+  await Promise.all(
+    EDITORIAL_ROW_DEFS.map((def) => fetchCached(def.id, def.loader).catch(() => [])),
+  );
+}
 
 export default router;

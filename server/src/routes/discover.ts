@@ -12,6 +12,31 @@ const BAYESIAN_PRIOR_MEAN = 6.8;
 const TOP_BAND_RATIO = 0.6;
 const TMDB_PAGES_PER_POOL = 5;
 const TMDB_PAGE_WINDOW = 15;
+const POOL_CACHE_TTL_MS = 2 * 60 * 1000;
+
+interface PoolCacheEntry {
+  merged: TmdbSearchResult[];
+  maxTmdbTotalPages: number;
+  expires: number;
+}
+
+const poolCache = new Map<string, PoolCacheEntry>();
+
+function poolCacheKey(opts: {
+  genreIds?: number[];
+  minRating?: number;
+  releaseDateGte?: string;
+  releaseDateLte?: string;
+  watchProviderIds?: number[];
+}): string {
+  return JSON.stringify({
+    g: opts.genreIds?.slice().sort((a, b) => a - b) ?? null,
+    m: opts.minRating ?? null,
+    d1: opts.releaseDateGte ?? null,
+    d2: opts.releaseDateLte ?? null,
+    p: opts.watchProviderIds?.slice().sort((a, b) => a - b) ?? null,
+  });
+}
 
 function weightedScore(voteAverage: number, voteCount: number): number {
   const v = Math.max(0, voteCount);
@@ -73,34 +98,49 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
     }
 
     const baseOpts = { genreIds, minRating, releaseDateGte, releaseDateLte, watchProviderIds };
+    const cacheKey = poolCacheKey(baseOpts);
 
-    const tmdbPages = samplePages(TMDB_PAGE_WINDOW, TMDB_PAGES_PER_POOL);
+    const cachedPool = poolCache.get(cacheKey);
+    const poolFresh = cachedPool && Date.now() < cachedPool.expires;
 
-    const [topRatedBatches, mostVotedBatches] = await Promise.all([
-      Promise.all(tmdbPages.map((p) => discoverMovies({ ...baseOpts, sortBy: 'vote_average.desc', voteCountGte: 1500, page: p }))),
-      Promise.all(tmdbPages.map((p) => discoverMovies({ ...baseOpts, sortBy: 'vote_count.desc', voteCountGte: BAYESIAN_PRIOR_VOTES, page: p }))),
+    const poolPromise: Promise<{ merged: TmdbSearchResult[]; maxTmdbTotalPages: number }> = poolFresh
+      ? Promise.resolve({ merged: cachedPool.merged, maxTmdbTotalPages: cachedPool.maxTmdbTotalPages })
+      : (async () => {
+        const tmdbPages = samplePages(TMDB_PAGE_WINDOW, TMDB_PAGES_PER_POOL);
+        const [topRatedBatches, mostVotedBatches] = await Promise.all([
+          Promise.all(tmdbPages.map((p) => discoverMovies({ ...baseOpts, sortBy: 'vote_average.desc', voteCountGte: 1500, page: p }))),
+          Promise.all(tmdbPages.map((p) => discoverMovies({ ...baseOpts, sortBy: 'vote_count.desc', voteCountGte: BAYESIAN_PRIOR_VOTES, page: p }))),
+        ]);
+
+        const seen = new Set<number>();
+        const merged: TmdbSearchResult[] = [];
+        for (const batch of [...topRatedBatches, ...mostVotedBatches]) {
+          for (const r of batch.results) {
+            if (seen.has(r.id)) continue;
+            seen.add(r.id);
+            merged.push(r);
+          }
+        }
+
+        const maxTmdbTotalPages = Math.max(
+          ...topRatedBatches.map((b) => b.totalPages),
+          ...mostVotedBatches.map((b) => b.totalPages),
+          1,
+        );
+
+        poolCache.set(cacheKey, { merged, maxTmdbTotalPages, expires: Date.now() + POOL_CACHE_TTL_MS });
+        return { merged, maxTmdbTotalPages };
+      })();
+
+    const [{ merged, maxTmdbTotalPages }, library, inCinemaSet] = await Promise.all([
+      poolPromise,
+      prisma.userMovie.findMany({
+        where: { userId: req.userId! },
+        select: { movie: { select: { tmdbId: true } } },
+      }),
+      getInCinemaIds(),
     ]);
 
-    const seen = new Set<number>();
-    const merged: TmdbSearchResult[] = [];
-    for (const batch of [...topRatedBatches, ...mostVotedBatches]) {
-      for (const r of batch.results) {
-        if (seen.has(r.id)) continue;
-        seen.add(r.id);
-        merged.push(r);
-      }
-    }
-
-    const maxTmdbTotalPages = Math.max(
-      ...topRatedBatches.map((b) => b.totalPages),
-      ...mostVotedBatches.map((b) => b.totalPages),
-      1,
-    );
-
-    const library = await prisma.userMovie.findMany({
-      where: { userId: req.userId! },
-      select: { movie: { select: { tmdbId: true } } },
-    });
     const excluded = new Set(library.map((r) => r.movie.tmdbId).filter((id): id is number => id !== null));
 
     const ranked = merged
@@ -111,7 +151,6 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
     const topBandSize = Math.max(1, Math.ceil(ranked.length * TOP_BAND_RATIO));
     const topBand = ranked.slice(0, topBandSize).map((x) => x.r);
 
-    const inCinemaSet = await getInCinemaIds();
     const movies = shuffleInPlace(topBand).map((r) => shapeTmdbSearchResult(r, inCinemaSet));
 
     const totalPages = Math.max(1, Math.ceil(maxTmdbTotalPages / TMDB_PAGES_PER_POOL));

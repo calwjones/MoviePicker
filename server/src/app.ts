@@ -28,7 +28,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 app.use(helmet());
-app.use(cors({ origin: CLIENT_URL }));
+app.use(cors({ origin: CLIENT_URL, maxAge: 86400 }));
 app.use(express.json());
 
 const authLimiter = rateLimit({
