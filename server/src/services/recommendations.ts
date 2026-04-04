@@ -2,7 +2,7 @@ import { prisma } from '../app';
 import { getTmdbRecommendations, TMDB_IMAGE_BASE } from './tmdb';
 import { getInCinemaIds } from './cinemaStatus';
 
-export interface ShapedRec {
+interface ShapedRec {
   tmdbId: number;
   title: string;
   year: number | null;
