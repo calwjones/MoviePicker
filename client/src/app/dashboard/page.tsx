@@ -60,7 +60,7 @@ export default function DashboardPage() {
     <div className="min-h-dvh px-6 py-8 w-full max-w-5xl mx-auto lg:px-12 flex flex-col items-stretch">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl font-bold font-display">
-          Match<span className="text-coral">sticked</span>
+          Match<span className="text-coral">Sticked</span>
         </h1>
         <div className="flex items-center gap-3">
           {user && !user.isGuest && (

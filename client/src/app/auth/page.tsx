@@ -101,7 +101,7 @@ function AuthForm() {
           {mode === 'login' ? 'Welcome back' : 'Create account'}
         </h1>
         <p className="text-cream-dim text-center mb-8">
-          {mode === 'login' ? 'Sign in to continue' : 'Join Matchsticked'}
+          {mode === 'login' ? 'Sign in to continue' : 'Join MatchSticked'}
         </p>
 
         {expired && (

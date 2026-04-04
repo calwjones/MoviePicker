@@ -102,9 +102,9 @@ export default function SwipeView({
   if (!currentMovie) return null;
 
   return (
-    <div className="min-h-dvh flex flex-col">
+    <div className="h-dvh overflow-hidden flex flex-col overscroll-none">
       {/* Header */}
-      <div className="px-4 py-3 flex items-center justify-between">
+      <div className="px-4 py-3 flex items-center justify-between shrink-0">
         <button onClick={() => router.push('/dashboard')} className="flex items-center gap-1.5 text-cream-dim hover:text-cream transition-colors px-3 py-1.5 glass rounded-lg text-sm">
           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
             <polyline points="15 18 9 12 15 6" />
@@ -120,7 +120,7 @@ export default function SwipeView({
       </div>
 
       {/* Card stack area */}
-      <div className="flex-1 flex items-center justify-center px-4 relative overflow-hidden">
+      <div className="flex-1 min-h-0 flex items-center justify-center px-4 relative overflow-hidden">
 
         {/* Previous card — fanned behind left */}
         <AnimatePresence mode="popLayout">
@@ -262,7 +262,7 @@ export default function SwipeView({
       />
 
       {/* Bottom buttons */}
-      <div className="px-4 py-3 flex gap-3 items-center w-full max-w-md lg:max-w-lg mx-auto">
+      <div className="px-4 py-3 flex gap-3 items-center w-full max-w-md lg:max-w-lg mx-auto shrink-0">
         {undoStack.length > 0 && (
           <motion.button
             initial={{ opacity: 0, x: -10 }}

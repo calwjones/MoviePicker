@@ -79,7 +79,7 @@ export default function OnboardingModal({ open, onClose, onPickPath }: Onboardin
                       className="text-2xl font-bold text-cream mb-1"
                       style={{ fontFamily: 'var(--font-playfair)' }}
                     >
-                      Welcome to Matchsticked
+                      Welcome to MatchSticked
                     </h2>
                     <p className="text-cream-dim text-sm">Pick a path to get started. You can always do the others later.</p>
                   </div>

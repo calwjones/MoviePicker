@@ -220,16 +220,21 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
     setImporting(false);
   };
 
+  const removeFromRecommendations = (tmdbId: number) => {
+    setRecommendations((prev) => prev.filter((r) => r.tmdbId !== tmdbId));
+    setMoviesLike((prev) => prev.filter((r) => r.tmdbId !== tmdbId));
+  };
+
   const handleDismissRec = async (rec: SearchResult) => {
-    setRecommendations((prev) => prev.filter((r) => r.tmdbId !== rec.tmdbId));
-    setMoviesLike((prev) => prev.filter((r) => r.tmdbId !== rec.tmdbId));
+    removeFromRecommendations(rec.tmdbId);
     try {
       await recommendationApi.dismiss(rec.tmdbId);
       if (dismissedOpen) {
         const res = await recommendationApi.dismissed();
         setDismissedMovies(res.data.movies);
       }
-    } catch {
+    } catch (err) {
+      console.warn('[recs] dismiss failed', err);
     }
   };
 
@@ -273,8 +278,7 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
   const handleAddRecommendation = async (rec: SearchResult) => {
     try {
       await movieApi.add(rec.tmdbId);
-      setRecommendations((prev) => prev.filter((r) => r.tmdbId !== rec.tmdbId));
-      setMoviesLike((prev) => prev.filter((r) => r.tmdbId !== rec.tmdbId));
+      removeFromRecommendations(rec.tmdbId);
       setRecDetail(null);
       loadWatchlist();
       addToast(`Added "${rec.title}" to your watchlist`);

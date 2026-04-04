@@ -1,9 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { importApi } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
+
+const LOADING_STAGES = [
+  'Fetching your watchlist…',
+  'Reading your ratings…',
+  'Matching movies to TMDb…',
+  'Saving to your library…',
+  'Almost there, hang tight…',
+];
 
 interface ImportResult {
   imported: number;
@@ -35,8 +43,28 @@ export default function LetterboxdImport({ mode, onSuccess, onSkip }: Letterboxd
   const [username, setUsername] = useState(stored);
   const [editing, setEditing] = useState(mode === 'onboarding' || !stored);
   const [loading, setLoading] = useState(false);
+  const [stageIndex, setStageIndex] = useState(0);
+  const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
+
+  useEffect(() => {
+    if (!loading) {
+      setStageIndex(0);
+      setProgress(0);
+      return;
+    }
+    const stageTimer = setInterval(() => {
+      setStageIndex((i) => Math.min(i + 1, LOADING_STAGES.length - 1));
+    }, 8000);
+    const progressTimer = setInterval(() => {
+      setProgress((p) => (p < 92 ? p + (92 - p) * 0.04 : p));
+    }, 500);
+    return () => {
+      clearInterval(stageTimer);
+      clearInterval(progressTimer);
+    };
+  }, [loading]);
 
   const hasStored = mode === 'library' && !!stored && !editing;
   const displayUsername = (hasStored ? stored : username).replace(/^@/, '').trim();
@@ -116,13 +144,18 @@ export default function LetterboxdImport({ mode, onSuccess, onSkip }: Letterboxd
           type="button"
           onClick={submit}
           disabled={loading}
-          className="w-full py-3 bg-coral text-charcoal font-semibold rounded-xl text-sm hover:bg-coral-dark transition-colors disabled:opacity-60"
+          className="w-full py-3 bg-coral text-charcoal font-semibold rounded-xl text-sm hover:bg-coral-dark transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
         >
-          {loading
-            ? 'Reading Letterboxd…'
-            : hasStored
-              ? `Sync from @${stored}`
-              : 'Sync'}
+          {loading ? (
+            <>
+              <span className="w-4 h-4 border-2 border-charcoal border-t-transparent rounded-full animate-spin" />
+              {LOADING_STAGES[stageIndex]}
+            </>
+          ) : hasStored ? (
+            `Sync from @${stored}`
+          ) : (
+            'Sync'
+          )}
         </button>
         {onSkip && !loading && !result && (
           <button
@@ -136,9 +169,18 @@ export default function LetterboxdImport({ mode, onSuccess, onSkip }: Letterboxd
       </div>
 
       {loading && (
-        <p className="text-cream-dim text-xs">
-          This can take up to a minute for large profiles.
-        </p>
+        <div className="space-y-1.5">
+          <div className="h-1 glass rounded-full overflow-hidden">
+            <motion.div
+              className="h-full bg-coral"
+              animate={{ width: `${progress}%` }}
+              transition={{ duration: 0.4, ease: 'easeOut' }}
+            />
+          </div>
+          <p className="text-cream-dim text-xs">
+            This can take up to a minute for large profiles.
+          </p>
+        </div>
       )}
 
       {error && (

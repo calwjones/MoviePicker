@@ -39,7 +39,7 @@ export default function Home() {
           className="text-5xl font-bold mb-4 tracking-tight"
           style={{ fontFamily: 'var(--font-playfair)' }}
         >
-          Match<span className="text-coral">sticked</span>
+          Match<span className="text-coral">Sticked</span>
         </h1>
         <p className="text-cream-dim text-lg mb-10">
           Pick a movie together. No more scrolling debates.
