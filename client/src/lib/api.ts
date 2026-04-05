@@ -93,6 +93,7 @@ export const sessionApi = {
 
 export const recommendationApi = {
   get: () => api.get('/recommendations'),
+  similar: (tmdbId: number) => api.get(`/recommendations/similar/${tmdbId}`),
 };
 
 export const swipeApi = {
