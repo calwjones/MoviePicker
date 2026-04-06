@@ -66,6 +66,9 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
   const [moviesLike, setMoviesLike] = useState<SearchResult[]>([]);
   const [moviesLikeLoading, setMoviesLikeLoading] = useState(false);
 
+  // Rec detail sheet
+  const [recDetail, setRecDetail] = useState<SearchResult | null>(null);
+
   // Load watchlist on mount and when filter changes
   const loadWatchlist = useCallback(async (filter?: 'watchlist' | 'watched' | 'all') => {
     setLibraryLoading(true);
@@ -94,6 +97,10 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
   // Close modal on escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && recDetail) {
+        setRecDetail(null);
+        return;
+      }
       if (e.key === 'Escape' && selectedMovie) {
         setSelectedMovie(null);
         setSelectedUserMovie(null);
@@ -101,11 +108,11 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
     };
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [selectedMovie]);
+  }, [selectedMovie, recDetail]);
 
-  // Lock body scroll when movie sheet is open
+  // Lock body scroll when any sheet is open
   useEffect(() => {
-    if (selectedMovie) {
+    if (selectedMovie || recDetail) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'unset';
@@ -113,7 +120,7 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [selectedMovie]);
+  }, [selectedMovie, recDetail]);
 
   const loadMoviesLike = async (movie: Movie) => {
     if (!movie.tmdbId) return;
@@ -195,6 +202,8 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
     try {
       await movieApi.add(rec.tmdbId);
       setRecommendations((prev) => prev.filter((r) => r.tmdbId !== rec.tmdbId));
+      setMoviesLike((prev) => prev.filter((r) => r.tmdbId !== rec.tmdbId));
+      setRecDetail(null);
       loadWatchlist();
       addToast(`Added "${rec.title}" to your watchlist`);
     } catch {
@@ -557,21 +566,16 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
             {recommendations.map((rec) => (
               <div
                 key={rec.tmdbId}
-                className="flex-shrink-0 w-28 snap-start group"
+                className="flex-shrink-0 w-28 snap-start group cursor-pointer"
+                onClick={() => setRecDetail(rec)}
               >
-                <div className="w-28 aspect-[2/3] rounded-xl overflow-hidden bg-card mb-2 shadow-lg group-hover:shadow-coral/20 transition-all">
+                <div className="w-28 aspect-[2/3] rounded-xl overflow-hidden bg-card mb-2 shadow-lg group-hover:shadow-coral/20 group-hover:scale-[1.03] transition-all">
                   <MoviePoster posterUrl={rec.posterUrl} title={rec.title} />
                 </div>
                 <p className="text-xs font-medium truncate">{rec.title}</p>
                 <p className="text-cream-dim text-[10px]">
                   {rec.year}{rec.rating ? ` · ${rec.rating.toFixed(1)}★` : ''}
                 </p>
-                <button
-                  onClick={() => handleAddRecommendation(rec)}
-                  className="text-danger text-[10px] hover:underline mt-0.5"
-                >
-                  + Add to Watchlist
-                </button>
               </div>
             ))}
           </div>
@@ -611,20 +615,18 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
             ) : moviesLike.length > 0 ? (
               <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x">
                 {moviesLike.map((rec) => (
-                  <div key={rec.tmdbId} className="flex-shrink-0 w-28 snap-start group">
-                    <div className="w-28 aspect-[2/3] rounded-xl overflow-hidden bg-card mb-2 shadow-lg group-hover:shadow-coral/20 transition-all">
+                  <div
+                    key={rec.tmdbId}
+                    className="flex-shrink-0 w-28 snap-start group cursor-pointer"
+                    onClick={() => setRecDetail(rec)}
+                  >
+                    <div className="w-28 aspect-[2/3] rounded-xl overflow-hidden bg-card mb-2 shadow-lg group-hover:shadow-coral/20 group-hover:scale-[1.03] transition-all">
                       <MoviePoster posterUrl={rec.posterUrl} title={rec.title} />
                     </div>
                     <p className="text-xs font-medium truncate">{rec.title}</p>
                     <p className="text-cream-dim text-[10px]">
                       {rec.year}{rec.rating ? ` · ${rec.rating.toFixed(1)}★` : ''}
                     </p>
-                    <button
-                      onClick={() => handleAddRecommendation(rec)}
-                      className="text-danger text-[10px] hover:underline mt-0.5"
-                    >
-                      + Add to Watchlist
-                    </button>
                   </div>
                 ))}
               </div>
@@ -779,6 +781,56 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
         cancelLabel="Cancel"
         danger
       />
+
+      {/* Rec Detail Sheet */}
+      <AnimatePresence>
+        {recDetail && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-charcoal/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center"
+            onClick={() => setRecDetail(null)}
+          >
+            <motion.div
+              initial={{ y: 100, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 100, opacity: 0 }}
+              className="glass rounded-t-2xl sm:rounded-2xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex gap-4 mb-4">
+                <div className="w-24 h-36 rounded-xl overflow-hidden flex-shrink-0">
+                  <MoviePoster posterUrl={recDetail.posterUrl} title={recDetail.title} />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold font-display">{recDetail.title}</h2>
+                  <p className="text-cream-dim text-sm mt-1">
+                    {recDetail.year}{recDetail.rating ? ` · ${recDetail.rating.toFixed(1)}★` : ''}
+                  </p>
+                </div>
+              </div>
+              {recDetail.overview && (
+                <p className="text-cream-dim text-sm mb-4">{recDetail.overview}</p>
+              )}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setRecDetail(null)}
+                  className="flex-1 py-3 glass rounded-xl text-cream-dim hover:text-cream transition-colors"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => handleAddRecommendation(recDetail)}
+                  className="flex-1 py-3 bg-coral text-charcoal rounded-xl font-medium text-sm hover:bg-coral/90 transition-colors"
+                >
+                  Add to Watchlist
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Movie Detail Modal */}
       <AnimatePresence>
