@@ -15,6 +15,20 @@ type SessionWithMovies = {
   matches?: { movie: Movie }[];
 } & Record<string, unknown>;
 
+function assertGroupJoinable(
+  session: { type: string; status: string; userId: string | null; user2Id: string | null } | null,
+  userId: string,
+): { status: number; error: string } | null {
+  if (!session) return { status: 404, error: 'Session not found' };
+  if (session.type !== 'group') return { status: 400, error: 'Not a group session' };
+  if (session.status !== 'waiting') return { status: 400, error: 'Session has already started' };
+  if (session.userId === userId) return { status: 400, error: 'You are the host' };
+  if (session.user2Id && session.user2Id !== userId) {
+    return { status: 400, error: 'Session already has a second participant' };
+  }
+  return null;
+}
+
 async function decorateSession<T extends SessionWithMovies | null>(session: T): Promise<T> {
   if (!session) return session;
   const set = await getInCinemaIds();
@@ -152,40 +166,15 @@ router.post('/:id/join', authenticate, async (req: AuthRequest, res: Response) =
     const sessionId = req.params.id as string;
 
     const session = await prisma.swipeSession.findUnique({ where: { id: sessionId } });
-    if (!session) {
-      res.status(404).json({ error: 'Session not found' });
-      return;
-    }
-    if (session.type !== 'group') {
-      res.status(400).json({ error: 'Not a group session' });
-      return;
-    }
-    if (session.status !== 'waiting') {
-      res.status(400).json({ error: 'Session has already started' });
-      return;
-    }
-    if (session.userId === req.userId) {
-      res.status(400).json({ error: 'You are the host' });
-      return;
-    }
-    if (session.user2Id && session.user2Id !== req.userId) {
-      res.status(400).json({ error: 'Session already has a second participant' });
+    const check = assertGroupJoinable(session, req.userId!);
+    if (check) {
+      res.status(check.status).json({ error: check.error });
       return;
     }
 
     const updated = await prisma.swipeSession.update({
       where: { id: sessionId },
       data: { user2Id: req.userId },
-    });
-
-    const joiner = await prisma.user.findUnique({
-      where: { id: req.userId },
-      select: { displayName: true },
-    });
-
-    emit(`session:${sessionId}`, 'participant-joined', {
-      displayName: joiner?.displayName,
-      type: 'registered',
     });
 
     res.json({ session: updated });

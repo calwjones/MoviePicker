@@ -4,6 +4,7 @@ import { emit } from '../services/emitter';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { resolveSessionRole } from '../lib/resolveSessionRole';
 import { getInCinemaIds, attachInCinema } from '../services/cinemaStatus';
+import { clearSessionState } from '../services/socket';
 
 const router = Router();
 
@@ -238,6 +239,7 @@ router.post('/done', authenticate, async (req: AuthRequest, res: Response) => {
         : [];
 
       emit(`session:${sessionId}`, 'session-complete', { matches, compromises });
+      clearSessionState(sessionId);
 
       res.json({ status: 'completed', matches, compromises });
     } else {
@@ -246,7 +248,9 @@ router.post('/done', authenticate, async (req: AuthRequest, res: Response) => {
         data: { status: 'swiping' },
       });
 
-      emit(`session:${sessionId}`, 'partner-done', { userDone: allSwiped });
+      emit(`session:${sessionId}`, 'partner-done', {
+        finishedByRole: isUser1 ? 'user1' : 'user2',
+      });
 
       res.json({ status: 'waiting', userDone: allSwiped, partnerDone });
     }

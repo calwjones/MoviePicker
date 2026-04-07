@@ -14,7 +14,15 @@ interface RouletteState {
 }
 
 const rouletteSpins = new Map<string, RouletteState>();
+const announcedJoins = new Set<string>();
 const MAX_SPINS = 3;
+
+export function clearSessionState(sessionId: string): void {
+  rouletteSpins.delete(sessionId);
+  for (const key of announcedJoins) {
+    if (key.startsWith(`${sessionId}:`)) announcedJoins.delete(key);
+  }
+}
 
 export function setupSocketHandlers(io: Server): void {
   io.use((socket: AuthenticatedSocket, next) => {
@@ -48,14 +56,35 @@ export function setupSocketHandlers(io: Server): void {
           return;
         }
 
+        const userKey = socket.guestId ? `guest:${socket.guestId}` : `user:${socket.userId}`;
+        const joinedKey = `${sessionId}:${userKey}`;
+        const alreadyAnnounced = announcedJoins.has(joinedKey);
+
+        const emitRouletteState = () => {
+          const count = rouletteSpins.get(sessionId)?.count ?? 0;
+          socket.emit('roulette-state', {
+            spinsLeft: Math.max(0, MAX_SPINS - count),
+            maxSpins: MAX_SPINS,
+          });
+        };
+
         if (socket.guestId && session.guestId === socket.guestId) {
           socket.join(`session:${sessionId}`);
           socket.to(`session:${sessionId}`).emit('partner-online');
+          if (!alreadyAnnounced) {
+            announcedJoins.add(joinedKey);
+            socket.to(`session:${sessionId}`).emit('participant-joined', {
+              displayName: session.guestName ?? 'Guest',
+              type: 'guest',
+            });
+          }
+          emitRouletteState();
           return;
         }
 
         if (session.type === 'solo' && session.userId === socket.userId) {
           socket.join(`session:${sessionId}`);
+          emitRouletteState();
           return;
         }
 
@@ -67,7 +96,21 @@ export function setupSocketHandlers(io: Server): void {
             return;
           }
           socket.join(`session:${sessionId}`);
-          if (!isHost) socket.to(`session:${sessionId}`).emit('partner-online');
+          if (!isHost) {
+            socket.to(`session:${sessionId}`).emit('partner-online');
+            if (!alreadyAnnounced) {
+              announcedJoins.add(joinedKey);
+              const joiner = await prisma.user.findUnique({
+                where: { id: socket.userId },
+                select: { displayName: true },
+              });
+              socket.to(`session:${sessionId}`).emit('participant-joined', {
+                displayName: joiner?.displayName ?? 'Player',
+                type: 'registered',
+              });
+            }
+          }
+          emitRouletteState();
           return;
         }
 
@@ -81,6 +124,18 @@ export function setupSocketHandlers(io: Server): void {
       socket.to(`session:${data.sessionId}`).emit('partner-done');
     });
 
+    socket.on('reveal-matches', (data: { sessionId: string }) => {
+      const { sessionId } = data;
+      if (!sessionId || !socket.rooms.has(`session:${sessionId}`)) return;
+      io.to(`session:${sessionId}`).emit('matches-revealed');
+    });
+
+    socket.on('reveal-all', (data: { sessionId: string }) => {
+      const { sessionId } = data;
+      if (!sessionId || !socket.rooms.has(`session:${sessionId}`)) return;
+      io.to(`session:${sessionId}`).emit('matches-reveal-all');
+    });
+
     socket.on('roulette-spin', (data: { sessionId: string; matchCount: number }) => {
       const { sessionId, matchCount } = data;
       if (!sessionId || !matchCount || matchCount <= 0) return;
@@ -92,7 +147,7 @@ export function setupSocketHandlers(io: Server): void {
 
       const state = rouletteSpins.get(sessionId) ?? { count: 0, lastWinner: null };
       if (state.count >= MAX_SPINS) {
-        socket.emit('roulette-error', { message: 'No spins left' });
+        socket.emit('roulette-error', { message: 'No spins left', spinsLeft: 0 });
         return;
       }
 

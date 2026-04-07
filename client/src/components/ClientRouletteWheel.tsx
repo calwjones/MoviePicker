@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import type { SessionMovie } from '@shared/types';
+import { getSocket } from '@/lib/socket';
 
 const SEGMENT_FILLS = ['#1A1A1A', '#222222', '#1E1E1E'];
 
@@ -11,13 +12,15 @@ interface ClientRouletteWheelProps {
   onResult: (sm: SessionMovie) => void;
   maxSpins?: number;
   children?: React.ReactNode;
+  sessionId?: string;
 }
 
 export default function ClientRouletteWheel({
   movies,
   onResult,
-  maxSpins = 3,
+  maxSpins = 3, // solo fallback only; group sessions get authoritative spinsLeft from server via roulette-state
   children,
+  sessionId,
 }: ClientRouletteWheelProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [spinning, setSpinning] = useState(false);
@@ -195,12 +198,11 @@ export default function ClientRouletteWheel({
     };
   }, []);
 
-  const spin = () => {
-    if (spinning || movies.length === 0 || spinsLeft <= 0) return;
+  const runSpinAnimation = useCallback((winnerIndex: number) => {
+    if (winnerIndex < 0 || winnerIndex >= movies.length) return;
     setSpinning(true);
     setHasLanded(false);
 
-    const winnerIndex = Math.floor(Math.random() * movies.length);
     const segmentAngle = (2 * Math.PI) / movies.length;
     const currentRotation = rotationRef.current;
 
@@ -208,12 +210,12 @@ export default function ClientRouletteWheel({
     const currentMod = ((currentRotation % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
     let extra = desiredMod - currentMod;
     if (extra < 0) extra += 2 * Math.PI;
-    const totalSpins = 5 + Math.floor(Math.random() * 4);
+    const totalSpins = 7;
     const targetRotation = currentRotation + totalSpins * 2 * Math.PI + extra;
 
     const startRotation = currentRotation;
     const startTime = Date.now();
-    const duration = 4000 + Math.random() * 1000;
+    const duration = 4500;
 
     const animate = () => {
       const elapsed = Date.now() - startTime;
@@ -225,7 +227,6 @@ export default function ClientRouletteWheel({
         animationRef.current = requestAnimationFrame(animate);
       } else {
         setSpinning(false);
-        setSpinsLeft((s) => s - 1);
         const result = movies[winnerIndex];
         setHasLanded(true);
         onResult(result);
@@ -233,6 +234,47 @@ export default function ClientRouletteWheel({
     };
 
     animationRef.current = requestAnimationFrame(animate);
+  }, [movies, onResult]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    const socket = getSocket();
+    const handleResult = (data: { winnerIndex: number; spinsLeft: number }) => {
+      setSpinsLeft(data.spinsLeft);
+      runSpinAnimation(data.winnerIndex);
+    };
+    const handleState = (data: { spinsLeft: number }) => {
+      setSpinsLeft(data.spinsLeft);
+    };
+    const handleError = (data?: { spinsLeft?: number }) => {
+      setSpinning(false);
+      if (typeof data?.spinsLeft === 'number') setSpinsLeft(data.spinsLeft);
+    };
+    socket.on('roulette-result', handleResult);
+    socket.on('roulette-state', handleState);
+    socket.on('roulette-error', handleError);
+    return () => {
+      socket.off('roulette-result', handleResult);
+      socket.off('roulette-state', handleState);
+      socket.off('roulette-error', handleError);
+    };
+  }, [sessionId, runSpinAnimation]);
+
+  const spin = () => {
+    if (spinning || movies.length === 0 || spinsLeft <= 0) return;
+
+    if (sessionId) {
+      const socket = getSocket();
+      if (socket.connected) {
+        setSpinning(true);
+        socket.emit('roulette-spin', { sessionId, matchCount: movies.length });
+        return;
+      }
+    }
+
+    const winnerIndex = Math.floor(Math.random() * movies.length);
+    setSpinsLeft((s) => s - 1);
+    runSpinAnimation(winnerIndex);
   };
 
   return (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
@@ -19,6 +19,7 @@ export default function JoinPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [hostName, setHostName] = useState<string | null>(null);
+  const [autoJoinAttempted, setAutoJoinAttempted] = useState(false);
 
   useEffect(() => {
     const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
@@ -73,7 +74,7 @@ export default function JoinPage() {
     }
   };
 
-  const handleJoinWithAccount = async () => {
+  const handleJoinWithAccount = useCallback(async () => {
     setSubmitting(true);
     setError('');
     try {
@@ -89,7 +90,15 @@ export default function JoinPage() {
     } finally {
       setSubmitting(false);
     }
-  };
+  }, [sessionId, router]);
+
+  useEffect(() => {
+    if (lobbyState !== 'join') return;
+    if (!user || user.isGuest) return;
+    if (autoJoinAttempted) return;
+    setAutoJoinAttempted(true);
+    handleJoinWithAccount();
+  }, [lobbyState, user, autoJoinAttempted, handleJoinWithAccount]);
 
   if (lobbyState === 'loading') {
     return (
@@ -141,7 +150,6 @@ export default function JoinPage() {
               animate={{ opacity: 1 }}
               className="glass rounded-2xl p-6 space-y-4"
             >
-              {/* Logged-in path */}
               {user && !user.isGuest ? (
                 <div className="space-y-4">
                   <div className="flex items-center gap-3 p-3 bg-charcoal rounded-xl">
@@ -161,51 +169,41 @@ export default function JoinPage() {
                     whileTap={{ scale: 0.98 }}
                     onClick={handleJoinWithAccount}
                     disabled={submitting}
-                    className="w-full py-4 bg-coral text-charcoal font-bold rounded-xl text-lg hover:bg-coral-dark transition-colors disabled:opacity-50"
+                    className="w-full py-4 bg-coral text-charcoal font-bold rounded-xl text-lg hover:bg-coral-dark transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                   >
+                    {submitting && (
+                      <span className="w-4 h-4 border-2 border-charcoal border-t-transparent rounded-full animate-spin" />
+                    )}
                     {submitting ? 'Joining...' : 'Join & Swipe'}
                   </motion.button>
-
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 h-px bg-card-hover" />
-                    <span className="text-cream-dim text-xs">or join without account</span>
-                    <div className="flex-1 h-px bg-card-hover" />
+                </div>
+              ) : (
+                <form onSubmit={handleJoinAsGuest} className="space-y-3">
+                  <div>
+                    <label className="block text-cream-dim text-sm mb-2">Your name</label>
+                    <input
+                      type="text"
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                      placeholder="e.g. Alex"
+                      maxLength={30}
+                      autoFocus
+                      className="w-full px-4 py-3 bg-charcoal border border-card-hover rounded-xl text-cream placeholder-cream-dim/50 focus:outline-none focus:border-coral"
+                    />
                   </div>
-                </div>
-              ) : null}
 
-              {/* Guest path — always shown when not logged in; shown as secondary when logged in */}
-              <form onSubmit={handleJoinAsGuest} className="space-y-3">
-                <div>
-                  <label className="block text-cream-dim text-sm mb-2">
-                    {user && !user.isGuest ? 'Your name (guest)' : 'Your name'}
-                  </label>
-                  <input
-                    type="text"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="e.g. Alex"
-                    maxLength={30}
-                    autoFocus={!user || !!user.isGuest}
-                    className="w-full px-4 py-3 bg-charcoal border border-card-hover rounded-xl text-cream placeholder-cream-dim/50 focus:outline-none focus:border-coral"
-                  />
-                </div>
+                  {error && <p className="text-danger text-sm text-center">{error}</p>}
 
-                {(!user || user.isGuest) && error && (
-                  <p className="text-danger text-sm text-center">{error}</p>
-                )}
+                  <motion.button
+                    whileHover={displayName.trim() ? { scale: 1.02 } : {}}
+                    whileTap={displayName.trim() ? { scale: 0.98 } : {}}
+                    type="submit"
+                    disabled={submitting || !displayName.trim()}
+                    className="w-full py-4 bg-coral text-charcoal font-bold rounded-xl text-lg hover:bg-coral-dark transition-colors disabled:opacity-50"
+                  >
+                    {submitting ? 'Joining...' : 'Join as Guest'}
+                  </motion.button>
 
-                <motion.button
-                  whileHover={displayName.trim() ? { scale: 1.02 } : {}}
-                  whileTap={displayName.trim() ? { scale: 0.98 } : {}}
-                  type="submit"
-                  disabled={submitting || !displayName.trim()}
-                  className="w-full py-4 bg-coral text-charcoal font-bold rounded-xl text-lg hover:bg-coral-dark transition-colors disabled:opacity-50"
-                >
-                  {submitting ? 'Joining...' : 'Join as Guest'}
-                </motion.button>
-
-                {(!user || user.isGuest) && (
                   <p className="text-center text-xs text-cream-dim">
                     Have an account?{' '}
                     <button
@@ -216,8 +214,8 @@ export default function JoinPage() {
                       Sign in
                     </button>
                   </p>
-                )}
-              </form>
+                </form>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

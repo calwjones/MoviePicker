@@ -52,9 +52,14 @@ export default function SessionPage() {
   const [rouletteOpen, setRouletteOpen] = useState(false);
   const [previousPickIds, setPreviousPickIds] = useState<string[]>([]);
   const revealTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const matchesRef = useRef<Match[]>([]);
   const { toasts, addToast, removeToast } = useToast();
   const hasConnectedRef = useRef(false);
   const wasPartnerOnlineRef = useRef(false);
+
+  useEffect(() => {
+    matchesRef.current = matches;
+  }, [matches]);
 
   useEffect(() => {
     return () => {
@@ -64,19 +69,29 @@ export default function SessionPage() {
   }, []);
 
   const startReveal = useCallback(() => {
-    revealTimers.current.forEach(clearTimeout);
-    setRevealed(true);
-    setRevealIndex(-1);
-    revealTimers.current = matches.map((_, i) =>
-      setTimeout(() => setRevealIndex(i), (i + 1) * 350),
-    );
-  }, [matches]);
+    const socket = getSocket();
+    if (socket.connected) {
+      socket.emit('reveal-matches', { sessionId });
+    } else {
+      revealTimers.current.forEach(clearTimeout);
+      setRevealed(true);
+      setRevealIndex(-1);
+      revealTimers.current = matchesRef.current.map((_, i) =>
+        setTimeout(() => setRevealIndex(i), (i + 1) * 350),
+      );
+    }
+  }, [sessionId]);
 
   const revealAll = useCallback(() => {
-    revealTimers.current.forEach(clearTimeout);
-    revealTimers.current = [];
-    setRevealIndex(matches.length - 1);
-  }, [matches.length]);
+    const socket = getSocket();
+    if (socket.connected) {
+      socket.emit('reveal-all', { sessionId });
+    } else {
+      revealTimers.current.forEach(clearTimeout);
+      revealTimers.current = [];
+      setRevealIndex(matchesRef.current.length - 1);
+    }
+  }, [sessionId]);
 
   const applySessionBatch = useCallback((session: SessionWithMovies, hostFlag: boolean) => {
     const swipeField = hostFlag ? 'user1Swipe' : 'user2Swipe';
@@ -164,7 +179,9 @@ export default function SessionPage() {
         sessionApi.get(sessionId).then((res) => applySessionBatch(res.data.session, isHost)).catch(() => {});
       }
     };
-    const handlePartnerDone = () => {
+    const handlePartnerDone = (data?: { finishedByRole?: 'user1' | 'user2' }) => {
+      const myRole = isHost ? 'user1' : 'user2';
+      if (data?.finishedByRole === myRole) return;
       setPartnerProgress(100);
       addToast('Partner finished swiping', { variant: 'info' });
     };
@@ -198,11 +215,27 @@ export default function SessionPage() {
       }
     };
 
+    const handleMatchesRevealed = () => {
+      revealTimers.current.forEach(clearTimeout);
+      setRevealed(true);
+      setRevealIndex(-1);
+      revealTimers.current = matchesRef.current.map((_, i) =>
+        setTimeout(() => setRevealIndex(i), (i + 1) * 350),
+      );
+    };
+    const handleMatchesRevealAll = () => {
+      revealTimers.current.forEach(clearTimeout);
+      revealTimers.current = [];
+      setRevealIndex(matchesRef.current.length - 1);
+    };
+
     socket.on('swipe-update', handleSwipeUpdate);
     socket.on('session-complete', handleSessionComplete);
     socket.on('new-batch', handleNewBatch);
     socket.on('partner-done', handlePartnerDone);
     socket.on('partner-online', handlePartnerOnline);
+    socket.on('matches-revealed', handleMatchesRevealed);
+    socket.on('matches-reveal-all', handleMatchesRevealAll);
     socket.on('disconnect', handleDisconnect);
     socket.on('connect', handleConnect);
     if (socket.connected) hasConnectedRef.current = true;
@@ -213,6 +246,8 @@ export default function SessionPage() {
       socket.off('new-batch', handleNewBatch);
       socket.off('partner-done', handlePartnerDone);
       socket.off('partner-online', handlePartnerOnline);
+      socket.off('matches-revealed', handleMatchesRevealed);
+      socket.off('matches-reveal-all', handleMatchesRevealAll);
       socket.off('disconnect', handleDisconnect);
       socket.off('connect', handleConnect);
     };
@@ -341,6 +376,7 @@ export default function SessionPage() {
     />
   ) : rouletteOpen && rouletteMatches.length >= 2 ? (
     <GroupRouletteStage
+      sessionId={sessionId}
       matches={rouletteMatches}
       onResult={handleRouletteResult}
       onBack={handleBackToShortlist}
@@ -469,10 +505,12 @@ function WaitingForPartner({
 }
 
 function GroupRouletteStage({
+  sessionId,
   matches,
   onResult,
   onBack,
 }: {
+  sessionId: string;
   matches: Match[];
   onResult: (sm: SessionMovie) => void;
   onBack: () => void;
@@ -482,6 +520,7 @@ function GroupRouletteStage({
       <ClientRouletteWheel
         movies={matches.map(matchToSessionMovie)}
         onResult={onResult}
+        sessionId={sessionId}
       />
       <button
         onClick={onBack}
