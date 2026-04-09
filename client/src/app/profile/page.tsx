@@ -47,9 +47,6 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <p className="text-cream-dim text-sm text-center mt-8">
-        More profile settings coming soon.
-      </p>
     </div>
   );
 }

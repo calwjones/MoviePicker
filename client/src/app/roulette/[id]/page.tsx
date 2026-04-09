@@ -27,7 +27,6 @@ interface Match {
   movie: Movie;
 }
 
-// Dark palette segments — subtle tonal alternation
 const SEGMENT_FILLS = ['#1A1A1A', '#222222', '#1E1E1E'];
 
 export default function RoulettePage() {
@@ -46,7 +45,6 @@ export default function RoulettePage() {
   const rotationRef = useRef(0);
   const matchesRef = useRef<Match[]>([]);
 
-  // Keep refs in sync for socket callback
   useEffect(() => { rotationRef.current = rotation; }, [rotation]);
   useEffect(() => { matchesRef.current = matches; }, [matches]);
 
@@ -72,7 +70,6 @@ export default function RoulettePage() {
     });
   }, [sessionId, user, authLoading, router]);
 
-  // Socket: join session and listen for roulette results
   useEffect(() => {
     if (!sessionId || loading) return;
     connectSocket();
@@ -88,7 +85,6 @@ export default function RoulettePage() {
       const segmentAngle = (2 * Math.PI) / currentMatches.length;
       const winnerIndex = data.winnerIndex % currentMatches.length;
 
-      // Calculate rotation to land on the given winnerIndex
       const desiredMod = ((-Math.PI / 2 - winnerIndex * segmentAngle - segmentAngle / 2) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
       const currentMod = ((currentRotation % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
       let extra = desiredMod - currentMod;
@@ -148,7 +144,6 @@ export default function RoulettePage() {
 
     ctx.clearRect(0, 0, size, size);
 
-    // Outer metallic ring
     const ringGrad = ctx.createLinearGradient(0, 0, size, size);
     ringGrad.addColorStop(0, '#3A3A3A');
     ringGrad.addColorStop(0.3, '#2A2A2A');
@@ -160,19 +155,16 @@ export default function RoulettePage() {
     ctx.fillStyle = ringGrad;
     ctx.fill();
 
-    // Thin bright accent line on outer edge
     ctx.beginPath();
     ctx.arc(center, center, outerRadius, 0, 2 * Math.PI);
     ctx.strokeStyle = 'rgba(255, 107, 107, 0.15)';
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // Draw segments
     matches.forEach((match, i) => {
       const startAngle = currentRotation + i * segmentAngle;
       const endAngle = startAngle + segmentAngle;
 
-      // Segment fill
       ctx.beginPath();
       ctx.moveTo(center, center);
       ctx.arc(center, center, innerRadius, startAngle, endAngle);
@@ -180,7 +172,6 @@ export default function RoulettePage() {
       ctx.fillStyle = SEGMENT_FILLS[i % SEGMENT_FILLS.length];
       ctx.fill();
 
-      // Segment divider line
       ctx.beginPath();
       ctx.moveTo(center, center);
       ctx.lineTo(
@@ -191,7 +182,6 @@ export default function RoulettePage() {
       ctx.lineWidth = 1;
       ctx.stroke();
 
-      // Text
       ctx.save();
       ctx.translate(center, center);
 
@@ -226,7 +216,6 @@ export default function RoulettePage() {
       ctx.restore();
     });
 
-    // Inner shadow ring for depth
     const innerShadow = ctx.createRadialGradient(center, center, 0, center, center, innerRadius);
     innerShadow.addColorStop(0, 'rgba(0, 0, 0, 0.4)');
     innerShadow.addColorStop(0.15, 'rgba(0, 0, 0, 0.1)');
@@ -236,7 +225,6 @@ export default function RoulettePage() {
     ctx.fillStyle = innerShadow;
     ctx.fill();
 
-    // Center hub — dark with accent ring
     const hubRadius = Math.max(20, center * 0.14);
 
     ctx.beginPath();
@@ -258,7 +246,6 @@ export default function RoulettePage() {
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    // Pointer at top — coral triangle
     const pointerW = 14;
     const pointerH = 22;
     ctx.beginPath();

@@ -20,7 +20,6 @@ export default function JoinPage() {
   const [error, setError] = useState('');
   const [hostName, setHostName] = useState<string | null>(null);
 
-  // Fetch host name for the heading (public endpoint, no auth required)
   useEffect(() => {
     const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
     fetch(`${API_BASE}/sessions/${sessionId}/preview`)
@@ -29,12 +28,10 @@ export default function JoinPage() {
       .catch(() => {}); // non-critical
   }, [sessionId]);
 
-  // Once auth is resolved, show the join form
   useEffect(() => {
     if (!authLoading) setLobbyState('join');
   }, [authLoading]);
 
-  // After joining, connect to socket lobby
   useEffect(() => {
     if (lobbyState !== 'waiting') return;
 
@@ -42,11 +39,9 @@ export default function JoinPage() {
     const socket = getSocket();
     socket.emit('join-session', sessionId);
 
-    // Rejoin room on reconnect so we don't miss session-started
     const rejoin = () => socket.emit('join-session', sessionId);
     socket.on('connect', rejoin);
 
-    // Host started — navigate to swipe session
     socket.on('session-started', () => {
       setLobbyState('starting');
       setTimeout(() => router.replace(`/session/${sessionId}`), 500);
@@ -86,7 +81,6 @@ export default function JoinPage() {
       setLobbyState('waiting');
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      // If already started, go straight to session
       if (msg === 'Session has already started') {
         router.replace(`/session/${sessionId}`);
         return;

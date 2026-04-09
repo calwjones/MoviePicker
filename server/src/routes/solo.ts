@@ -5,14 +5,13 @@ import { applyMovieFilters } from '../lib/filterMovies';
 
 const router = Router();
 
-// Get active solo session
 router.get('/active', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const session = await prisma.swipeSession.findFirst({
       where: {
         userId: req.userId,
         type: 'solo',
-        status: { in: ['active', 'swiping'] },
+        status: 'swiping',
       },
       include: {
         movies: {
@@ -33,7 +32,6 @@ router.get('/active', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Create a new solo session
 router.post('/create', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { filters } = req.body;
@@ -53,7 +51,6 @@ router.post('/create', authenticate, async (req: AuthRequest, res: Response) => 
       filters || {}
     );
 
-    // Shuffle (Fisher-Yates) then cap at 50
     for (let i = watchlistMovies.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [watchlistMovies[i], watchlistMovies[j]] = [watchlistMovies[j], watchlistMovies[i]];
@@ -65,17 +62,15 @@ router.post('/create', authenticate, async (req: AuthRequest, res: Response) => 
       return;
     }
 
-    // Cancel any existing active solo sessions
     await prisma.swipeSession.updateMany({
       where: {
         userId: req.userId,
         type: 'solo',
-        status: { in: ['active', 'swiping'] },
+        status: 'swiping',
       },
       data: { status: 'completed' },
     });
 
-    // Create session
     const session = await prisma.swipeSession.create({
       data: {
         type: 'solo',

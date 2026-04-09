@@ -27,13 +27,11 @@ interface LibraryTabProps {
 }
 
 export default function LibraryTab({ addToast }: LibraryTabProps) {
-  // Library state
   const [watchlist, setWatchlist] = useState<UserMovie[]>([]);
   const [libraryLoading, setLibraryLoading] = useState(false);
   const [libraryFilter, setLibraryFilter] = useState<'watchlist' | 'watched' | 'all'>('watchlist');
   const [watchlistFilter, setWatchlistFilter] = useState('');
 
-  // Sort & filter state
   const [showSortFilter, setShowSortFilter] = useState(false);
   const [sortBy, setSortBy] = useState<SortField>('dateAdded');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -43,33 +41,31 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
   const [filterMaxRating, setFilterMaxRating] = useState(10);
   const [filterMaxRuntime, setFilterMaxRuntime] = useState(0);
 
-  // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<(SearchResult & { _added?: boolean })[]>([]);
   const [searching, setSearching] = useState(false);
   const [addingTmdbId, setAddingTmdbId] = useState<number | null>(null);
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Movie detail modal
   const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
   const [selectedUserMovie, setSelectedUserMovie] = useState<UserMovie | null>(null);
-
-  // Remove confirmation modal
   const [removeMovieId, setRemoveMovieId] = useState<string | null>(null);
 
-  // For You recommendations
   const [recommendations, setRecommendations] = useState<SearchResult[]>([]);
   const [recsLoading, setRecsLoading] = useState(false);
 
-  // Movies Like
   const [moviesLikeSeed, setMoviesLikeSeed] = useState<Movie | null>(null);
   const [moviesLike, setMoviesLike] = useState<SearchResult[]>([]);
   const [moviesLikeLoading, setMoviesLikeLoading] = useState(false);
 
-  // Rec detail sheet
-  const [recDetail, setRecDetail] = useState<SearchResult | null>(null);
+  const [dismissedMovies, setDismissedMovies] = useState<UserMovie[]>([]);
+  const [dismissedOpen, setDismissedOpen] = useState(false);
+  const [dismissedLoading, setDismissedLoading] = useState(false);
 
-  // Load watchlist on mount and when filter changes
+  const [recDetail, setRecDetail] = useState<SearchResult | null>(null);
+  const [recDetailFull, setRecDetailFull] = useState<Movie | null>(null);
+  const [recDetailLoading, setRecDetailLoading] = useState(false);
+
   const loadWatchlist = useCallback(async (filter?: 'watchlist' | 'watched' | 'all') => {
     setLibraryLoading(true);
     try {
@@ -87,14 +83,25 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
     loadWatchlist();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Cleanup search timeout on unmount
   useEffect(() => {
     return () => {
       if (searchTimeout.current) clearTimeout(searchTimeout.current);
     };
   }, []);
 
-  // Close modal on escape key
+  useEffect(() => {
+    if (!recDetail) {
+      setRecDetailFull(null);
+      return;
+    }
+    setRecDetailFull(null);
+    setRecDetailLoading(true);
+    movieApi.getByTmdbId(recDetail.tmdbId)
+      .then((res) => setRecDetailFull(res.data.movie))
+      .catch(() => {})
+      .finally(() => setRecDetailLoading(false));
+  }, [recDetail]);
+
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && recDetail) {
@@ -110,7 +117,6 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
     return () => window.removeEventListener('keydown', handleEscape);
   }, [selectedMovie, recDetail]);
 
-  // Lock body scroll when any sheet is open
   useEffect(() => {
     if (selectedMovie || recDetail) {
       document.body.style.overflow = 'hidden';
@@ -188,6 +194,46 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
     }
   };
 
+  const handleDismissRec = async (rec: SearchResult) => {
+    setRecommendations((prev) => prev.filter((r) => r.tmdbId !== rec.tmdbId));
+    setMoviesLike((prev) => prev.filter((r) => r.tmdbId !== rec.tmdbId));
+    try {
+      await recommendationApi.dismiss(rec.tmdbId);
+      if (dismissedOpen) {
+        const res = await recommendationApi.dismissed();
+        setDismissedMovies(res.data.movies);
+      }
+    } catch {
+    }
+  };
+
+  const loadDismissed = async () => {
+    setDismissedLoading(true);
+    try {
+      const res = await recommendationApi.dismissed();
+      setDismissedMovies(res.data.movies);
+    } catch {
+      // ignore
+    } finally {
+      setDismissedLoading(false);
+    }
+  };
+
+  const handleUndismiss = async (um: UserMovie) => {
+    setDismissedMovies((prev) => prev.filter((m) => m.id !== um.id));
+    try {
+      await recommendationApi.undismiss(um.movie.tmdbId!);
+    } catch {
+      // best-effort
+    }
+  };
+
+  const handleToggleDismissed = () => {
+    const next = !dismissedOpen;
+    setDismissedOpen(next);
+    if (next && dismissedMovies.length === 0) loadDismissed();
+  };
+
   const handleRemoveFromWatchlist = async (movieId: string) => {
     try {
       await movieApi.removeFromWatchlist(movieId);
@@ -263,7 +309,6 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
 
   const [visibleCount, setVisibleCount] = useState(30);
 
-  // Reset visible count when any filter/sort changes
   useEffect(() => {
     setVisibleCount(30);
   }, [libraryFilter, watchlistFilter, sortBy, sortDir, filterGenres, filterDecade, filterMinRating, filterMaxRating, filterMaxRuntime]);
@@ -285,29 +330,24 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
       setSortDir(d => d === 'desc' ? 'asc' : 'desc');
     } else {
       setSortBy(field);
-      // Smart defaults: newest/highest first except runtime (shortest first)
       setSortDir(field === 'runtime' ? 'asc' : 'desc');
     }
   };
 
-  // Full filter + sort pipeline
   const filteredWatchlist = useMemo(() => {
     let result = [...watchlist];
 
-    // Text search
     if (watchlistFilter) {
       const q = watchlistFilter.toLowerCase();
       result = result.filter(um => um.movie.title.toLowerCase().includes(q));
     }
 
-    // Genre filter
     if (filterGenres.length > 0) {
       result = result.filter(um =>
         filterGenres.some(g => (um.movie.genres as string[]).includes(g))
       );
     }
 
-    // Decade filter
     if (filterDecade) {
       const decadeStart = parseInt(filterDecade);
       result = result.filter(um =>
@@ -315,7 +355,6 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
       );
     }
 
-    // TMDb rating range
     if (filterMinRating > 0) {
       result = result.filter(um => (um.movie.tmdbRating ?? 0) >= filterMinRating);
     }
@@ -323,17 +362,14 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
       result = result.filter(um => (um.movie.tmdbRating ?? 0) <= filterMaxRating);
     }
 
-    // Max runtime
     if (filterMaxRuntime > 0) {
       result = result.filter(um => (um.movie.runtime ?? 0) <= filterMaxRuntime);
     }
 
-    // Sort
     result.sort((a, b) => {
       let cmp = 0;
       switch (sortBy) {
         case 'dateAdded':
-          // API returns newest first — use createdAt if available, otherwise preserve order
           cmp = new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime();
           break;
         case 'year':
@@ -566,12 +602,19 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
             {recommendations.map((rec) => (
               <div
                 key={rec.tmdbId}
-                className="flex-shrink-0 w-28 snap-start group cursor-pointer"
+                className="flex-shrink-0 w-28 snap-start group cursor-pointer relative"
                 onClick={() => setRecDetail(rec)}
               >
                 <div className="w-28 aspect-[2/3] rounded-xl overflow-hidden bg-card mb-2 shadow-lg group-hover:shadow-coral/20 group-hover:scale-[1.03] transition-all">
                   <MoviePoster posterUrl={rec.posterUrl} title={rec.title} />
                 </div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDismissRec(rec); }}
+                  className="absolute top-1 right-1 w-5 h-5 rounded-full bg-charcoal/80 text-cream-dim hover:text-cream flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[10px] leading-none"
+                  title="Not interested"
+                >
+                  ✕
+                </button>
                 <p className="text-xs font-medium truncate">{rec.title}</p>
                 <p className="text-cream-dim text-[10px]">
                   {rec.year}{rec.rating ? ` · ${rec.rating.toFixed(1)}★` : ''}
@@ -584,6 +627,46 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
         ) : (
           <div className="flex items-center justify-center py-4">
             <LoadingSpinner size="sm" />
+          </div>
+        )}
+        {/* Dismissed recs toggle */}
+        <button
+          onClick={handleToggleDismissed}
+          className="mt-2 text-cream-dim text-[11px] hover:text-cream transition-colors"
+        >
+          {dismissedOpen ? 'Hide hidden movies' : 'Manage hidden movies'}
+        </button>
+        {dismissedOpen && (
+          <div className="mt-2">
+            {dismissedLoading ? (
+              <div className="flex items-center justify-center py-3">
+                <LoadingSpinner size="sm" />
+              </div>
+            ) : dismissedMovies.length === 0 ? (
+              <p className="text-cream-dim text-xs">No hidden movies.</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {dismissedMovies.map((um) => (
+                  <div key={um.id} className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-8 h-12 rounded overflow-hidden flex-shrink-0 bg-card">
+                        <MoviePoster posterUrl={um.movie.posterUrl} title={um.movie.title} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium truncate">{um.movie.title}</p>
+                        <p className="text-cream-dim text-[10px]">{um.movie.year}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleUndismiss(um)}
+                      className="text-xs text-coral hover:text-coral/80 transition-colors flex-shrink-0"
+                    >
+                      Undo
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -617,12 +700,19 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
                 {moviesLike.map((rec) => (
                   <div
                     key={rec.tmdbId}
-                    className="flex-shrink-0 w-28 snap-start group cursor-pointer"
+                    className="flex-shrink-0 w-28 snap-start group cursor-pointer relative"
                     onClick={() => setRecDetail(rec)}
                   >
                     <div className="w-28 aspect-[2/3] rounded-xl overflow-hidden bg-card mb-2 shadow-lg group-hover:shadow-coral/20 group-hover:scale-[1.03] transition-all">
                       <MoviePoster posterUrl={rec.posterUrl} title={rec.title} />
                     </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDismissRec(rec); }}
+                      className="absolute top-1 right-1 w-5 h-5 rounded-full bg-charcoal/80 text-cream-dim hover:text-cream flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[10px] leading-none"
+                      title="Not interested"
+                    >
+                      ✕
+                    </button>
                     <p className="text-xs font-medium truncate">{rec.title}</p>
                     <p className="text-cream-dim text-[10px]">
                       {rec.year}{rec.rating ? ` · ${rec.rating.toFixed(1)}★` : ''}
@@ -799,6 +889,17 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
               className="glass rounded-t-2xl sm:rounded-2xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
+              {recDetail.seedTitles && recDetail.seedTitles.length > 0 && (
+                <p className="text-xs text-cream-dim mb-3">
+                  Because you liked{' '}
+                  {recDetail.seedTitles.map((t, i) => (
+                    <span key={t}>
+                      <span className="text-cream">{t}</span>
+                      {i < recDetail.seedTitles!.length - 1 ? ' and ' : ''}
+                    </span>
+                  ))}
+                </p>
+              )}
               <div className="flex gap-4 mb-4">
                 <div className="w-24 h-36 rounded-xl overflow-hidden flex-shrink-0">
                   <MoviePoster posterUrl={recDetail.posterUrl} title={recDetail.title} />
@@ -808,10 +909,21 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
                   <p className="text-cream-dim text-sm mt-1">
                     {recDetail.year}{recDetail.rating ? ` · ${recDetail.rating.toFixed(1)}★` : ''}
                   </p>
+                  {recDetailFull?.director && (
+                    <p className="text-cream-dim text-sm mt-1">Directed by <span className="text-cream">{recDetailFull.director}</span></p>
+                  )}
+                  {recDetailLoading && !recDetailFull && (
+                    <p className="text-cream-dim text-xs mt-2 animate-pulse">Loading details…</p>
+                  )}
                 </div>
               </div>
               {recDetail.overview && (
                 <p className="text-cream-dim text-sm mb-4">{recDetail.overview}</p>
+              )}
+              {recDetailFull?.streamingProviders && recDetailFull.streamingProviders.length > 0 && (
+                <div className="mb-4">
+                  <StreamingProvidersList providers={recDetailFull.streamingProviders} />
+                </div>
               )}
               <div className="flex gap-3">
                 <button

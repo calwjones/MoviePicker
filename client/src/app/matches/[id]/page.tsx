@@ -31,7 +31,6 @@ export default function MatchesPage() {
   const [loading, setLoading] = useState(true);
   const revealTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  // Clear reveal timers on unmount
   useEffect(() => {
     return () => {
       revealTimers.current.forEach(clearTimeout);
@@ -72,7 +71,6 @@ export default function MatchesPage() {
     );
   }
 
-  // No matches — show compromises if available
   if (matches.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center min-h-dvh px-6 text-center">
@@ -135,7 +133,6 @@ export default function MatchesPage() {
     );
   }
 
-  // Single match — show it directly as the pick
   if (matches.length === 1) {
     const movie = matches[0].movie;
 
@@ -236,7 +233,6 @@ export default function MatchesPage() {
     );
   }
 
-  // Pre-reveal state (multiple matches)
   if (!revealed) {
     return (
       <div className="flex flex-col items-center justify-center min-h-dvh px-6 text-center">
@@ -268,7 +264,6 @@ export default function MatchesPage() {
     );
   }
 
-  // Multiple matches — reveal grid then go to roulette
   return (
     <div className="min-h-dvh px-6 py-8 flex flex-col items-center justify-center">
       <h2

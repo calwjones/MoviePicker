@@ -9,8 +9,6 @@ import type { Movie } from '@prisma/client';
 
 const router = Router();
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
 function shuffle<T>(arr: T[]): T[] {
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -19,11 +17,6 @@ function shuffle<T>(arr: T[]): T[] {
   return arr;
 }
 
-/**
- * Build the movie pool for a group session at start time.
- * - Both registered: intersection of watchlists. If < MIN_SHARED, fill from union up to MAX_POOL.
- * - Guest joining: host's watchlist only.
- */
 async function buildGroupPool(
   hostId: string,
   user2Id: string | null,
@@ -39,11 +32,8 @@ async function buildGroupPool(
   const hostPool = hostMovies.map((um) => um.movie);
 
   if (!user2Id) {
-    // Guest joining — use host's watchlist only
     return applyMovieFilters(shuffle(hostPool).slice(0, MAX_POOL), filters);
   }
-
-  // Registered user2 — compute intersection, fill from union if needed
   const user2Movies = await prisma.userMovie.findMany({
     where: { userId: user2Id, onWatchlist: true, watched: false },
     include: { movie: true },
@@ -57,7 +47,6 @@ async function buildGroupPool(
   if (intersection.length >= MIN_SHARED) {
     pool = shuffle(intersection);
   } else {
-    // Fill from union (deduplicated), excluding already-included intersection movies
     const intersectionIds = new Set(intersection.map((m) => m.id));
     const unionMap = new Map<string, Movie>();
     for (const m of [...hostPool, ...user2Pool]) {
@@ -70,13 +59,10 @@ async function buildGroupPool(
   return applyMovieFilters(pool.slice(0, MAX_POOL), filters);
 }
 
-// ─── Group session: create ───────────────────────────────────────────────────
-
 router.post('/group', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { filters } = req.body;
 
-    // Cancel any existing active group sessions for this user
     await prisma.swipeSession.updateMany({
       where: {
         userId: req.userId,
@@ -102,8 +88,6 @@ router.post('/group', authenticate, async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
-
-// ─── Group session: registered user joins ────────────────────────────────────
 
 router.post('/:id/join', authenticate, async (req: AuthRequest, res: Response) => {
   try {
@@ -141,7 +125,6 @@ router.post('/:id/join', authenticate, async (req: AuthRequest, res: Response) =
       select: { displayName: true },
     });
 
-    // Notify host that someone joined
     emit(`session:${sessionId}`, 'participant-joined', {
       displayName: joiner?.displayName,
       type: 'registered',
@@ -153,8 +136,6 @@ router.post('/:id/join', authenticate, async (req: AuthRequest, res: Response) =
     res.status(500).json({ error: 'Internal server error' });
   }
 });
-
-// ─── Group session: host starts swiping ──────────────────────────────────────
 
 router.post('/:id/start', authenticate, async (req: AuthRequest, res: Response) => {
   try {
@@ -174,7 +155,6 @@ router.post('/:id/start', authenticate, async (req: AuthRequest, res: Response) 
       return;
     }
 
-    // Build the pool now that we know all participants
     const moviePool = await buildGroupPool(
       session.userId!,
       session.user2Id ?? null,
@@ -188,7 +168,6 @@ router.post('/:id/start', authenticate, async (req: AuthRequest, res: Response) 
       return;
     }
 
-    // Create session movies and update status in a transaction
     await prisma.$transaction([
       prisma.sessionMovie.createMany({
         data: moviePool.map((m) => ({ sessionId, movieId: m.id })),
@@ -199,7 +178,6 @@ router.post('/:id/start', authenticate, async (req: AuthRequest, res: Response) 
       }),
     ]);
 
-    // Tell all participants (host + guest/user2) to navigate to the session
     emit(`session:${sessionId}`, 'session-started', { sessionId });
 
     res.json({ sessionId });
@@ -209,11 +187,8 @@ router.post('/:id/start', authenticate, async (req: AuthRequest, res: Response) 
   }
 });
 
-// ─── Active session ───────────────────────────────────────────────────────────
-
 router.get('/active', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    // Check for active group session (host or participant)
     const groupSession = await prisma.swipeSession.findFirst({
       where: {
         OR: [
@@ -237,8 +212,6 @@ router.get('/active', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// ─── Public session preview (host name, status) — used by join page ──────────
-
 router.get('/:id/preview', async (req, res: Response) => {
   try {
     const session = await prisma.swipeSession.findUnique({
@@ -254,8 +227,6 @@ router.get('/:id/preview', async (req, res: Response) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
-
-// ─── Get session by ID ────────────────────────────────────────────────────────
 
 router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
@@ -284,8 +255,6 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
-
-// ─── Session history ──────────────────────────────────────────────────────────
 
 router.get('/history/all', authenticate, async (req: AuthRequest, res: Response) => {
   try {
@@ -323,8 +292,6 @@ router.get('/history/all', authenticate, async (req: AuthRequest, res: Response)
     res.status(500).json({ error: 'Internal server error' });
   }
 });
-
-// ─── Cancel / delete session ──────────────────────────────────────────────────
 
 router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {

@@ -43,7 +43,6 @@ router.post('/join/:sessionId', async (req: Request, res: Response) => {
         data: { guestId, guestName: displayName.trim() },
       });
     } else {
-      // A guest is already assigned — allow re-join only if same display name
       if (session.guestName?.toLowerCase() !== displayName.trim().toLowerCase()) {
         res.status(409).json({ error: 'This session already has a guest' });
         return;

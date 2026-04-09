@@ -4,8 +4,6 @@
   --color-charcoal: #0D0D0D;
   --color-card: #1C1C1C;
   --color-card-hover: #262626;
-  --color-coral: #F5A623;
-  --color-coral-dark: #D4900E;
   --color-coral: #FF6B6B;
   --color-coral-dark: #E04545;
   --color-cream: #F0E6D3;
@@ -19,9 +17,9 @@
 
 body {
   background: var(--color-charcoal);
-  background-image: 
-    radial-gradient(at 0% 0%, rgba(245, 166, 35, 0.08) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(255, 107, 107, 0.05) 0px, transparent 50%);
+  background-image:
+    radial-gradient(at 0% 0%, rgba(255, 107, 107, 0.06) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(255, 107, 107, 0.04) 0px, transparent 50%);
   background-attachment: fixed;
   color: var(--color-cream);
   font-family: var(--font-sans);
@@ -37,11 +35,11 @@ body {
   background: rgba(0, 0, 0, 0.2);
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(245, 166, 35, 0.3);
+  background: rgba(255, 107, 107, 0.3);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(245, 166, 35, 0.6);
+  background: rgba(255, 107, 107, 0.6);
 }
 
 /* Glass card effect — true glassmorphism */
@@ -55,7 +53,7 @@ body {
 
 /* Button hover glow */
 .btn-glow:hover {
-  box-shadow: 0 0 20px rgba(245, 166, 35, 0.3);
+  box-shadow: 0 0 20px rgba(255, 107, 107, 0.3);
   transform: translateY(-2px);
 }
 
@@ -68,7 +66,7 @@ body {
 
 /* Roulette glow */
 .roulette-glow {
-  box-shadow: 0 0 60px rgba(245, 166, 35, 0.3), 0 0 120px rgba(245, 166, 35, 0.1);
+  box-shadow: 0 0 60px rgba(255, 107, 107, 0.3), 0 0 120px rgba(255, 107, 107, 0.1);
 }
 
 /* Match celebration */
@@ -86,3 +84,4 @@ body {
   background-size: 20px 20px;
   background-position: -10px center;
 }
+

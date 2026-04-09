@@ -15,28 +15,11 @@ model User {
   avatarUrl    String?  @map("avatar_url")
   createdAt    DateTime @default(now()) @map("created_at")
 
-  couplesAsUser1    Couple[]       @relation("CoupleUser1")
-  couplesAsUser2    Couple[]       @relation("CoupleUser2")
   userMovies        UserMovie[]
   soloSessions      SwipeSession[]
   groupSessionsAsP2 SwipeSession[] @relation("SessionUser2")
 
   @@map("users")
-}
-
-model Couple {
-  id         String   @id @default(uuid())
-  user1Id    String   @map("user_1_id")
-  user2Id    String?  @map("user_2_id")
-  inviteCode String   @unique @map("invite_code")
-  createdAt  DateTime @default(now()) @map("created_at")
-
-  user1   User            @relation("CoupleUser1", fields: [user1Id], references: [id])
-  user2   User?           @relation("CoupleUser2", fields: [user2Id], references: [id])
-  sessions SwipeSession[]
-  lists    List[]
-
-  @@map("couples")
 }
 
 model Movie {
@@ -64,7 +47,7 @@ model UserMovie {
   id          String   @id @default(uuid())
   userId      String   @map("user_id")
   movieId     String   @map("movie_id")
-  source      String   @default("manual") // letterboxd_import | manual | recommendation
+  source      String   @default("manual")
   onWatchlist Boolean  @default(false) @map("on_watchlist")
   watched     Boolean  @default(false)
   userRating  Float?   @map("user_rating")
@@ -79,17 +62,15 @@ model UserMovie {
 
 model SwipeSession {
   id        String   @id @default(uuid())
-  type      String   @default("group") // group | solo (couple | guest = legacy)
-  coupleId  String?  @map("couple_id")
-  userId    String?  @map("user_id")    // host / solo user
-  user2Id   String?  @map("user_2_id")  // registered second participant
-  guestId   String?  @map("guest_id")   // guest second participant
+  type      String   @default("group")
+  userId    String?  @map("user_id")
+  user2Id   String?  @map("user_2_id")
+  guestId   String?  @map("guest_id")
   guestName String?  @map("guest_name")
-  status    String   @default("waiting") // waiting | swiping | completed
-  filters   Json     @default("{}") // genre, decade, rating, runtime
+  status    String   @default("waiting")
+  filters   Json     @default("{}")
   createdAt DateTime @default(now()) @map("created_at")
 
-  couple  Couple?        @relation(fields: [coupleId], references: [id])
   user    User?          @relation(fields: [userId], references: [id])
   user2   User?          @relation("SessionUser2", fields: [user2Id], references: [id])
   movies  SessionMovie[]
@@ -102,8 +83,8 @@ model SessionMovie {
   id        String  @id @default(uuid())
   sessionId String  @map("session_id")
   movieId   String  @map("movie_id")
-  user1Swipe String? @map("user_1_swipe") // left | right | null
-  user2Swipe String? @map("user_2_swipe") // left | right | null
+  user1Swipe String? @map("user_1_swipe")
+  user2Swipe String? @map("user_2_swipe")
 
   session SwipeSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   movie   Movie        @relation(fields: [movieId], references: [id])
@@ -129,27 +110,3 @@ model Match {
   @@map("matches")
 }
 
-model List {
-  id          String   @id @default(uuid())
-  coupleId    String   @map("couple_id")
-  name        String
-  description String?
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  couple Couple     @relation(fields: [coupleId], references: [id])
-  movies ListMovie[]
-
-  @@map("lists")
-}
-
-model ListMovie {
-  id          String   @id @default(uuid())
-  listId      String   @map("list_id")
-  movieId     String   @map("movie_id")
-  addedByUserId String @map("added_by_user_id")
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  list List @relation(fields: [listId], references: [id])
-
-  @@map("list_movies")
-}

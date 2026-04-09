@@ -98,8 +98,13 @@ router.get('/mine', authenticate, async (req: AuthRequest, res: Response) => {
     const filter = req.query.filter as string | undefined;
 
     const where: Record<string, unknown> = { userId: req.userId! };
-    if (filter === 'watchlist') where.onWatchlist = true;
-    if (filter === 'watched') where.watched = true;
+    if (filter === 'dismissed') {
+      where.source = 'dismissed';
+    } else {
+      where.source = { not: 'dismissed' };
+      if (filter === 'watchlist') where.onWatchlist = true;
+      if (filter === 'watched') where.watched = true;
+    }
 
     const userMovies = await prisma.userMovie.findMany({
       where,
@@ -155,6 +160,24 @@ router.post('/:movieId/rate', authenticate, async (req: AuthRequest, res: Respon
     res.json({ userMovie });
   } catch {
     res.status(500).json({ error: 'Failed to rate movie' });
+  }
+});
+
+router.get('/tmdb/:tmdbId', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const tmdbId = parseInt(req.params.tmdbId as string);
+    if (isNaN(tmdbId)) {
+      res.status(400).json({ error: 'Invalid tmdbId' });
+      return;
+    }
+    const movie = await findOrCreateMovieByTmdbId(tmdbId);
+    if (!movie) {
+      res.status(404).json({ error: 'Movie not found' });
+      return;
+    }
+    res.json({ movie });
+  } catch {
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

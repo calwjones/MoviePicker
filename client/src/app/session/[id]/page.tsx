@@ -30,7 +30,6 @@ export default function SessionPage() {
       const swipeField = iu1 ? 'user1Swipe' : 'user2Swipe';
       const unswiped = session.movies.filter((m: SessionMovie) => m[swipeField] === null);
       const swiped = session.movies.filter((m: SessionMovie) => m[swipeField] !== null);
-      // Shuffle unswiped movies — DB returns them in UUID order (consistent but not random)
       for (let i = unswiped.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [unswiped[i], unswiped[j]] = [unswiped[j], unswiped[i]];
@@ -99,9 +98,7 @@ export default function SessionPage() {
       setUndoStack((prev) => prev.slice(0, -1));
       if (done) setDone(false);
       setCurrentIndex(last.index);
-    } catch {
-      // Don't reset state on API failure
-    }
+    } catch {}
   }, [undoStack, done, sessionId]);
 
   const doneContent = (

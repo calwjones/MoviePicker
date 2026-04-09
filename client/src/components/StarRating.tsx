@@ -16,18 +16,14 @@ export default function StarRating({ value, onChange, readonly }: StarRatingProp
 
         return (
           <div key={starIndex} className="relative w-4 h-4 text-sm leading-none flex items-center justify-center">
-            {/* Base inactive star */}
             <div className="text-cream-dim/30">&#9733;</div>
-            
-            {/* Active overlay (yellow/coral star clipped to width) */}
-            <div 
+            <div
               className="absolute left-0 top-0 overflow-hidden text-coral pointer-events-none flex items-center justify-start h-full"
               style={{ width: isFull ? '100%' : isHalf ? '50%' : '0%' }}
             >
               &#9733;
             </div>
 
-            {/* Tap targets for half vs full increments */}
             {!readonly && (
               <>
                 <button

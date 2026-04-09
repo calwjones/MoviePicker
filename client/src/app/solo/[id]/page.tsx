@@ -67,9 +67,7 @@ export default function SoloSessionPage() {
       setUndoStack((prev) => prev.slice(0, -1));
       if (done) setDone(false);
       setCurrentIndex(last.index);
-    } catch {
-      // Don't reset state on API failure
-    }
+    } catch {}
   }, [undoStack, done, sessionId]);
 
   const doneContent = (
