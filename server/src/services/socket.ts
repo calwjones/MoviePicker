@@ -48,6 +48,10 @@ export function setupSocketHandlers(io: Server): void {
   io.on('connection', (socket: AuthenticatedSocket) => {
     console.log(`User connected: ${socket.userId}`);
 
+    if (socket.userId && socket.userId !== 'guest') {
+      socket.join(`user:${socket.userId}`);
+    }
+
     socket.on('join-session', async (sessionId: string) => {
       try {
         const session = await prisma.swipeSession.findUnique({ where: { id: sessionId } });

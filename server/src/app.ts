@@ -16,6 +16,7 @@ import recommendationRoutes from './routes/recommendations';
 import providerRoutes from './routes/providers';
 import browseRoutes from './routes/browse';
 import discoverRoutes from './routes/discover';
+import friendsRoutes from './routes/friends';
 
 export const prisma = process.env.NODE_ENV === 'test'
   ? ({} as unknown as PrismaClient)
@@ -50,6 +51,7 @@ app.use('/api/recommendations', recommendationRoutes);
 app.use('/api/providers', providerRoutes);
 app.use('/api/browse', browseRoutes);
 app.use('/api/discover', discoverRoutes);
+app.use('/api/friends', friendsRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

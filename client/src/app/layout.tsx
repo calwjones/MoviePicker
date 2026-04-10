@@ -3,6 +3,7 @@ import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import ConditionalFooter from "@/components/ConditionalFooter";
+import GlobalInviteListener from "@/components/GlobalInviteListener";
 
 export const metadata: Metadata = {
   title: "MatchSticked",
@@ -28,6 +29,7 @@ export default function RootLayout({
             {children}
           </main>
           <ConditionalFooter />
+          <GlobalInviteListener />
         </AuthProvider>
         <Analytics />
       </body>

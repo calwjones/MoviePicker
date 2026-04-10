@@ -24,8 +24,46 @@ model User {
   userMovies        UserMovie[]
   soloSessions      SwipeSession[]
   groupSessionsAsP2 SwipeSession[] @relation("SessionUser2")
+  friendshipsSent      Friendship[]    @relation("FriendshipRequester")
+  friendshipsReceived  Friendship[]    @relation("FriendshipAddressee")
+  invitesSent          SessionInvite[] @relation("SessionInviteFrom")
+  invitesReceived      SessionInvite[] @relation("SessionInviteTo")
 
   @@map("users")
+}
+
+model Friendship {
+  id          String   @id @default(uuid())
+  requesterId String   @map("requester_id")
+  addresseeId String   @map("addressee_id")
+  status      String   @default("pending")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  requester User @relation("FriendshipRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  addressee User @relation("FriendshipAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, addresseeId])
+  @@index([addresseeId])
+  @@map("friendships")
+}
+
+model SessionInvite {
+  id         String   @id @default(uuid())
+  sessionId  String   @map("session_id")
+  fromUserId String   @map("from_user_id")
+  toUserId   String   @map("to_user_id")
+  status     String   @default("pending")
+  createdAt  DateTime @default(now()) @map("created_at")
+  expiresAt  DateTime @map("expires_at")
+
+  session  SwipeSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  fromUser User         @relation("SessionInviteFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser   User         @relation("SessionInviteTo",   fields: [toUserId],   references: [id], onDelete: Cascade)
+
+  @@index([toUserId, status])
+  @@index([sessionId])
+  @@map("session_invites")
 }
 
 model Movie {
@@ -73,6 +111,7 @@ model SwipeSession {
   user2Id   String?  @map("user_2_id")
   guestId   String?  @map("guest_id")
   guestName String?  @map("guest_name")
+  shortCode String?  @unique @map("short_code")
   status    String   @default("waiting")
   filters   Json     @default("{}")
   batchSize Int?     @map("batch_size")
@@ -82,6 +121,7 @@ model SwipeSession {
   user2   User?          @relation("SessionUser2", fields: [user2Id], references: [id], onDelete: Cascade)
   movies  SessionMovie[]
   matches Match[]
+  invites SessionInvite[]
 
   @@map("swipe_sessions")
 }

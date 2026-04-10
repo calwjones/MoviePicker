@@ -29,6 +29,35 @@ function assertGroupJoinable(
   return null;
 }
 
+const SHORT_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+function generateShortCode(length = 6): string {
+  let out = '';
+  for (let i = 0; i < length; i++) {
+    out += SHORT_CODE_ALPHABET[Math.floor(Math.random() * SHORT_CODE_ALPHABET.length)];
+  }
+  return out;
+}
+
+async function assignShortCode(sessionId: string): Promise<string | null> {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = generateShortCode();
+    const existing = await prisma.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "swipe_sessions" WHERE "short_code" = ${code} LIMIT 1
+    `;
+    if (existing.length > 0) continue;
+    try {
+      await prisma.$executeRaw`UPDATE "swipe_sessions" SET "short_code" = ${code} WHERE "id" = ${sessionId}`;
+      return code;
+    } catch (err) {
+      const errCode = (err as { code?: string })?.code;
+      if (errCode === 'P2002' || errCode === '23505') continue;
+      throw err;
+    }
+  }
+  return null;
+}
+
 async function decorateSession<T extends SessionWithMovies | null>(session: T): Promise<T> {
   if (!session) return session;
   const set = await getInCinemaIds();
@@ -153,8 +182,10 @@ router.post('/group', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
 
+    const shortCode = await assignShortCode(session.id);
+
     const shareLink = `${CLIENT_URL}/join/${session.id}`;
-    res.status(201).json({ session, shareLink });
+    res.status(201).json({ session: { ...session, shortCode }, shareLink, shortCode });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal server error' });
@@ -180,6 +211,79 @@ router.post('/:id/join', authenticate, async (req: AuthRequest, res: Response) =
     res.json({ session: updated });
   } catch (error) {
     console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/:id/invite', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const sessionId = req.params.id as string;
+    const userId = req.userId!;
+    const { friendIds } = req.body as { friendIds?: string[] };
+    const ids = Array.isArray(friendIds) ? friendIds.filter((s) => typeof s === 'string' && s.length > 0) : [];
+    if (ids.length === 0) {
+      res.status(400).json({ error: 'friendIds is required' });
+      return;
+    }
+
+    const session = await prisma.swipeSession.findUnique({ where: { id: sessionId } });
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+    if (session.userId !== userId) {
+      res.status(403).json({ error: 'Only the host can invite friends' });
+      return;
+    }
+    if (session.type !== 'group') {
+      res.status(400).json({ error: 'Only group sessions can have invites' });
+      return;
+    }
+    if (session.status !== 'waiting') {
+      res.status(400).json({ error: 'Session has already started' });
+      return;
+    }
+
+    const friendships = await prisma.$queryRaw<{ other_id: string }[]>`
+      SELECT CASE WHEN requester_id = ${userId} THEN addressee_id ELSE requester_id END as other_id
+      FROM friendships
+      WHERE status = 'accepted'
+        AND ((requester_id = ${userId} AND addressee_id = ANY(${ids}::text[]))
+          OR (addressee_id = ${userId} AND requester_id = ANY(${ids}::text[])))
+    `;
+    const acceptedFriendIds = new Set(friendships.map((f) => f.other_id));
+    const validIds = ids.filter((id) => acceptedFriendIds.has(id));
+    if (validIds.length === 0) {
+      res.status(400).json({ error: 'No valid friends to invite' });
+      return;
+    }
+
+    const host = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { displayName: true },
+    });
+
+    const created: { id: string; to_user_id: string }[] = [];
+    for (const toId of validIds) {
+      const rows = await prisma.$queryRaw<{ id: string; to_user_id: string }[]>`
+        INSERT INTO session_invites (id, session_id, from_user_id, to_user_id, status, created_at, expires_at)
+        VALUES (gen_random_uuid()::text, ${sessionId}, ${userId}, ${toId}, 'pending', NOW(), NOW() + INTERVAL '24 hours')
+        RETURNING id, to_user_id
+      `;
+      if (rows[0]) created.push(rows[0]);
+    }
+
+    for (const row of created) {
+      emit(`user:${row.to_user_id}`, 'session-invite', {
+        inviteId: row.id,
+        sessionId,
+        hostName: host?.displayName ?? 'A friend',
+      });
+    }
+
+    res.status(201).json({ invited: created.length });
+  } catch (err) {
+    console.error('[sessions] invite failed', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -332,6 +436,31 @@ router.get('/active', authenticate, async (req: AuthRequest, res: Response) => {
     }
 
     res.status(404).json({ error: 'No active session' });
+  } catch {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/by-code/:code', async (req, res: Response) => {
+  try {
+    const code = String(req.params.code ?? '').toUpperCase();
+    if (!/^[A-Z0-9]{4,10}$/.test(code)) {
+      res.status(400).json({ error: 'Invalid code' });
+      return;
+    }
+    const rows = await prisma.$queryRaw<{ id: string; status: string }[]>`
+      SELECT "id", "status" FROM "swipe_sessions" WHERE "short_code" = ${code} LIMIT 1
+    `;
+    const row = rows[0];
+    if (!row) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+    if (row.status === 'completed') {
+      res.status(400).json({ error: 'This session has already ended' });
+      return;
+    }
+    res.json({ sessionId: row.id });
   } catch {
     res.status(500).json({ error: 'Internal server error' });
   }

@@ -103,6 +103,7 @@ export const sessionApi = {
   cancel: (id: string) => api.delete(`/sessions/${id}`),
   anotherBatch: (sessionId: string) =>
     api.post(`/sessions/${sessionId}/another-batch`),
+  byCode: (code: string) => api.get<{ sessionId: string }>(`/sessions/by-code/${code}`),
 };
 
 export const recommendationApi = {
@@ -142,6 +143,22 @@ export const providerApi = {
 
 export const browseApi = {
   get: () => api.get('/browse'),
+};
+
+export const friendsApi = {
+  list: () => api.get('/friends'),
+  pending: () => api.get('/friends/pending'),
+  request: (emailOrDisplayName: string) =>
+    api.post('/friends/request', { emailOrDisplayName }),
+  accept: (friendshipId: string) => api.post(`/friends/${friendshipId}/accept`),
+  reject: (friendshipId: string) => api.post(`/friends/${friendshipId}/reject`),
+  remove: (friendshipId: string) => api.delete(`/friends/${friendshipId}`),
+  invites: () => api.get('/friends/invites'),
+  acceptInvite: (inviteId: string) =>
+    api.post<{ sessionId: string }>(`/friends/invites/${inviteId}/accept`),
+  declineInvite: (inviteId: string) => api.post(`/friends/invites/${inviteId}/decline`),
+  inviteToSession: (sessionId: string, friendIds: string[]) =>
+    api.post(`/sessions/${sessionId}/invite`, { friendIds }),
 };
 
 export const discoverApi = {

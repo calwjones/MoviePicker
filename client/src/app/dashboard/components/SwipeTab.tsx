@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { sessionApi, soloApi, movieApi, providerApi } from '@/lib/api';
+import { QRCodeSVG } from 'qrcode.react';
+import { sessionApi, soloApi, movieApi, providerApi, friendsApi } from '@/lib/api';
 import { getErrorMessage } from '@/lib/errors';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { connectSocket, getSocket } from '@/lib/socket';
@@ -92,7 +93,15 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
 
   const [groupSessionId, setGroupSessionId] = useState<string | null>(null);
   const [shareLink, setShareLink] = useState<string | null>(null);
+  const [shortCode, setShortCode] = useState<string | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
+  const [joinCodeInput, setJoinCodeInput] = useState('');
+  const [joinCodeLoading, setJoinCodeLoading] = useState(false);
+  const [joinCodeError, setJoinCodeError] = useState('');
+  const [friends, setFriends] = useState<{ id: string; displayName: string }[]>([]);
+  const [selectedFriendIds, setSelectedFriendIds] = useState<Set<string>>(new Set());
+  const [invitedFriendIds, setInvitedFriendIds] = useState<Set<string>>(new Set());
+  const [inviting, setInviting] = useState(false);
 
   const [filters, setFilters] = useState<Filters>({
     genres: [], decade: '', minRating: 0, maxRuntime: 0, streamingProviders: [],
@@ -220,6 +229,38 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
     return () => { socket.off('participant-joined'); };
   }, [groupSessionId, addToast]);
 
+  useEffect(() => {
+    if (!groupSessionId || !user || user.isGuest) return;
+    friendsApi.list()
+      .then((res) => setFriends(res.data.friends ?? []))
+      .catch(() => { /* ignore */ });
+  }, [groupSessionId, user]);
+
+  const toggleFriend = (id: string) => {
+    setSelectedFriendIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleInviteFriends = async () => {
+    if (!groupSessionId || selectedFriendIds.size === 0) return;
+    const ids = Array.from(selectedFriendIds);
+    setInviting(true);
+    try {
+      await friendsApi.inviteToSession(groupSessionId, ids);
+      setInvitedFriendIds((prev) => new Set([...prev, ...ids]));
+      setSelectedFriendIds(new Set());
+      addToast(`Invited ${ids.length} friend${ids.length === 1 ? '' : 's'}`);
+    } catch (err: unknown) {
+      addToast(getErrorMessage(err, 'Failed to invite friends'));
+    } finally {
+      setInviting(false);
+    }
+  };
+
   const buildActiveFilters = useCallback((): Record<string, unknown> | undefined => {
     const active: Record<string, unknown> = {};
     if (filters.genres?.length > 0) active.genres = filters.genres;
@@ -237,11 +278,30 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
       const res = await sessionApi.createGroup(buildActiveFilters(), batchSize);
       setGroupSessionId(res.data.session.id);
       setShareLink(res.data.shareLink);
+      setShortCode(res.data.shortCode ?? null);
       setParticipants([]);
     } catch (err: unknown) {
       setSessionError(getErrorMessage(err, 'Failed to create session'));
     } finally {
       setSessionLoading(false);
+    }
+  };
+
+  const handleJoinByCode = async () => {
+    const code = joinCodeInput.trim().toUpperCase();
+    if (!/^[A-Z0-9]{6}$/.test(code)) {
+      setJoinCodeError('Enter a 6-character code');
+      return;
+    }
+    setJoinCodeLoading(true);
+    setJoinCodeError('');
+    try {
+      const res = await sessionApi.byCode(code);
+      router.push(`/join/${res.data.sessionId}`);
+    } catch (err: unknown) {
+      setJoinCodeError(getErrorMessage(err, 'Invalid or expired code'));
+    } finally {
+      setJoinCodeLoading(false);
     }
   };
 
@@ -266,7 +326,10 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
     } catch { /* ignore */ }
     setGroupSessionId(null);
     setShareLink(null);
+    setShortCode(null);
     setParticipants([]);
+    setSelectedFriendIds(new Set());
+    setInvitedFriendIds(new Set());
     addToast('Session cancelled');
   };
 
@@ -596,6 +659,77 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
               </div>
             </div>
 
+            {/* Short code */}
+            {shortCode && (
+              <div>
+                <p className="text-cream-dim text-xs mb-2">
+                  Or enter this code on the Join screen:
+                </p>
+                <div className="flex gap-2 items-center">
+                  <p className="flex-1 text-center text-2xl font-bold tracking-[0.3em] text-coral font-mono bg-charcoal rounded-lg px-3 py-3">
+                    {shortCode}
+                  </p>
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => { navigator.clipboard.writeText(shortCode); addToast('Code copied!'); }}
+                    className="px-3 py-2 bg-coral text-charcoal text-xs font-semibold rounded-lg shrink-0"
+                  >
+                    Copy
+                  </motion.button>
+                </div>
+              </div>
+            )}
+
+            {/* QR code */}
+            {shareLink && (
+              <div className="flex flex-col items-center gap-2 pt-1">
+                <p className="text-cream-dim text-xs">Or scan to join:</p>
+                <div className="bg-cream p-2.5 rounded-xl">
+                  <QRCodeSVG value={shareLink} size={140} level="M" />
+                </div>
+              </div>
+            )}
+
+            {/* Invite friends */}
+            {user && !user.isGuest && friends.length > 0 && (
+              <div>
+                <p className="text-cream-dim text-xs mb-2">Invite a friend:</p>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {friends.map((f) => {
+                    const selected = selectedFriendIds.has(f.id);
+                    const invited = invitedFriendIds.has(f.id);
+                    return (
+                      <button
+                        key={f.id}
+                        onClick={() => !invited && toggleFriend(f.id)}
+                        disabled={invited}
+                        className={`px-3 py-1.5 rounded-full text-xs transition-all ${
+                          invited
+                            ? 'bg-coral/20 text-cream-dim cursor-default'
+                            : selected
+                              ? 'bg-coral text-charcoal'
+                              : 'glass text-cream-dim hover:text-cream'
+                        }`}
+                      >
+                        {f.displayName}
+                        {invited ? ' ✓' : ''}
+                      </button>
+                    );
+                  })}
+                </div>
+                {selectedFriendIds.size > 0 && (
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleInviteFriends}
+                    disabled={inviting}
+                    className="w-full py-2 bg-coral/80 text-charcoal text-xs font-semibold rounded-lg disabled:opacity-50"
+                  >
+                    {inviting ? 'Sending…' : `Invite ${selectedFriendIds.size} friend${selectedFriendIds.size === 1 ? '' : 's'}`}
+                  </motion.button>
+                )}
+              </div>
+            )}
+
             {/* Participant list */}
             <div>
               <p className="text-cream-dim text-xs mb-2">
@@ -709,6 +843,35 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
             >
               Discover
             </motion.button>
+          </div>
+
+          {/* Join by code */}
+          <div className="glass rounded-2xl p-4 space-y-2">
+            <p className="text-cream-dim text-xs">Got a code from a friend?</p>
+            <div className="flex gap-2 items-stretch">
+              <input
+                type="text"
+                inputMode="text"
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
+                value={joinCodeInput}
+                onChange={(e) => { setJoinCodeInput(e.target.value.toUpperCase().slice(0, 6)); setJoinCodeError(''); }}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleJoinByCode(); }}
+                placeholder="ABC123"
+                maxLength={6}
+                className="flex-1 bg-charcoal border border-card-hover rounded-xl px-4 py-2.5 text-center text-lg font-mono tracking-[0.3em] text-cream placeholder-cream-dim/40 focus:outline-none focus:border-coral"
+              />
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={handleJoinByCode}
+                disabled={joinCodeLoading || joinCodeInput.length !== 6}
+                className="px-5 bg-coral text-charcoal text-sm font-semibold rounded-xl shrink-0 hover:bg-coral-dark transition-colors disabled:opacity-50"
+              >
+                {joinCodeLoading ? '…' : 'Join'}
+              </motion.button>
+            </div>
+            {joinCodeError && <p className="text-danger text-xs">{joinCodeError}</p>}
           </div>
         </div>
       )}
