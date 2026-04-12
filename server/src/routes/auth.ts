@@ -1,13 +1,42 @@
 import { randomBytes } from 'crypto';
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
+import rateLimit from 'express-rate-limit';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../app';
 import { JWT_SECRET } from '../config';
 import { authenticate, AuthRequest } from '../middleware/auth';
-import { sendVerificationEmail, sendPasswordResetEmail } from '../services/email';
+import { sendVerificationEmail, sendPasswordResetEmail, sendRegistrationAttemptEmail } from '../services/email';
 
 const router = Router();
+
+// Prevent caches/proxies from storing auth responses (tokens, verification
+// status, password-reset artifacts). Applied to every route in this router.
+router.use((_req: Request, res: Response, next: NextFunction) => {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  next();
+});
+
+const buildLimiter = (windowMs: number, max: number) =>
+  rateLimit({
+    windowMs,
+    max,
+    message: { error: 'Too many attempts, please try again later' },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+const HOUR = 60 * 60 * 1000;
+const QUARTER_HOUR = 15 * 60 * 1000;
+
+const registerLimiter = buildLimiter(HOUR, 5);
+const loginLimiter = buildLimiter(QUARTER_HOUR, 10);
+const forgotLimiter = buildLimiter(HOUR, 5);
+const resetLimiter = buildLimiter(HOUR, 10);
+const resendVerificationLimiter = buildLimiter(HOUR, 5);
+const verifyLimiter = buildLimiter(QUARTER_HOUR, 20);
+const changePasswordLimiter = buildLimiter(QUARTER_HOUR, 10);
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -15,33 +44,97 @@ function randomToken(): string {
   return randomBytes(32).toString('hex');
 }
 
-router.post('/register', async (req: Request, res: Response) => {
+// Computed once at boot to equalize login response time when the email
+// doesn't match a user — prevents timing-based account enumeration.
+const DUMMY_HASH = bcrypt.hashSync(randomBytes(24).toString('hex'), 12);
+
+interface RegistrationInput {
+  email: string;
+  password: string;
+  displayName: string;
+}
+
+function parseRegistrationInput(body: unknown): { value: RegistrationInput } | { error: string } {
+  const { email, password, displayName } = (body ?? {}) as Partial<RegistrationInput>;
+  if (!email || !password || !displayName) {
+    return { error: 'Email, password, and display name are required' };
+  }
+  const trimmedEmail = email.trim().toLowerCase();
+  if (!EMAIL_RE.test(trimmedEmail)) {
+    return { error: 'Please enter a valid email address' };
+  }
+  if (typeof password !== 'string' || password.length < 8) {
+    return { error: 'Password must be at least 8 characters' };
+  }
+  const trimmedName = displayName.trim();
+  if (trimmedName.length < 1 || trimmedName.length > 50) {
+    return { error: 'Display name must be 1-50 characters' };
+  }
+  return { value: { email: trimmedEmail, password, displayName: trimmedName } };
+}
+
+// Public register: always returns the same generic response whether the email
+// is available or already taken, to prevent account enumeration. Users must
+// verify via email before they can sign in.
+router.post('/register', registerLimiter, async (req: Request, res: Response) => {
+  const parsed = parseRegistrationInput(req.body);
+  if ('error' in parsed) {
+    res.status(400).json({ error: parsed.error });
+    return;
+  }
+  const { email, password, displayName } = parsed.value;
+
   try {
-    const { email, password, displayName } = req.body;
-
-    if (!email || !password || !displayName) {
-      res.status(400).json({ error: 'Email, password, and display name are required' });
-      return;
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      sendRegistrationAttemptEmail(email).catch((err) => {
+        console.error('[auth] registration-attempt email failed:', err);
+      });
+    } else {
+      const passwordHash = await bcrypt.hash(password, 12);
+      const verificationToken = randomToken();
+      const user = await prisma.user.create({
+        data: {
+          email,
+          passwordHash,
+          displayName,
+          emailVerificationToken: verificationToken,
+        },
+      });
+      sendVerificationEmail(user.email, verificationToken).catch((err) => {
+        console.error('[auth] verification email failed:', err);
+      });
     }
 
-    const trimmedEmail = email.trim().toLowerCase();
-    if (!EMAIL_RE.test(trimmedEmail)) {
-      res.status(400).json({ error: 'Please enter a valid email address' });
-      return;
-    }
+    res.status(200).json({
+      message: 'If your email is available, check your inbox to verify your account.',
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
-    if (typeof password !== 'string' || password.length < 8) {
-      res.status(400).json({ error: 'Password must be at least 8 characters' });
-      return;
-    }
+// Guest-to-user conversion: authenticated with a guest JWT, preserves the
+// active swipe session by returning a real token. Because the caller proves
+// they hold a valid guest token, the enumeration concern doesn't apply the
+// same way, but the response still doesn't distinguish "taken" from other
+// errors in a way an unauthenticated attacker could poll.
+router.post('/convert-guest', authenticate, async (req: AuthRequest, res: Response) => {
+  if (!req.isGuest) {
+    res.status(403).json({ error: 'Only guest sessions can be converted' });
+    return;
+  }
 
-    const trimmedName = displayName.trim();
-    if (trimmedName.length < 1 || trimmedName.length > 50) {
-      res.status(400).json({ error: 'Display name must be 1-50 characters' });
-      return;
-    }
+  const parsed = parseRegistrationInput(req.body);
+  if ('error' in parsed) {
+    res.status(400).json({ error: parsed.error });
+    return;
+  }
+  const { email, password, displayName } = parsed.value;
 
-    const existing = await prisma.user.findUnique({ where: { email: trimmedEmail } });
+  try {
+    const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
       res.status(409).json({ error: 'Email already registered' });
       return;
@@ -51,9 +144,9 @@ router.post('/register', async (req: Request, res: Response) => {
     const verificationToken = randomToken();
     const user = await prisma.user.create({
       data: {
-        email: trimmedEmail,
+        email,
         passwordHash,
-        displayName: trimmedName,
+        displayName,
         emailVerificationToken: verificationToken,
       },
     });
@@ -80,7 +173,7 @@ router.post('/register', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/verify', async (req: Request, res: Response) => {
+router.get('/verify', verifyLimiter, async (req: Request, res: Response) => {
   try {
     const token = typeof req.query.token === 'string' ? req.query.token : '';
     if (!token) {
@@ -103,7 +196,7 @@ router.get('/verify', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/resend-verification', async (req: Request, res: Response) => {
+router.post('/resend-verification', resendVerificationLimiter, async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
     if (!email) {
@@ -129,7 +222,7 @@ router.post('/resend-verification', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/forgot-password', async (req: Request, res: Response) => {
+router.post('/forgot-password', forgotLimiter, async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
     if (!email) {
@@ -156,7 +249,7 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/reset-password', async (req: Request, res: Response) => {
+router.post('/reset-password', resetLimiter, async (req: Request, res: Response) => {
   try {
     const { token, newPassword } = req.body;
     if (!token || !newPassword) {
@@ -188,7 +281,7 @@ router.post('/reset-password', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/login', async (req: Request, res: Response) => {
+router.post('/login', loginLimiter, async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
 
@@ -199,13 +292,9 @@ router.post('/login', async (req: Request, res: Response) => {
 
     const trimmedEmail = email.trim().toLowerCase();
     const user = await prisma.user.findUnique({ where: { email: trimmedEmail } });
-    if (!user) {
-      res.status(401).json({ error: 'Invalid credentials' });
-      return;
-    }
-
-    const valid = await bcrypt.compare(password, user.passwordHash);
-    if (!valid) {
+    // Always run bcrypt.compare so response time doesn't leak user existence.
+    const valid = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_HASH);
+    if (!user || !valid) {
       res.status(401).json({ error: 'Invalid credentials' });
       return;
     }
@@ -233,7 +322,7 @@ router.post('/login', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/change-password', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/change-password', changePasswordLimiter, authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { currentPassword, newPassword } = req.body;
     if (!currentPassword || !newPassword) {

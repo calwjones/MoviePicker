@@ -74,9 +74,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const register = async (email: string, password: string, displayName: string) => {
-    const res = await authApi.register(email, password, displayName);
-    localStorage.setItem('token', res.data.token);
-    setUser(res.data.user);
+    // Server now requires email verification before granting a session token.
+    // No state change here — the auth page shows a "Check your inbox" screen.
+    await authApi.register(email, password, displayName);
   };
 
   const logout = useCallback(() => {

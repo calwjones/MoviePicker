@@ -29,6 +29,8 @@ model User {
   invitesSent          SessionInvite[] @relation("SessionInviteFrom")
   invitesReceived      SessionInvite[] @relation("SessionInviteTo")
 
+  @@index([passwordResetToken])
+  @@index([emailVerificationToken])
   @@map("users")
 }
 

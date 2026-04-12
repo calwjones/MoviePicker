@@ -32,7 +32,7 @@ app.use(helmet());
 app.use(cors({ origin: CLIENT_URL, maxAge: 86400 }));
 app.use(express.json());
 
-const authLimiter = rateLimit({
+const guestLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
   message: { error: 'Too many attempts, please try again later' },
@@ -40,13 +40,13 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/movies', movieRoutes);
 app.use('/api/import', importRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/swipes', swipeRoutes);
 app.use('/api/solo', soloRoutes);
-app.use('/api/guest', authLimiter, guestRoutes);
+app.use('/api/guest', guestLimiter, guestRoutes);
 app.use('/api/recommendations', recommendationRoutes);
 app.use('/api/providers', providerRoutes);
 app.use('/api/browse', browseRoutes);

@@ -57,6 +57,8 @@ export const authApi = {
     api.post('/auth/reset-password', { token, newPassword }),
   deleteAccount: (currentPassword: string) =>
     api.delete('/auth/me', { data: { currentPassword } }),
+  convertGuest: (email: string, password: string, displayName: string) =>
+    api.post('/auth/convert-guest', { email, password, displayName }),
 };
 
 export const movieApi = {

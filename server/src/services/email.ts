@@ -78,6 +78,22 @@ export function sendVerificationEmail(to: string, token: string): Promise<void> 
   );
 }
 
+export function sendRegistrationAttemptEmail(to: string): Promise<void> {
+  const link = `${CLIENT_URL}/auth?mode=login`;
+  return sendEmail({
+    to,
+    subject: 'Someone tried to register with your Matchsticked email',
+    html: wrap(`
+      <p>Someone just tried to create a new Matchsticked account using this email address.</p>
+      <p>If that was you and you forgot you already have an account, you can sign in or reset your password.</p>
+      <p style="margin: 24px 0;">
+        <a href="${link}" style="display: inline-block; background: #FF6B3D; color: #1a1a1a; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: 600;">Sign in</a>
+      </p>
+      <p style="font-size: 12px; color: #9a9284;">If it wasn't you, you can safely ignore this email. No changes were made.</p>
+    `),
+  });
+}
+
 export function sendPasswordResetEmail(to: string, token: string): Promise<void> {
   const link = `${CLIENT_URL}/auth/reset?token=${encodeURIComponent(token)}`;
   return sendEmail(

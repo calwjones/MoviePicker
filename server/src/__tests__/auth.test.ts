@@ -20,7 +20,7 @@ describe('Auth Routes', () => {
   });
 
   describe('POST /api/auth/register', () => {
-    it('should register a new user successfully', async () => {
+    it('should accept a new registration and never return a token', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
       mockPrisma.user.create.mockResolvedValue({
         id: 'user-1',
@@ -34,14 +34,10 @@ describe('Auth Routes', () => {
         .post('/api/auth/register')
         .send({ email: 'test@example.com', password: 'password123', displayName: 'Test User' });
 
-      expect(res.status).toBe(201);
-      expect(res.body.user).toEqual({
-        id: 'user-1',
-        email: 'test@example.com',
-        displayName: 'Test User',
-        emailVerified: false,
-      });
-      expect(res.body.token).toBeDefined();
+      expect(res.status).toBe(200);
+      expect(res.body.message).toMatch(/check your inbox/i);
+      expect(res.body.token).toBeUndefined();
+      expect(res.body.user).toBeUndefined();
       expect(mockPrisma.user.create).toHaveBeenCalledTimes(1);
     });
 
@@ -54,15 +50,17 @@ describe('Auth Routes', () => {
       expect(res.body.error).toBe('Email, password, and display name are required');
     });
 
-    it('should return 409 if email already exists', async () => {
+    it('should return the same generic response when the email is already taken', async () => {
       mockPrisma.user.findUnique.mockResolvedValue({ id: 'existing-user' });
 
       const res = await request(app)
         .post('/api/auth/register')
         .send({ email: 'taken@example.com', password: 'password123', displayName: 'Test' });
 
-      expect(res.status).toBe(409);
-      expect(res.body.error).toBe('Email already registered');
+      expect(res.status).toBe(200);
+      expect(res.body.message).toMatch(/check your inbox/i);
+      expect(res.body.token).toBeUndefined();
+      expect(mockPrisma.user.create).not.toHaveBeenCalled();
     });
   });
 

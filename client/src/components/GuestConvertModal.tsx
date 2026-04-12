@@ -24,7 +24,7 @@ export default function GuestConvertModal({ open, onClose, defaultName = '', onC
     setError('');
     setLoading(true);
     try {
-      const res = await authApi.register(email, password, displayName);
+      const res = await authApi.convertGuest(email, password, displayName);
       localStorage.setItem('token', res.data.token);
       localStorage.removeItem('guest_session_id');
       localStorage.removeItem('user_token_backup');
