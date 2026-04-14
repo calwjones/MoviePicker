@@ -154,10 +154,10 @@ export default function JoinPage() {
                 <div className="space-y-4">
                   <div className="flex items-center gap-3 p-3 bg-charcoal rounded-xl">
                     <div className="w-8 h-8 rounded-full bg-coral flex items-center justify-center text-charcoal font-bold text-sm">
-                      {user.displayName[0].toUpperCase()}
+                      {user.username[0].toUpperCase()}
                     </div>
                     <div>
-                      <p className="text-cream text-sm font-medium">{user.displayName}</p>
+                      <p className="text-cream text-sm font-medium">@{user.username}</p>
                       <p className="text-cream-dim text-xs">Your watchlist will be merged</p>
                     </div>
                   </div>

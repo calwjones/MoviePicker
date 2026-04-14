@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { authApi, providerApi } from '@/lib/api';
 import { getBaseName } from '@/components/StreamingProviders';
+import LetterboxdImport from '@/components/LetterboxdImport';
 
 interface ProviderOption {
   id: number;
@@ -21,7 +22,7 @@ const PREFERRED_PROVIDERS = [
 ];
 
 export default function ProfilePage() {
-  const { user, loading, logout, updateDisplayName, updatePreferredProviders } = useAuth();
+  const { user, loading, logout, updateUsername, updatePreferredProviders } = useAuth();
   const router = useRouter();
 
   const [name, setName] = useState('');
@@ -55,7 +56,7 @@ export default function ProfilePage() {
   }, [user, loading, router]);
 
   useEffect(() => {
-    if (user) setName(user.displayName);
+    if (user) setName(user.username);
   }, [user]);
 
   useEffect(() => {
@@ -122,14 +123,15 @@ export default function ProfilePage() {
     );
   }
 
-  const nameChanged = name.trim() !== user.displayName && name.trim().length > 0;
+  const normalizedName = name.trim().toLowerCase();
+  const nameChanged = normalizedName !== user.username && normalizedName.length > 0;
 
   const handleSaveName = async () => {
     setNameMsg('');
     setNameError('');
     setSavingName(true);
     try {
-      await updateDisplayName(name.trim());
+      await updateUsername(normalizedName);
       setNameMsg('Saved');
     } catch (err: unknown) {
       const apiErr = err as { response?: { data?: { error?: string } } };
@@ -204,16 +206,19 @@ export default function ProfilePage() {
           <p className="text-lg font-medium mt-1">{user.email}</p>
         </div>
         <div>
-          <label className="text-cream-dim text-xs uppercase tracking-wide mb-1 block">Display name</label>
+          <label className="text-cream-dim text-xs uppercase tracking-wide mb-1 block">Username</label>
           <input
             type="text"
             value={name}
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             onChange={(e) => {
-              setName(e.target.value);
+              setName(e.target.value.replace(/\s/g, '').toLowerCase());
               setNameMsg('');
               setNameError('');
             }}
-            maxLength={50}
+            maxLength={30}
             className="w-full px-4 py-2.5 glass rounded-xl text-cream placeholder:text-cream-dim/50 focus:outline-none focus:border-coral/60 border border-cream/10"
           />
           <div className="flex items-center justify-between mt-2 min-h-[1.25rem]">
@@ -279,6 +284,18 @@ export default function ProfilePage() {
           </div>
         )}
         {providersError && <p className="text-danger text-xs">{providersError}</p>}
+      </div>
+
+      <div className="glass rounded-2xl p-6 space-y-3 mb-6">
+        <div>
+          <h2 className="text-lg font-semibold">Letterboxd</h2>
+          <p className="text-cream-dim text-xs mt-1">
+            {user.letterboxdUsername
+              ? 'Change your Letterboxd username or pull a fresh sync.'
+              : 'Connect your Letterboxd account to pull your watchlist and ratings.'}
+          </p>
+        </div>
+        <LetterboxdImport mode="library" />
       </div>
 
       <div className="glass rounded-2xl p-6 space-y-3 mb-6">

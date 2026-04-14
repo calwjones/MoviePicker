@@ -98,7 +98,7 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
   const [joinCodeInput, setJoinCodeInput] = useState('');
   const [joinCodeLoading, setJoinCodeLoading] = useState(false);
   const [joinCodeError, setJoinCodeError] = useState('');
-  const [friends, setFriends] = useState<{ id: string; displayName: string }[]>([]);
+  const [friends, setFriends] = useState<{ id: string; username: string }[]>([]);
   const [selectedFriendIds, setSelectedFriendIds] = useState<Set<string>>(new Set());
   const [invitedFriendIds, setInvitedFriendIds] = useState<Set<string>>(new Set());
   const [inviting, setInviting] = useState(false);
@@ -711,7 +711,7 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
                               : 'glass text-cream-dim hover:text-cream'
                         }`}
                       >
-                        {f.displayName}
+                        @{f.username}
                         {invited ? ' ✓' : ''}
                       </button>
                     );

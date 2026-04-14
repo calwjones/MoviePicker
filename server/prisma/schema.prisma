@@ -11,7 +11,7 @@ model User {
   id                       String    @id @default(uuid())
   email                    String    @unique
   passwordHash             String    @map("password_hash")
-  displayName              String    @map("display_name")
+  username                 String    @unique
   avatarUrl                String?   @map("avatar_url")
   emailVerified            Boolean   @default(false) @map("email_verified")
   emailVerificationToken   String?   @map("email_verification_token")

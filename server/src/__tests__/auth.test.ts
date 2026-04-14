@@ -25,14 +25,14 @@ describe('Auth Routes', () => {
       mockPrisma.user.create.mockResolvedValue({
         id: 'user-1',
         email: 'test@example.com',
-        displayName: 'Test User',
+        username: 'testuser',
         passwordHash: 'hashed',
         emailVerified: false,
       });
 
       const res = await request(app)
         .post('/api/auth/register')
-        .send({ email: 'test@example.com', password: 'password123', displayName: 'Test User' });
+        .send({ email: 'test@example.com', password: 'password123', username: 'testuser' });
 
       expect(res.status).toBe(200);
       expect(res.body.message).toMatch(/check your inbox/i);
@@ -47,7 +47,7 @@ describe('Auth Routes', () => {
         .send({ email: 'test@example.com' });
 
       expect(res.status).toBe(400);
-      expect(res.body.error).toBe('Email, password, and display name are required');
+      expect(res.body.error).toBe('Email, password, and username are required');
     });
 
     it('should return the same generic response when the email is already taken', async () => {
@@ -55,7 +55,7 @@ describe('Auth Routes', () => {
 
       const res = await request(app)
         .post('/api/auth/register')
-        .send({ email: 'taken@example.com', password: 'password123', displayName: 'Test' });
+        .send({ email: 'taken@example.com', password: 'password123', username: 'taker' });
 
       expect(res.status).toBe(200);
       expect(res.body.message).toMatch(/check your inbox/i);
@@ -70,7 +70,7 @@ describe('Auth Routes', () => {
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 'user-1',
         email: 'test@example.com',
-        displayName: 'Test User',
+        username: 'testuser',
         passwordHash: hashedPassword,
         emailVerified: true,
       });
@@ -89,7 +89,7 @@ describe('Auth Routes', () => {
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 'user-1',
         email: 'test@example.com',
-        displayName: 'Test User',
+        username: 'testuser',
         passwordHash: hashedPassword,
         emailVerified: false,
       });
@@ -145,7 +145,7 @@ describe('Auth Routes', () => {
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 'user-1',
         email: 'test@example.com',
-        displayName: 'Test User',
+        username: 'testuser',
         avatarUrl: null,
       });
 

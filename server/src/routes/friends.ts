@@ -7,7 +7,7 @@ const router = Router();
 
 interface FriendRow {
   id: string;
-  display_name: string;
+  username: string;
   avatar_url: string | null;
   friendship_id: string;
 }
@@ -16,7 +16,7 @@ interface PendingRow {
   friendship_id: string;
   created_at: Date;
   other_id: string;
-  other_display_name: string;
+  other_username: string;
   other_avatar_url: string | null;
   direction: 'incoming' | 'outgoing';
 }
@@ -27,7 +27,7 @@ interface InviteRow {
   from_user_id: string;
   created_at: Date;
   expires_at: Date;
-  from_display_name: string;
+  from_username: string;
   short_code: string | null;
 }
 
@@ -35,7 +35,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
     const rows = await prisma.$queryRaw<FriendRow[]>`
-      SELECT u.id, u.display_name, u.avatar_url, f.id as friendship_id
+      SELECT u.id, u.username, u.avatar_url, f.id as friendship_id
       FROM friendships f
       JOIN users u ON (
         (f.requester_id = ${userId} AND u.id = f.addressee_id)
@@ -43,12 +43,12 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
         (f.addressee_id = ${userId} AND u.id = f.requester_id)
       )
       WHERE f.status = 'accepted'
-      ORDER BY u.display_name ASC
+      ORDER BY u.username ASC
     `;
     res.json({
       friends: rows.map((r) => ({
         id: r.id,
-        displayName: r.display_name,
+        username: r.username,
         avatarUrl: r.avatar_url,
         friendshipId: r.friendship_id,
       })),
@@ -67,7 +67,7 @@ router.get('/pending', authenticate, async (req: AuthRequest, res: Response) => 
         f.id as friendship_id,
         f.created_at,
         CASE WHEN f.addressee_id = ${userId} THEN f.requester_id ELSE f.addressee_id END as other_id,
-        u.display_name as other_display_name,
+        u.username as other_username,
         u.avatar_url as other_avatar_url,
         CASE WHEN f.addressee_id = ${userId} THEN 'incoming' ELSE 'outgoing' END as direction
       FROM friendships f
@@ -83,7 +83,7 @@ router.get('/pending', authenticate, async (req: AuthRequest, res: Response) => 
         direction: r.direction,
         other: {
           id: r.other_id,
-          displayName: r.other_display_name,
+          username: r.other_username,
           avatarUrl: r.other_avatar_url,
         },
         createdAt: r.created_at,
@@ -98,21 +98,16 @@ router.get('/pending', authenticate, async (req: AuthRequest, res: Response) => 
 router.post('/request', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const { emailOrDisplayName } = req.body as { emailOrDisplayName?: string };
-    const query = (emailOrDisplayName ?? '').trim();
+    const { username } = req.body as { username?: string };
+    const query = (username ?? '').trim().toLowerCase();
     if (!query) {
-      res.status(400).json({ error: 'emailOrDisplayName is required' });
+      res.status(400).json({ error: 'Username is required' });
       return;
     }
 
-    const target = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { email: query.toLowerCase() },
-          { displayName: query },
-        ],
-      },
-      select: { id: true, displayName: true, avatarUrl: true },
+    const target = await prisma.user.findUnique({
+      where: { username: query },
+      select: { id: true, username: true, avatarUrl: true },
     });
     if (!target) {
       res.status(404).json({ error: 'User not found' });
@@ -150,19 +145,19 @@ router.post('/request', authenticate, async (req: AuthRequest, res: Response) =>
 
     const requester = await prisma.user.findUnique({
       where: { id: userId },
-      select: { displayName: true, avatarUrl: true },
+      select: { username: true, avatarUrl: true },
     });
 
     emit(`user:${target.id}`, 'friend-request', {
       friendshipId: rows[0].id,
-      from: { id: userId, displayName: requester?.displayName, avatarUrl: requester?.avatarUrl },
+      from: { id: userId, username: requester?.username, avatarUrl: requester?.avatarUrl },
     });
 
     res.status(201).json({
       friendship: {
         id: rows[0].id,
         status: rows[0].status,
-        target: { id: target.id, displayName: target.displayName, avatarUrl: target.avatarUrl },
+        target: { id: target.id, username: target.username, avatarUrl: target.avatarUrl },
       },
     });
   } catch (err) {
@@ -233,7 +228,7 @@ router.get('/invites', authenticate, async (req: AuthRequest, res: Response) => 
     const rows = await prisma.$queryRaw<InviteRow[]>`
       SELECT
         i.id, i.session_id, i.from_user_id, i.created_at, i.expires_at,
-        u.display_name as from_display_name,
+        u.username as from_username,
         s.short_code
       FROM session_invites i
       JOIN users u ON u.id = i.from_user_id
@@ -247,7 +242,7 @@ router.get('/invites', authenticate, async (req: AuthRequest, res: Response) => 
         id: r.id,
         sessionId: r.session_id,
         shortCode: r.short_code,
-        from: { id: r.from_user_id, displayName: r.from_display_name },
+        from: { id: r.from_user_id, username: r.from_username },
         createdAt: r.created_at,
         expiresAt: r.expires_at,
       })),

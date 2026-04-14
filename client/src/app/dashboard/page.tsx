@@ -68,11 +68,11 @@ export default function DashboardPage() {
               onClick={() => router.push('/profile')}
               className="text-cream-dim text-sm hover:text-coral transition-colors"
             >
-              {user.displayName}
+              @{user.username}
             </button>
           )}
           {user?.isGuest && (
-            <span className="text-cream-dim text-sm">{user.displayName}</span>
+            <span className="text-cream-dim text-sm">{user.username}</span>
           )}
           <button
             onClick={logout}

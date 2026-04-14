@@ -14,7 +14,7 @@ function AuthForm() {
   );
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
+  const [username, setUsername] = useState('');
   const [error, setError] = useState('');
   const [needsVerification, setNeedsVerification] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
@@ -43,7 +43,7 @@ function AuthForm() {
 
     try {
       if (mode === 'register') {
-        await register(email, password, displayName);
+        await register(email, password, username);
         setRegisteredEmail(email);
       } else {
         await login(email, password);
@@ -112,14 +112,24 @@ function AuthForm() {
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           {mode === 'register' && (
-            <input
-              type="text"
-              placeholder="Display name"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              required
-              className="w-full px-4 py-3 glass rounded-xl bg-transparent text-cream placeholder:text-cream-dim focus:outline-none focus:ring-2 focus:ring-coral"
-            />
+            <div className="flex items-center glass rounded-xl pl-3 pr-1">
+              <span className="text-cream-dim text-sm">@</span>
+              <input
+                type="text"
+                placeholder="username"
+                value={username}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                onChange={(e) => setUsername(e.target.value.replace(/\s/g, '').toLowerCase())}
+                required
+                minLength={3}
+                maxLength={30}
+                pattern="[a-z0-9_-]{3,30}"
+                title="3–30 characters, letters, numbers, underscores or hyphens"
+                className="flex-1 bg-transparent py-3 px-2 text-cream placeholder:text-cream-dim focus:outline-none"
+              />
+            </div>
           )}
           <input
             type="email"

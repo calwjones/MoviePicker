@@ -80,6 +80,6 @@ export interface Filters {
 export interface User {
   id: string;
   email: string;
-  displayName: string;
+  username: string;
   avatarUrl?: string;
 }

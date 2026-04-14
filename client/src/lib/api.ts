@@ -39,13 +39,13 @@ api.interceptors.response.use(
 );
 
 export const authApi = {
-  register: (email: string, password: string, displayName: string) =>
-    api.post('/auth/register', { email, password, displayName }),
+  register: (email: string, password: string, username: string) =>
+    api.post('/auth/register', { email, password, username }),
   login: (email: string, password: string) =>
     api.post('/auth/login', { email, password }),
   me: () => api.get('/auth/me'),
-  updateProfile: (displayName: string) =>
-    api.patch('/auth/me', { displayName }),
+  updateProfile: (username: string) =>
+    api.patch('/auth/me', { username }),
   updatePreferredProviders: (preferredStreamingProviderIds: number[]) =>
     api.patch('/auth/me', { preferredStreamingProviderIds }),
   changePassword: (currentPassword: string, newPassword: string) =>
@@ -57,8 +57,8 @@ export const authApi = {
     api.post('/auth/reset-password', { token, newPassword }),
   deleteAccount: (currentPassword: string) =>
     api.delete('/auth/me', { data: { currentPassword } }),
-  convertGuest: (email: string, password: string, displayName: string) =>
-    api.post('/auth/convert-guest', { email, password, displayName }),
+  convertGuest: (email: string, password: string, username: string) =>
+    api.post('/auth/convert-guest', { email, password, username }),
 };
 
 export const movieApi = {
@@ -150,8 +150,8 @@ export const browseApi = {
 export const friendsApi = {
   list: () => api.get('/friends'),
   pending: () => api.get('/friends/pending'),
-  request: (emailOrDisplayName: string) =>
-    api.post('/friends/request', { emailOrDisplayName }),
+  request: (username: string) =>
+    api.post('/friends/request', { username }),
   accept: (friendshipId: string) => api.post(`/friends/${friendshipId}/accept`),
   reject: (friendshipId: string) => api.post(`/friends/${friendshipId}/reject`),
   remove: (friendshipId: string) => api.delete(`/friends/${friendshipId}`),

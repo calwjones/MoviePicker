@@ -6,7 +6,7 @@ import { authApi } from '@/lib/api';
 interface User {
   id: string;
   email: string;
-  displayName: string;
+  username: string;
   avatarUrl?: string;
   emailVerified?: boolean;
   isGuest?: boolean;
@@ -18,9 +18,9 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, displayName: string) => Promise<void>;
+  register: (email: string, password: string, username: string) => Promise<void>;
   logout: () => void;
-  updateDisplayName: (displayName: string) => Promise<void>;
+  updateUsername: (username: string) => Promise<void>;
   updatePreferredProviders: (providerIds: number[]) => Promise<void>;
   setLetterboxdUsername: (username: string | null) => void;
 }
@@ -51,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser({
         id: payload.guestId as string,
         email: '',
-        displayName: (payload.displayName as string) || 'Guest',
+        username: (payload.displayName as string) || 'Guest',
         isGuest: true,
       });
       setLoading(false);
@@ -73,10 +73,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(res.data.user);
   };
 
-  const register = async (email: string, password: string, displayName: string) => {
+  const register = async (email: string, password: string, username: string) => {
     // Server now requires email verification before granting a session token.
     // No state change here — the auth page shows a "Check your inbox" screen.
-    await authApi.register(email, password, displayName);
+    await authApi.register(email, password, username);
   };
 
   const logout = useCallback(() => {
@@ -86,9 +86,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
-  const updateDisplayName = async (displayName: string) => {
-    const res = await authApi.updateProfile(displayName);
-    setUser((prev) => (prev ? { ...prev, displayName: res.data.user.displayName } : prev));
+  const updateUsername = async (username: string) => {
+    const res = await authApi.updateProfile(username);
+    setUser((prev) => (prev ? { ...prev, username: res.data.user.username } : prev));
   };
 
   const updatePreferredProviders = async (providerIds: number[]) => {
@@ -101,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, updateDisplayName, updatePreferredProviders, setLetterboxdUsername }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, updateUsername, updatePreferredProviders, setLetterboxdUsername }}>
       {children}
     </AuthContext.Provider>
   );

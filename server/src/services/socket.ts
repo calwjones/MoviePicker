@@ -106,10 +106,10 @@ export function setupSocketHandlers(io: Server): void {
               announcedJoins.add(joinedKey);
               const joiner = await prisma.user.findUnique({
                 where: { id: socket.userId },
-                select: { displayName: true },
+                select: { username: true },
               });
               socket.to(`session:${sessionId}`).emit('participant-joined', {
-                displayName: joiner?.displayName ?? 'Player',
+                displayName: joiner?.username ?? 'Player',
                 type: 'registered',
               });
             }

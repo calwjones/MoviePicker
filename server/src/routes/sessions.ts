@@ -260,7 +260,7 @@ router.post('/:id/invite', authenticate, async (req: AuthRequest, res: Response)
 
     const host = await prisma.user.findUnique({
       where: { id: userId },
-      select: { displayName: true },
+      select: { username: true },
     });
 
     const created: { id: string; to_user_id: string }[] = [];
@@ -277,7 +277,7 @@ router.post('/:id/invite', authenticate, async (req: AuthRequest, res: Response)
       emit(`user:${row.to_user_id}`, 'session-invite', {
         inviteId: row.id,
         sessionId,
-        hostName: host?.displayName ?? 'A friend',
+        hostName: host?.username ?? 'A friend',
       });
     }
 
@@ -470,13 +470,13 @@ router.get('/:id/preview', async (req, res: Response) => {
   try {
     const session = await prisma.swipeSession.findUnique({
       where: { id: req.params.id },
-      include: { user: { select: { displayName: true } } },
+      include: { user: { select: { username: true } } },
     });
     if (!session || session.status !== 'waiting') {
       res.status(404).json({ error: 'Session not found or already started' });
       return;
     }
-    res.json({ hostName: session.user?.displayName ?? null });
+    res.json({ hostName: session.user?.username ?? null });
   } catch {
     res.status(500).json({ error: 'Internal server error' });
   }

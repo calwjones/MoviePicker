@@ -13,7 +13,7 @@ interface GuestConvertModalProps {
 }
 
 export default function GuestConvertModal({ open, onClose, defaultName = '', onConverted }: GuestConvertModalProps) {
-  const [displayName, setDisplayName] = useState(defaultName);
+  const [username, setUsername] = useState(defaultName.replace(/\s/g, '').toLowerCase());
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,7 +24,7 @@ export default function GuestConvertModal({ open, onClose, defaultName = '', onC
     setError('');
     setLoading(true);
     try {
-      const res = await authApi.convertGuest(email, password, displayName);
+      const res = await authApi.convertGuest(email, password, username);
       localStorage.setItem('token', res.data.token);
       localStorage.removeItem('guest_session_id');
       localStorage.removeItem('user_token_backup');
@@ -68,15 +68,24 @@ export default function GuestConvertModal({ open, onClose, defaultName = '', onC
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-3">
-                <input
-                  type="text"
-                  placeholder="Display name"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  required
-                  minLength={2}
-                  className="w-full px-4 py-3 glass rounded-xl text-cream placeholder:text-cream-dim/50 focus:outline-none focus:border-coral/60 border border-cream/10"
-                />
+                <div className="flex items-center glass rounded-xl pl-3 pr-1 border border-cream/10">
+                  <span className="text-cream-dim text-sm">@</span>
+                  <input
+                    type="text"
+                    placeholder="username"
+                    value={username}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    onChange={(e) => setUsername(e.target.value.replace(/\s/g, '').toLowerCase())}
+                    required
+                    minLength={3}
+                    maxLength={30}
+                    pattern="[a-z0-9_-]{3,30}"
+                    title="3–30 characters, letters, numbers, underscores or hyphens"
+                    className="flex-1 bg-transparent py-3 px-2 text-cream placeholder:text-cream-dim/50 focus:outline-none"
+                  />
+                </div>
                 <input
                   type="email"
                   placeholder="Email"

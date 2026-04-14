@@ -84,7 +84,7 @@ export default function MatchesPage() {
     <GuestConvertModal
       open={guestModalOpen}
       onClose={() => setGuestModalOpen(false)}
-      defaultName={authUser?.displayName}
+      defaultName={authUser?.username}
     />
   );
 

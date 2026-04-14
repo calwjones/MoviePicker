@@ -39,6 +39,7 @@ const verifyLimiter = buildLimiter(QUARTER_HOUR, 20);
 const changePasswordLimiter = buildLimiter(QUARTER_HOUR, 10);
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const USERNAME_RE = /^[a-z0-9_-]{3,30}$/;
 
 function randomToken(): string {
   return randomBytes(32).toString('hex');
@@ -51,13 +52,13 @@ const DUMMY_HASH = bcrypt.hashSync(randomBytes(24).toString('hex'), 12);
 interface RegistrationInput {
   email: string;
   password: string;
-  displayName: string;
+  username: string;
 }
 
 function parseRegistrationInput(body: unknown): { value: RegistrationInput } | { error: string } {
-  const { email, password, displayName } = (body ?? {}) as Partial<RegistrationInput>;
-  if (!email || !password || !displayName) {
-    return { error: 'Email, password, and display name are required' };
+  const { email, password, username } = (body ?? {}) as Partial<RegistrationInput>;
+  if (!email || !password || !username) {
+    return { error: 'Email, password, and username are required' };
   }
   const trimmedEmail = email.trim().toLowerCase();
   if (!EMAIL_RE.test(trimmedEmail)) {
@@ -66,11 +67,11 @@ function parseRegistrationInput(body: unknown): { value: RegistrationInput } | {
   if (typeof password !== 'string' || password.length < 8) {
     return { error: 'Password must be at least 8 characters' };
   }
-  const trimmedName = displayName.trim();
-  if (trimmedName.length < 1 || trimmedName.length > 50) {
-    return { error: 'Display name must be 1-50 characters' };
+  const normalizedUsername = username.trim().toLowerCase();
+  if (!USERNAME_RE.test(normalizedUsername)) {
+    return { error: 'Username must be 3-30 characters, letters, numbers, underscores, or hyphens only' };
   }
-  return { value: { email: trimmedEmail, password, displayName: trimmedName } };
+  return { value: { email: trimmedEmail, password, username: normalizedUsername } };
 }
 
 // Public register: always returns the same generic response whether the email
@@ -82,14 +83,18 @@ router.post('/register', registerLimiter, async (req: Request, res: Response) =>
     res.status(400).json({ error: parsed.error });
     return;
   }
-  const { email, password, displayName } = parsed.value;
+  const { email, password, username } = parsed.value;
 
   try {
     const existing = await prisma.user.findUnique({ where: { email } });
+    const usernameTaken = existing ? false : !!(await prisma.user.findUnique({ where: { username } }));
     if (existing) {
       sendRegistrationAttemptEmail(email).catch((err) => {
         console.error('[auth] registration-attempt email failed:', err);
       });
+    } else if (usernameTaken) {
+      res.status(409).json({ error: 'That username is taken', code: 'username_taken' });
+      return;
     } else {
       const passwordHash = await bcrypt.hash(password, 12);
       const verificationToken = randomToken();
@@ -97,7 +102,7 @@ router.post('/register', registerLimiter, async (req: Request, res: Response) =>
         data: {
           email,
           passwordHash,
-          displayName,
+          username,
           emailVerificationToken: verificationToken,
         },
       });
@@ -131,12 +136,17 @@ router.post('/convert-guest', authenticate, async (req: AuthRequest, res: Respon
     res.status(400).json({ error: parsed.error });
     return;
   }
-  const { email, password, displayName } = parsed.value;
+  const { email, password, username } = parsed.value;
 
   try {
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
       res.status(409).json({ error: 'Email already registered' });
+      return;
+    }
+    const usernameTaken = await prisma.user.findUnique({ where: { username } });
+    if (usernameTaken) {
+      res.status(409).json({ error: 'That username is taken', code: 'username_taken' });
       return;
     }
 
@@ -146,7 +156,7 @@ router.post('/convert-guest', authenticate, async (req: AuthRequest, res: Respon
       data: {
         email,
         passwordHash,
-        displayName,
+        username,
         emailVerificationToken: verificationToken,
       },
     });
@@ -161,7 +171,7 @@ router.post('/convert-guest', authenticate, async (req: AuthRequest, res: Respon
       user: {
         id: user.id,
         email: user.email,
-        displayName: user.displayName,
+        username: user.username,
         emailVerified: user.emailVerified,
         preferredStreamingProviderIds: user.preferredStreamingProviderIds,
       },
@@ -310,7 +320,7 @@ router.post('/login', loginLimiter, async (req: Request, res: Response) => {
       user: {
         id: user.id,
         email: user.email,
-        displayName: user.displayName,
+        username: user.username,
         emailVerified: user.emailVerified,
         preferredStreamingProviderIds: user.preferredStreamingProviderIds,
       },
@@ -363,7 +373,7 @@ router.post('/change-password', changePasswordLimiter, authenticate, async (req:
 const USER_SELECT = {
   id: true,
   email: true,
-  displayName: true,
+  username: true,
   avatarUrl: true,
   emailVerified: true,
   preferredStreamingProviderIds: true,
@@ -388,20 +398,25 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
 
 router.patch('/me', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const { displayName, preferredStreamingProviderIds } = req.body;
-    const data: { displayName?: string; preferredStreamingProviderIds?: number[] } = {};
+    const { username, preferredStreamingProviderIds } = req.body;
+    const data: { username?: string; preferredStreamingProviderIds?: number[] } = {};
 
-    if (displayName !== undefined) {
-      if (typeof displayName !== 'string') {
-        res.status(400).json({ error: 'Display name must be a string' });
+    if (username !== undefined) {
+      if (typeof username !== 'string') {
+        res.status(400).json({ error: 'Username must be a string' });
         return;
       }
-      const trimmed = displayName.trim();
-      if (trimmed.length < 1 || trimmed.length > 50) {
-        res.status(400).json({ error: 'Display name must be 1-50 characters' });
+      const normalized = username.trim().toLowerCase();
+      if (!USERNAME_RE.test(normalized)) {
+        res.status(400).json({ error: 'Username must be 3-30 characters, letters, numbers, underscores, or hyphens only' });
         return;
       }
-      data.displayName = trimmed;
+      const clash = await prisma.user.findUnique({ where: { username: normalized } });
+      if (clash && clash.id !== req.userId) {
+        res.status(409).json({ error: 'That username is taken', code: 'username_taken' });
+        return;
+      }
+      data.username = normalized;
     }
 
     if (preferredStreamingProviderIds !== undefined) {
