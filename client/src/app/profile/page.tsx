@@ -192,14 +192,6 @@ export default function ProfilePage() {
         </button>
       </div>
 
-      <button
-        onClick={() => router.push('/profile/friends')}
-        className="w-full mb-6 glass rounded-2xl p-4 flex items-center justify-between hover:border-coral/40 border border-transparent transition-colors"
-      >
-        <span className="font-semibold">Friends</span>
-        <span className="text-cream-dim text-sm">Manage →</span>
-      </button>
-
       <div className="glass rounded-2xl p-6 space-y-4 mb-6">
         <div>
           <label className="text-cream-dim text-xs uppercase tracking-wide">Email</label>

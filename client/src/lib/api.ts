@@ -155,6 +155,10 @@ export const friendsApi = {
   accept: (friendshipId: string) => api.post(`/friends/${friendshipId}/accept`),
   reject: (friendshipId: string) => api.post(`/friends/${friendshipId}/reject`),
   remove: (friendshipId: string) => api.delete(`/friends/${friendshipId}`),
+  library: (friendId: string, filter?: 'watchlist' | 'watched' | 'all') =>
+    api.get(`/friends/${friendId}/library`, {
+      params: filter && filter !== 'all' ? { filter } : undefined,
+    }),
   invites: () => api.get('/friends/invites'),
   acceptInvite: (inviteId: string) =>
     api.post<{ sessionId: string }>(`/friends/invites/${inviteId}/accept`),

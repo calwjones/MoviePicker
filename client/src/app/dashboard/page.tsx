@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/useToast';
@@ -9,14 +9,17 @@ import ToastContainer from '@/components/ToastContainer';
 import BrowseTab from './components/BrowseTab';
 import LibraryTab from './components/LibraryTab';
 import SwipeTab from './components/SwipeTab';
+import FriendsTab from './components/FriendsTab';
 import HistoryTab from './components/HistoryTab';
 import OnboardingModal from '@/components/OnboardingModal';
 
-type Tab = 'browse' | 'library' | 'swipe' | 'history';
+type Tab = 'browse' | 'library' | 'swipe' | 'friends' | 'history';
+const ALL_TABS: readonly Tab[] = ['browse', 'library', 'swipe', 'friends', 'history'];
 
 export default function DashboardPage() {
   const { user, loading: authLoading, logout } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toasts, addToast } = useToast();
   const [tab, setTab] = useState<Tab>('browse');
   const [onboardingOpen, setOnboardingOpen] = useState(false);
@@ -26,6 +29,14 @@ export default function DashboardPage() {
       router.push('/auth?mode=login');
     }
   }, [user, authLoading, router]);
+
+  useEffect(() => {
+    const t = searchParams.get('tab');
+    if (t && ALL_TABS.includes(t as Tab)) {
+      if (t === 'friends' && user?.isGuest) return;
+      setTab(t as Tab);
+    }
+  }, [searchParams, user]);
 
   useEffect(() => {
     if (authLoading || !user || user.isGuest) return;
@@ -54,7 +65,9 @@ export default function DashboardPage() {
     );
   }
 
-  const tabs: Tab[] = ['browse', 'library', 'swipe', 'history'];
+  const tabs: Tab[] = user?.isGuest
+    ? ['browse', 'library', 'swipe', 'history']
+    : ['browse', 'library', 'swipe', 'friends', 'history'];
 
   return (
     <div className="min-h-dvh px-6 py-8 w-full max-w-5xl mx-auto lg:px-12 flex flex-col items-stretch">
@@ -101,6 +114,7 @@ export default function DashboardPage() {
         {tab === 'browse' && <BrowseTab key="browse" addToast={addToast} />}
         {tab === 'library' && <LibraryTab key="library" addToast={addToast} />}
         {tab === 'swipe' && <SwipeTab key="swipe" addToast={addToast} />}
+        {tab === 'friends' && <FriendsTab key="friends" addToast={addToast} />}
         {tab === 'history' && <HistoryTab key="history" addToast={addToast} />}
       </AnimatePresence>
 

@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { prisma } from '../app';
 import { emit } from '../services/emitter';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { getInCinemaIds, attachInCinema } from '../services/cinemaStatus';
 
 const router = Router();
 
@@ -203,6 +204,61 @@ router.post('/:id/reject', authenticate, async (req: AuthRequest, res: Response)
     res.json({ success: true });
   } catch (err) {
     console.error('[friends] reject failed', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/:id/library', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const friendId = req.params.id as string;
+    const filter = req.query.filter as string | undefined;
+
+    const rel = await prisma.$queryRaw<{ id: string }[]>`
+      SELECT id FROM friendships
+      WHERE status = 'accepted'
+        AND (
+          (requester_id = ${userId} AND addressee_id = ${friendId})
+          OR
+          (requester_id = ${friendId} AND addressee_id = ${userId})
+        )
+      LIMIT 1
+    `;
+    if (!rel[0]) {
+      res.status(403).json({ error: 'Not friends' });
+      return;
+    }
+
+    const where: Record<string, unknown> = { userId: friendId, source: { not: 'dismissed' } };
+    if (filter === 'watchlist') where.onWatchlist = true;
+    if (filter === 'watched') where.watched = true;
+
+    const [userMovies, inCinemaSet, friend] = await Promise.all([
+      prisma.userMovie.findMany({
+        where,
+        include: { movie: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+      getInCinemaIds(),
+      prisma.user.findUnique({
+        where: { id: friendId },
+        select: { id: true, username: true, avatarUrl: true },
+      }),
+    ]);
+
+    const movies = userMovies.map((um) => ({
+      id: um.id,
+      movieId: um.movieId,
+      watched: um.watched,
+      onWatchlist: um.onWatchlist,
+      userRating: um.userRating,
+      createdAt: um.createdAt,
+      movie: attachInCinema(um.movie, inCinemaSet),
+    }));
+
+    res.json({ friend, movies });
+  } catch (err) {
+    console.error('[friends] library failed', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
