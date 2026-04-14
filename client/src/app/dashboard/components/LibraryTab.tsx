@@ -12,6 +12,8 @@ import ConfirmModal from '@/components/ConfirmModal';
 import RecDetailSheet from '@/components/RecDetailSheet';
 import MovieDetailModal from '@/components/MovieDetailModal';
 import LetterboxdImport from '@/components/LetterboxdImport';
+import LetterboxdResyncButton from '@/components/LetterboxdResyncButton';
+import { useAuth } from '@/context/AuthContext';
 import { DECADE_OPTIONS } from '@/lib/decades';
 import type { Movie, UserMovie, SearchResult } from '@shared/types';
 
@@ -29,6 +31,8 @@ interface LibraryTabProps {
 }
 
 export default function LibraryTab({ addToast }: LibraryTabProps) {
+  const { user } = useAuth();
+  const hasLetterboxd = !!user?.letterboxdUsername;
   const [watchlist, setWatchlist] = useState<UserMovie[]>([]);
   const [libraryLoading, setLibraryLoading] = useState(false);
   const [libraryFilter, setLibraryFilter] = useState<'watchlist' | 'watched' | 'all'>('watchlist');
@@ -450,171 +454,6 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
         ))}
       </div>
 
-      {/* Sort & Filter drawer */}
-      <div className="glass rounded-2xl p-4">
-        <button
-          onClick={() => setShowSortFilter(!showSortFilter)}
-          className="w-full flex items-center justify-between"
-        >
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold">Sort & Filter</h3>
-            {hasActiveFilters && (
-              <span className="w-2 h-2 rounded-full bg-coral" />
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            {showSortFilter && hasActiveFilters && (
-              <button
-                onClick={(e) => { e.stopPropagation(); clearAllFilters(); }}
-                className="text-danger text-xs hover:underline"
-              >
-                Clear all
-              </button>
-            )}
-            <span className="text-cream-dim text-sm">
-              {showSortFilter ? 'Hide' : 'Show'}
-            </span>
-          </div>
-        </button>
-
-        <AnimatePresence>
-          {showSortFilter && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden"
-            >
-              <div className="pt-4 space-y-4">
-                {/* Sort */}
-                <div>
-                  <label className="text-cream-dim text-xs mb-2 block uppercase tracking-wider">Sort by</label>
-                  <div className="flex flex-wrap gap-2">
-                    {([
-                      ['dateAdded', 'Date Added'],
-                      ['year', 'Release Year'],
-                      ['runtime', 'Runtime'],
-                      ['tmdbRating', 'TMDb Rating'],
-                      ['userRating', 'Your Rating'],
-                    ] as [SortField, string][]).map(([field, label]) => (
-                      <button
-                        key={field}
-                        onClick={() => toggleSortField(field)}
-                        className={`px-3 py-1.5 rounded-full text-xs transition-all hover:-translate-y-0.5 hover:shadow-md flex items-center gap-1 ${
-                          sortBy === field
-                            ? 'bg-coral text-charcoal shadow-coral/20'
-                            : 'glass text-cream-dim shadow-sm'
-                        }`}
-                      >
-                        {label}
-                        {sortBy === field && (
-                          <span className="text-[10px]">{sortDir === 'desc' ? '↓' : '↑'}</span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Genres */}
-                <div>
-                  <label className="text-cream-dim text-xs mb-2 block uppercase tracking-wider">Genres</label>
-                  <div className="flex flex-wrap gap-2">
-                    {GENRE_OPTIONS.map((genre) => (
-                      <button
-                        key={genre}
-                        onClick={() => setFilterGenres(prev =>
-                          prev.includes(genre) ? prev.filter(g => g !== genre) : [...prev, genre]
-                        )}
-                        className={`px-3 py-1.5 rounded-full text-xs transition-all hover:-translate-y-0.5 hover:shadow-md ${
-                          filterGenres.includes(genre)
-                            ? 'bg-coral text-charcoal shadow-coral/20'
-                            : 'glass text-cream-dim shadow-sm'
-                        }`}
-                      >
-                        {genre}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Decade */}
-                <div>
-                  <label className="text-cream-dim text-xs mb-2 block uppercase tracking-wider">Decade</label>
-                  <div className="flex flex-wrap gap-2">
-                    {DECADE_OPTIONS.map((decade) => (
-                      <button
-                        key={decade}
-                        onClick={() => setFilterDecade(prev => prev === decade ? '' : decade)}
-                        className={`px-3 py-1.5 rounded-full text-xs transition-all hover:-translate-y-0.5 hover:shadow-md ${
-                          filterDecade === decade
-                            ? 'bg-coral text-charcoal shadow-coral/20'
-                            : 'glass text-cream-dim shadow-sm'
-                        }`}
-                      >
-                        {decade}s
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* TMDb Rating range */}
-                <div>
-                  <label className="text-cream-dim text-xs mb-2 block uppercase tracking-wider">
-                    TMDb Rating: {filterMinRating > 0 || filterMaxRating < 10
-                      ? `${filterMinRating} – ${filterMaxRating}`
-                      : 'Any'}
-                  </label>
-                  <div className="flex items-center gap-3">
-                    <span className="text-cream-dim text-xs w-6">{filterMinRating}</span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="10"
-                      step="0.5"
-                      value={filterMinRating}
-                      onChange={(e) => {
-                        const v = parseFloat(e.target.value);
-                        setFilterMinRating(Math.min(v, filterMaxRating));
-                      }}
-                      className="flex-1 accent-coral"
-                    />
-                    <input
-                      type="range"
-                      min="0"
-                      max="10"
-                      step="0.5"
-                      value={filterMaxRating}
-                      onChange={(e) => {
-                        const v = parseFloat(e.target.value);
-                        setFilterMaxRating(Math.max(v, filterMinRating));
-                      }}
-                      className="flex-1 accent-coral"
-                    />
-                    <span className="text-cream-dim text-xs w-6">{filterMaxRating}</span>
-                  </div>
-                </div>
-
-                {/* Max Runtime */}
-                <div>
-                  <label className="text-cream-dim text-xs mb-2 block uppercase tracking-wider">
-                    Max Runtime: {filterMaxRuntime > 0 ? `${filterMaxRuntime} min` : 'Any'}
-                  </label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="240"
-                    step="15"
-                    value={filterMaxRuntime}
-                    onChange={(e) => setFilterMaxRuntime(parseInt(e.target.value))}
-                    className="w-full accent-coral"
-                  />
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
       {/* For You Recommendations */}
       <div className="glass rounded-2xl p-4">
         <div className="flex items-center justify-between mb-3">
@@ -819,7 +658,8 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
           <p className="text-cream-dim text-sm text-center mt-3">No movies found</p>
         )}
 
-        {/* Letterboxd import */}
+        {/* Letterboxd import (first-time only — once stored, resync lives in the list header) */}
+        {!hasLetterboxd && (
         <div className="mt-3 pt-3 border-t border-cream-dim/10 space-y-3">
           <LetterboxdImport mode="library" onSuccess={() => loadWatchlist()} />
 
@@ -884,19 +724,193 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
             )}
           </AnimatePresence>
         </div>
+        )}
+      </div>
+
+      {/* Sort & Filter drawer */}
+      <div className="glass rounded-2xl p-4">
+        <button
+          onClick={() => setShowSortFilter(!showSortFilter)}
+          className="w-full flex items-center justify-between"
+        >
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold">Sort & Filter</h3>
+            {hasActiveFilters && (
+              <span className="w-2 h-2 rounded-full bg-coral" />
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            {showSortFilter && hasActiveFilters && (
+              <button
+                onClick={(e) => { e.stopPropagation(); clearAllFilters(); }}
+                className="text-danger text-xs hover:underline"
+              >
+                Clear all
+              </button>
+            )}
+            <span className="text-cream-dim text-sm">
+              {showSortFilter ? 'Hide' : 'Show'}
+            </span>
+          </div>
+        </button>
+
+        <AnimatePresence>
+          {showSortFilter && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="pt-4 space-y-4">
+                {/* Sort */}
+                <div>
+                  <label className="text-cream-dim text-xs mb-2 block uppercase tracking-wider">Sort by</label>
+                  <div className="flex flex-wrap gap-2">
+                    {([
+                      ['dateAdded', 'Date Added'],
+                      ['year', 'Release Year'],
+                      ['runtime', 'Runtime'],
+                      ['tmdbRating', 'TMDb Rating'],
+                      ['userRating', 'Your Rating'],
+                    ] as [SortField, string][]).map(([field, label]) => (
+                      <button
+                        key={field}
+                        onClick={() => toggleSortField(field)}
+                        className={`px-3 py-1.5 rounded-full text-xs transition-all hover:-translate-y-0.5 hover:shadow-md flex items-center gap-1 ${
+                          sortBy === field
+                            ? 'bg-coral text-charcoal shadow-coral/20'
+                            : 'glass text-cream-dim shadow-sm'
+                        }`}
+                      >
+                        {label}
+                        {sortBy === field && (
+                          <span className="text-[10px]">{sortDir === 'desc' ? '↓' : '↑'}</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Genres */}
+                <div>
+                  <label className="text-cream-dim text-xs mb-2 block uppercase tracking-wider">Genres</label>
+                  <div className="flex flex-wrap gap-2">
+                    {GENRE_OPTIONS.map((genre) => (
+                      <button
+                        key={genre}
+                        onClick={() => setFilterGenres(prev =>
+                          prev.includes(genre) ? prev.filter(g => g !== genre) : [...prev, genre]
+                        )}
+                        className={`px-3 py-1.5 rounded-full text-xs transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                          filterGenres.includes(genre)
+                            ? 'bg-coral text-charcoal shadow-coral/20'
+                            : 'glass text-cream-dim shadow-sm'
+                        }`}
+                      >
+                        {genre}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Decade */}
+                <div>
+                  <label className="text-cream-dim text-xs mb-2 block uppercase tracking-wider">Decade</label>
+                  <div className="flex flex-wrap gap-2">
+                    {DECADE_OPTIONS.map((decade) => (
+                      <button
+                        key={decade}
+                        onClick={() => setFilterDecade(prev => prev === decade ? '' : decade)}
+                        className={`px-3 py-1.5 rounded-full text-xs transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                          filterDecade === decade
+                            ? 'bg-coral text-charcoal shadow-coral/20'
+                            : 'glass text-cream-dim shadow-sm'
+                        }`}
+                      >
+                        {decade}s
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* TMDb Rating range */}
+                <div>
+                  <label className="text-cream-dim text-xs mb-2 block uppercase tracking-wider">
+                    TMDb Rating: {filterMinRating > 0 || filterMaxRating < 10
+                      ? `${filterMinRating} – ${filterMaxRating}`
+                      : 'Any'}
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <span className="text-cream-dim text-xs w-6">{filterMinRating}</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="10"
+                      step="0.5"
+                      value={filterMinRating}
+                      onChange={(e) => {
+                        const v = parseFloat(e.target.value);
+                        setFilterMinRating(Math.min(v, filterMaxRating));
+                      }}
+                      className="flex-1 accent-coral"
+                    />
+                    <input
+                      type="range"
+                      min="0"
+                      max="10"
+                      step="0.5"
+                      value={filterMaxRating}
+                      onChange={(e) => {
+                        const v = parseFloat(e.target.value);
+                        setFilterMaxRating(Math.max(v, filterMinRating));
+                      }}
+                      className="flex-1 accent-coral"
+                    />
+                    <span className="text-cream-dim text-xs w-6">{filterMaxRating}</span>
+                  </div>
+                </div>
+
+                {/* Max Runtime */}
+                <div>
+                  <label className="text-cream-dim text-xs mb-2 block uppercase tracking-wider">
+                    Max Runtime: {filterMaxRuntime > 0 ? `${filterMaxRuntime} min` : 'Any'}
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="240"
+                    step="15"
+                    value={filterMaxRuntime}
+                    onChange={(e) => setFilterMaxRuntime(parseInt(e.target.value))}
+                    className="w-full accent-coral"
+                  />
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Watchlist with search/filter */}
       <div className="glass rounded-2xl p-4">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4 gap-3">
           <h2 className="text-lg font-semibold font-display">
             {libraryFilter === 'watchlist' ? 'Your Watchlist' : libraryFilter === 'watched' ? 'Watched' : 'All Movies'}
           </h2>
-          <span className="text-cream-dim text-sm">
-            {hasActiveFilters || watchlistFilter
-              ? `${filteredWatchlist.length} of ${watchlist.length}`
-              : watchlist.length} movies
-          </span>
+          <div className="flex items-center gap-3">
+            {hasLetterboxd && (
+              <LetterboxdResyncButton
+                onSuccess={() => loadWatchlist()}
+                onToast={addToast}
+              />
+            )}
+            <span className="text-cream-dim text-sm whitespace-nowrap">
+              {hasActiveFilters || watchlistFilter
+                ? `${filteredWatchlist.length} of ${watchlist.length}`
+                : watchlist.length} movies
+            </span>
+          </div>
         </div>
 
         {/* Watchlist search */}
