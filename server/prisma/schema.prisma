@@ -19,6 +19,7 @@ model User {
   passwordResetExpiresAt   DateTime? @map("password_reset_expires_at")
   preferredStreamingProviderIds Int[]  @default([]) @map("preferred_streaming_provider_ids")
   letterboxdUsername       String?   @map("letterboxd_username")
+  onboardedAt              DateTime? @map("onboarded_at")
   createdAt                DateTime  @default(now()) @map("created_at")
 
   userMovies        UserMovie[]

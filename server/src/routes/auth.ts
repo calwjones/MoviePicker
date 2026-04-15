@@ -174,6 +174,7 @@ router.post('/convert-guest', authenticate, async (req: AuthRequest, res: Respon
         username: user.username,
         emailVerified: user.emailVerified,
         preferredStreamingProviderIds: user.preferredStreamingProviderIds,
+        onboardedAt: user.onboardedAt,
       },
       token,
     });
@@ -323,6 +324,8 @@ router.post('/login', loginLimiter, async (req: Request, res: Response) => {
         username: user.username,
         emailVerified: user.emailVerified,
         preferredStreamingProviderIds: user.preferredStreamingProviderIds,
+        letterboxdUsername: user.letterboxdUsername,
+        onboardedAt: user.onboardedAt,
       },
       token,
     });
@@ -378,6 +381,7 @@ const USER_SELECT = {
   emailVerified: true,
   preferredStreamingProviderIds: true,
   letterboxdUsername: true,
+  onboardedAt: true,
 } as const;
 
 router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
@@ -435,6 +439,20 @@ router.patch('/me', authenticate, async (req: AuthRequest, res: Response) => {
     const user = await prisma.user.update({
       where: { id: req.userId },
       data,
+      select: USER_SELECT,
+    });
+    res.json({ user });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/complete-onboarding', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await prisma.user.update({
+      where: { id: req.userId },
+      data: { onboardedAt: new Date() },
       select: USER_SELECT,
     });
     res.json({ user });

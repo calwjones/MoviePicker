@@ -17,7 +17,7 @@ type Tab = 'browse' | 'library' | 'swipe' | 'friends' | 'history';
 const ALL_TABS: readonly Tab[] = ['browse', 'library', 'swipe', 'friends', 'history'];
 
 export default function DashboardPage() {
-  const { user, loading: authLoading, logout } = useAuth();
+  const { user, loading: authLoading, logout, completeOnboarding } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toasts, addToast } = useToast();
@@ -40,15 +40,12 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (authLoading || !user || user.isGuest) return;
-    try {
-      const seen = localStorage.getItem('moviepicker_onboarded');
-      if (!seen) setOnboardingOpen(true);
-    } catch { /* ignore */ }
+    if (!user.onboardedAt) setOnboardingOpen(true);
   }, [user, authLoading]);
 
   const dismissOnboarding = () => {
     setOnboardingOpen(false);
-    try { localStorage.setItem('moviepicker_onboarded', '1'); } catch {}
+    completeOnboarding().catch((err) => console.warn('[onboarding] mark complete failed', err));
   };
 
   const handleOnboardingPath = (path: 'together' | 'solo' | 'discover') => {

@@ -59,6 +59,7 @@ export const authApi = {
     api.delete('/auth/me', { data: { currentPassword } }),
   convertGuest: (email: string, password: string, username: string) =>
     api.post('/auth/convert-guest', { email, password, username }),
+  completeOnboarding: () => api.post('/auth/complete-onboarding'),
 };
 
 export const movieApi = {
