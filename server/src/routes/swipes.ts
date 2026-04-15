@@ -229,6 +229,7 @@ router.post('/done', authenticate, async (req: AuthRequest, res: Response) => {
         prisma.match.findMany({
           where: { sessionId },
           include: { movie: true },
+          orderBy: { id: 'asc' },
         }),
         getInCinemaIds(),
       ]);
@@ -287,6 +288,7 @@ router.get('/matches/:sessionId', authenticate, async (req: AuthRequest, res: Re
       prisma.match.findMany({
         where: { sessionId: sid },
         include: { movie: true },
+        orderBy: { id: 'asc' },
       }),
       getInCinemaIds(),
     ]);
