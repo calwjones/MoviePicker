@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
@@ -16,7 +16,7 @@ import OnboardingModal from '@/components/OnboardingModal';
 type Tab = 'browse' | 'library' | 'swipe' | 'friends' | 'history';
 const ALL_TABS: readonly Tab[] = ['browse', 'library', 'swipe', 'friends', 'history'];
 
-export default function DashboardPage() {
+function DashboardContent() {
   const { user, loading: authLoading, logout, completeOnboarding } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -122,5 +122,17 @@ export default function DashboardPage() {
         onPickPath={handleOnboardingPath}
       />
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-dvh">
+        <div className="w-12 h-12 border-3 border-coral border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
   );
 }
