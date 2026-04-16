@@ -436,24 +436,6 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
       exit={{ opacity: 0, x: 20 }}
       className="space-y-4"
     >
-      {/* Library sub-filters */}
-      <div className="flex gap-2">
-        {(['watchlist', 'watched', 'all'] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => {
-              setLibraryFilter(f);
-              loadWatchlist(f);
-            }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors capitalize ${
-              libraryFilter === f ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
-            }`}
-          >
-            {f}
-          </button>
-        ))}
-      </div>
-
       {/* For You Recommendations */}
       <div className="glass rounded-2xl p-4">
         <div className="flex items-center justify-between mb-3">
@@ -913,12 +895,30 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
           </div>
         </div>
 
+        {/* Library sub-filters */}
+        <div className="flex gap-2 mb-3">
+          {(['watchlist', 'watched', 'all'] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => {
+                setLibraryFilter(f);
+                loadWatchlist(f);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors capitalize ${
+                libraryFilter === f ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+
         {/* Watchlist search */}
         {watchlist.length > 5 && (
           <div className="relative mb-3">
             <input
               type="text"
-              placeholder="Filter watchlist..."
+              placeholder="Search..."
               value={watchlistFilter}
               onChange={(e) => setWatchlistFilter(e.target.value)}
               className="w-full px-4 py-2 pl-9 glass rounded-lg bg-transparent text-cream text-sm placeholder:text-cream-dim focus:outline-none focus:ring-1 focus:ring-coral"
