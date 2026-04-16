@@ -140,6 +140,18 @@ export function setupSocketHandlers(io: Server): void {
       io.to(`session:${sessionId}`).emit('matches-reveal-all');
     });
 
+    socket.on('roulette-open', (data: { sessionId: string; excludedIds?: string[] }) => {
+      const { sessionId, excludedIds } = data;
+      if (!sessionId || !socket.rooms.has(`session:${sessionId}`)) return;
+      io.to(`session:${sessionId}`).emit('roulette-opened', { excludedIds: excludedIds ?? [] });
+    });
+
+    socket.on('roulette-close', (data: { sessionId: string }) => {
+      const { sessionId } = data;
+      if (!sessionId || !socket.rooms.has(`session:${sessionId}`)) return;
+      io.to(`session:${sessionId}`).emit('roulette-closed');
+    });
+
     socket.on('roulette-spin', (data: { sessionId: string; matchCount: number }) => {
       const { sessionId, matchCount } = data;
       if (!sessionId || !matchCount || matchCount <= 0) return;

@@ -228,6 +228,16 @@ export default function SessionPage() {
       revealTimers.current = [];
       setRevealIndex(matchesRef.current.length - 1);
     };
+    const handleRouletteOpened = (data: { excludedIds: string[] }) => {
+      setPreviousPickIds(data.excludedIds ?? []);
+      setWinner(null);
+      setRouletteOpen(true);
+    };
+    const handleRouletteClosed = () => {
+      setWinner(null);
+      setRouletteOpen(false);
+      setPreviousPickIds([]);
+    };
 
     socket.on('swipe-update', handleSwipeUpdate);
     socket.on('session-complete', handleSessionComplete);
@@ -236,6 +246,8 @@ export default function SessionPage() {
     socket.on('partner-online', handlePartnerOnline);
     socket.on('matches-revealed', handleMatchesRevealed);
     socket.on('matches-reveal-all', handleMatchesRevealAll);
+    socket.on('roulette-opened', handleRouletteOpened);
+    socket.on('roulette-closed', handleRouletteClosed);
     socket.on('disconnect', handleDisconnect);
     socket.on('connect', handleConnect);
     if (socket.connected) hasConnectedRef.current = true;
@@ -248,6 +260,8 @@ export default function SessionPage() {
       socket.off('partner-online', handlePartnerOnline);
       socket.off('matches-revealed', handleMatchesRevealed);
       socket.off('matches-reveal-all', handleMatchesRevealAll);
+      socket.off('roulette-opened', handleRouletteOpened);
+      socket.off('roulette-closed', handleRouletteClosed);
       socket.off('disconnect', handleDisconnect);
       socket.off('connect', handleConnect);
     };
@@ -332,7 +346,12 @@ export default function SessionPage() {
       setWinner(remaining[0]);
       return;
     }
-    setRouletteOpen(true);
+    const socket = getSocket();
+    if (socket.connected) {
+      socket.emit('roulette-open', { sessionId, excludedIds: previousPickIds });
+    } else {
+      setRouletteOpen(true);
+    }
   };
 
   const handleRouletteResult = (sm: SessionMovie) => {
@@ -343,20 +362,33 @@ export default function SessionPage() {
   const handlePickAgain = () => {
     if (!winner) return;
     const nextExcluded = [...previousPickIds, winner.id];
-    setPreviousPickIds(nextExcluded);
-    setWinner(null);
     const remaining = matches.filter((m) => !nextExcluded.includes(m.id));
     if (remaining.length === 1) {
+      setPreviousPickIds(nextExcluded);
       setWinner(remaining[0]);
       return;
     }
-    if (remaining.length >= 2) setRouletteOpen(true);
+    if (remaining.length >= 2) {
+      const socket = getSocket();
+      if (socket.connected) {
+        socket.emit('roulette-open', { sessionId, excludedIds: nextExcluded });
+      } else {
+        setPreviousPickIds(nextExcluded);
+        setWinner(null);
+        setRouletteOpen(true);
+      }
+    }
   };
 
   const handleBackToShortlist = () => {
-    setWinner(null);
-    setRouletteOpen(false);
-    setPreviousPickIds([]);
+    const socket = getSocket();
+    if (socket.connected) {
+      socket.emit('roulette-close', { sessionId });
+    } else {
+      setWinner(null);
+      setRouletteOpen(false);
+      setPreviousPickIds([]);
+    }
   };
 
   const handleDoneExit = () => {
