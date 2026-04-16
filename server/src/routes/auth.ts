@@ -382,6 +382,7 @@ const USER_SELECT = {
   preferredStreamingProviderIds: true,
   letterboxdUsername: true,
   onboardedAt: true,
+  usernameChangedAt: true,
 } as const;
 
 router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
@@ -400,27 +401,72 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
+const USERNAME_CHANGE_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
+
+router.get('/username-available', async (req: Request, res: Response) => {
+  const raw = (req.query.u ?? '').toString();
+  const normalized = raw.trim().replace(/^@+/, '').toLowerCase();
+  if (!USERNAME_RE.test(normalized)) {
+    res.json({ available: false, reason: 'invalid' });
+    return;
+  }
+  const clash = await prisma.user.findUnique({ where: { username: normalized } });
+  res.json({ available: !clash, normalized });
+});
+
 router.patch('/me', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const { username, preferredStreamingProviderIds } = req.body;
-    const data: { username?: string; preferredStreamingProviderIds?: number[] } = {};
+    const { username, preferredStreamingProviderIds, currentPassword } = req.body;
+    const data: { username?: string; preferredStreamingProviderIds?: number[]; usernameChangedAt?: Date } = {};
 
     if (username !== undefined) {
       if (typeof username !== 'string') {
         res.status(400).json({ error: 'Username must be a string' });
         return;
       }
-      const normalized = username.trim().toLowerCase();
+      const normalized = username.trim().replace(/^@+/, '').toLowerCase();
       if (!USERNAME_RE.test(normalized)) {
         res.status(400).json({ error: 'Username must be 3-30 characters, letters, numbers, underscores, or hyphens only' });
         return;
       }
-      const clash = await prisma.user.findUnique({ where: { username: normalized } });
-      if (clash && clash.id !== req.userId) {
-        res.status(409).json({ error: 'That username is taken', code: 'username_taken' });
+
+      const me = await prisma.user.findUnique({ where: { id: req.userId } });
+      if (!me) {
+        res.status(404).json({ error: 'User not found' });
         return;
       }
-      data.username = normalized;
+
+      if (normalized !== me.username) {
+        if (typeof currentPassword !== 'string' || currentPassword.length === 0) {
+          res.status(400).json({ error: 'Current password is required to change username', code: 'password_required' });
+          return;
+        }
+        const valid = await bcrypt.compare(currentPassword, me.passwordHash);
+        if (!valid) {
+          res.status(401).json({ error: 'Incorrect password' });
+          return;
+        }
+        if (me.usernameChangedAt) {
+          const elapsed = Date.now() - me.usernameChangedAt.getTime();
+          if (elapsed < USERNAME_CHANGE_COOLDOWN_MS) {
+            const nextAllowedAt = new Date(me.usernameChangedAt.getTime() + USERNAME_CHANGE_COOLDOWN_MS);
+            const daysLeft = Math.ceil((USERNAME_CHANGE_COOLDOWN_MS - elapsed) / (24 * 60 * 60 * 1000));
+            res.status(429).json({
+              error: `You can change your username again in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`,
+              code: 'username_cooldown',
+              nextAllowedAt: nextAllowedAt.toISOString(),
+            });
+            return;
+          }
+        }
+        const clash = await prisma.user.findUnique({ where: { username: normalized } });
+        if (clash && clash.id !== req.userId) {
+          res.status(409).json({ error: 'That username is taken', code: 'username_taken' });
+          return;
+        }
+        data.username = normalized;
+        data.usernameChangedAt = new Date();
+      }
     }
 
     if (preferredStreamingProviderIds !== undefined) {
@@ -432,7 +478,8 @@ router.patch('/me', authenticate, async (req: AuthRequest, res: Response) => {
     }
 
     if (Object.keys(data).length === 0) {
-      res.status(400).json({ error: 'No fields to update' });
+      const user = await prisma.user.findUnique({ where: { id: req.userId }, select: USER_SELECT });
+      res.json({ user });
       return;
     }
 

@@ -1,11 +1,14 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { authApi, providerApi } from '@/lib/api';
 import { getBaseName } from '@/components/StreamingProviders';
 import LetterboxdImport from '@/components/LetterboxdImport';
+
+const USERNAME_RE = /^[a-z0-9_-]{3,30}$/;
+const USERNAME_COOLDOWN_DAYS = 30;
 
 interface ProviderOption {
   id: number;
@@ -29,6 +32,9 @@ export default function ProfilePage() {
   const [savingName, setSavingName] = useState(false);
   const [nameMsg, setNameMsg] = useState('');
   const [nameError, setNameError] = useState('');
+  const [namePassword, setNamePassword] = useState('');
+  const [availability, setAvailability] = useState<'unknown' | 'checking' | 'available' | 'taken' | 'invalid'>('unknown');
+  const availabilityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [providerOptions, setProviderOptions] = useState<ProviderOption[]>([]);
   const [providersLoading, setProvidersLoading] = useState(true);
@@ -58,6 +64,33 @@ export default function ProfilePage() {
   useEffect(() => {
     if (user) setName(user.username);
   }, [user]);
+
+  useEffect(() => {
+    if (availabilityTimer.current) clearTimeout(availabilityTimer.current);
+    if (!user) return;
+    const normalized = name.trim().replace(/^@+/, '').toLowerCase();
+    const changed = normalized !== user.username && normalized.length > 0;
+    if (!changed) {
+      setAvailability('unknown');
+      return;
+    }
+    if (!USERNAME_RE.test(normalized)) {
+      setAvailability('invalid');
+      return;
+    }
+    setAvailability('checking');
+    availabilityTimer.current = setTimeout(async () => {
+      try {
+        const res = await authApi.checkUsername(normalized);
+        setAvailability(res.data.available ? 'available' : 'taken');
+      } catch {
+        setAvailability('unknown');
+      }
+    }, 350);
+    return () => {
+      if (availabilityTimer.current) clearTimeout(availabilityTimer.current);
+    };
+  }, [name, user]);
 
   useEffect(() => {
     let cancelled = false;
@@ -123,16 +156,30 @@ export default function ProfilePage() {
     );
   }
 
-  const normalizedName = name.trim().toLowerCase();
+  const normalizedName = name.trim().replace(/^@+/, '').toLowerCase();
   const nameChanged = normalizedName !== user.username && normalizedName.length > 0;
+  const nameFormatValid = USERNAME_RE.test(normalizedName);
+
+  const cooldownDaysLeft = (() => {
+    if (!user.usernameChangedAt) return 0;
+    const last = new Date(user.usernameChangedAt).getTime();
+    const elapsedDays = (Date.now() - last) / (24 * 60 * 60 * 1000);
+    return Math.max(0, Math.ceil(USERNAME_COOLDOWN_DAYS - elapsedDays));
+  })();
+  const onCooldown = cooldownDaysLeft > 0;
+
+  const canSaveName =
+    nameChanged && nameFormatValid && !savingName && !onCooldown &&
+    availability === 'available' && namePassword.length > 0;
 
   const handleSaveName = async () => {
     setNameMsg('');
     setNameError('');
     setSavingName(true);
     try {
-      await updateUsername(normalizedName);
+      await updateUsername(normalizedName, namePassword);
       setNameMsg('Saved');
+      setNamePassword('');
     } catch (err: unknown) {
       const apiErr = err as { response?: { data?: { error?: string } } };
       setNameError(apiErr.response?.data?.error || 'Failed to update');
@@ -206,20 +253,44 @@ export default function ProfilePage() {
             autoCorrect="off"
             spellCheck={false}
             onChange={(e) => {
-              setName(e.target.value.replace(/\s/g, '').toLowerCase());
+              setName(e.target.value.replace(/\s/g, '').replace(/^@+/, '').toLowerCase());
               setNameMsg('');
               setNameError('');
             }}
             maxLength={30}
             className="w-full px-4 py-2.5 glass rounded-xl text-cream placeholder:text-cream-dim/50 focus:outline-none focus:border-coral/60 border border-cream/10"
           />
+          {nameChanged && (
+            <p className="text-xs mt-1.5 min-h-[1rem]">
+              {availability === 'checking' && <span className="text-cream-dim">Checking availability…</span>}
+              {availability === 'available' && <span className="text-green-400">Available</span>}
+              {availability === 'taken' && <span className="text-danger">That username is taken</span>}
+              {availability === 'invalid' && (
+                <span className="text-danger">3–30 characters, letters, numbers, underscore or hyphen</span>
+              )}
+            </p>
+          )}
+          {onCooldown && (
+            <p className="text-xs mt-1.5 text-cream-dim">
+              You can change your username again in {cooldownDaysLeft} day{cooldownDaysLeft === 1 ? '' : 's'}.
+            </p>
+          )}
+          {nameChanged && !onCooldown && (
+            <input
+              type="password"
+              value={namePassword}
+              onChange={(e) => setNamePassword(e.target.value)}
+              placeholder="Current password"
+              className="w-full mt-2 px-4 py-2.5 glass rounded-xl text-cream placeholder:text-cream-dim/50 focus:outline-none focus:border-coral/60 border border-cream/10"
+            />
+          )}
           <div className="flex items-center justify-between mt-2 min-h-[1.25rem]">
             <p className={`text-xs ${nameError ? 'text-danger' : 'text-cream-dim'}`}>
               {nameError || nameMsg}
             </p>
             <button
               onClick={handleSaveName}
-              disabled={!nameChanged || savingName}
+              disabled={!canSaveName}
               className="px-3 py-1.5 text-xs font-medium rounded-lg bg-coral text-charcoal hover:bg-coral-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {savingName ? 'Saving…' : 'Save'}

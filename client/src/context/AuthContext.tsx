@@ -13,6 +13,7 @@ interface User {
   preferredStreamingProviderIds?: number[];
   letterboxdUsername?: string | null;
   onboardedAt?: string | null;
+  usernameChangedAt?: string | null;
 }
 
 interface AuthContextType {
@@ -21,7 +22,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, username: string) => Promise<void>;
   logout: () => void;
-  updateUsername: (username: string) => Promise<void>;
+  updateUsername: (username: string, currentPassword: string) => Promise<void>;
   updatePreferredProviders: (providerIds: number[]) => Promise<void>;
   setLetterboxdUsername: (username: string | null) => void;
   completeOnboarding: () => Promise<void>;
@@ -88,9 +89,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
-  const updateUsername = async (username: string) => {
-    const res = await authApi.updateProfile(username);
-    setUser((prev) => (prev ? { ...prev, username: res.data.user.username } : prev));
+  const updateUsername = async (username: string, currentPassword: string) => {
+    const res = await authApi.updateProfile(username, currentPassword);
+    setUser((prev) => (prev ? {
+      ...prev,
+      username: res.data.user.username,
+      usernameChangedAt: res.data.user.usernameChangedAt,
+    } : prev));
   };
 
   const updatePreferredProviders = async (providerIds: number[]) => {

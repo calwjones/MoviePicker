@@ -20,6 +20,7 @@ model User {
   preferredStreamingProviderIds Int[]  @default([]) @map("preferred_streaming_provider_ids")
   letterboxdUsername       String?   @map("letterboxd_username")
   onboardedAt              DateTime? @map("onboarded_at")
+  usernameChangedAt        DateTime? @map("username_changed_at")
   createdAt                DateTime  @default(now()) @map("created_at")
 
   userMovies        UserMovie[]

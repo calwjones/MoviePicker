@@ -44,10 +44,12 @@ export const authApi = {
   login: (email: string, password: string) =>
     api.post('/auth/login', { email, password }),
   me: () => api.get('/auth/me'),
-  updateProfile: (username: string) =>
-    api.patch('/auth/me', { username }),
+  updateProfile: (username: string, currentPassword: string) =>
+    api.patch('/auth/me', { username, currentPassword }),
   updatePreferredProviders: (preferredStreamingProviderIds: number[]) =>
     api.patch('/auth/me', { preferredStreamingProviderIds }),
+  checkUsername: (username: string) =>
+    api.get<{ available: boolean; reason?: string; normalized?: string }>('/auth/username-available', { params: { u: username } }),
   changePassword: (currentPassword: string, newPassword: string) =>
     api.post('/auth/change-password', { currentPassword, newPassword }),
   verifyEmail: (token: string) => api.get('/auth/verify', { params: { token } }),
