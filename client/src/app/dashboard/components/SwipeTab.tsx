@@ -860,13 +860,13 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
                 onKeyDown={(e) => { if (e.key === 'Enter') handleJoinByCode(); }}
                 placeholder="ABC123"
                 maxLength={6}
-                className="flex-1 bg-charcoal border border-card-hover rounded-xl px-4 py-2.5 text-center text-lg font-mono tracking-[0.3em] text-cream placeholder-cream-dim/40 focus:outline-none focus:border-coral"
+                className="flex-1 min-w-0 bg-charcoal border border-card-hover rounded-xl px-3 py-2.5 text-center text-base font-mono tracking-[0.2em] text-cream placeholder-cream-dim/40 focus:outline-none focus:border-coral"
               />
               <motion.button
                 whileTap={{ scale: 0.95 }}
                 onClick={handleJoinByCode}
                 disabled={joinCodeLoading || joinCodeInput.length !== 6}
-                className="px-5 bg-coral text-charcoal text-sm font-semibold rounded-xl shrink-0 hover:bg-coral-dark transition-colors disabled:opacity-50"
+                className="px-4 bg-coral text-charcoal text-sm font-semibold rounded-xl shrink-0 hover:bg-coral-dark transition-colors disabled:opacity-50"
               >
                 {joinCodeLoading ? '…' : 'Join'}
               </motion.button>
