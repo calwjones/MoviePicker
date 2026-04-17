@@ -157,7 +157,7 @@ export default function JoinPage() {
                       {user.username[0].toUpperCase()}
                     </div>
                     <div>
-                      <p className="text-cream text-sm font-medium">@{user.username}</p>
+                      <p className="text-cream text-sm font-medium">{user.username}</p>
                       <p className="text-cream-dim text-xs">Your watchlist will be merged</p>
                     </div>
                   </div>

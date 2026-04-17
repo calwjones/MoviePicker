@@ -61,7 +61,7 @@ export default function FriendLibraryPanel({ friend, onClose, addToast }: Props)
         if (cancelled) return;
         setMovies(res.data.movies ?? []);
       })
-      .catch(() => { if (!cancelled) addToast(`Couldn't load @${friend.username}'s library`); })
+      .catch(() => { if (!cancelled) addToast(`Couldn't load ${friend.username}'s library`); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [friend.id, friend.username, filter, addToast]);
@@ -189,7 +189,7 @@ export default function FriendLibraryPanel({ friend, onClose, addToast }: Props)
               <div className="w-10 h-10 rounded-full bg-coral/20 flex items-center justify-center text-coral font-semibold shrink-0">
                 {friend.username.charAt(0).toUpperCase()}
               </div>
-              <h2 className="text-lg font-semibold truncate">@{friend.username}</h2>
+              <h2 className="text-lg font-semibold truncate">{friend.username}</h2>
             </div>
             <button
               onClick={onClose}
@@ -406,10 +406,10 @@ export default function FriendLibraryPanel({ friend, onClose, addToast }: Props)
               <p className="text-cream-dim text-sm text-center py-8">
                 {movies.length === 0
                   ? (filter === 'watchlist'
-                      ? `@${friend.username} has no movies on their watchlist.`
+                      ? `${friend.username} has no movies on their watchlist.`
                       : filter === 'watched'
-                        ? `@${friend.username} hasn't marked anything as watched.`
-                        : `@${friend.username}'s library is empty.`)
+                        ? `${friend.username} hasn't marked anything as watched.`
+                        : `${friend.username}'s library is empty.`)
                   : `No matches${search ? ` for "${search}"` : ''}.`}
               </p>
             ) : (

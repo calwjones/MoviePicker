@@ -169,7 +169,7 @@ export default function FriendsTab({ addToast }: FriendsTabProps) {
                   <div className="w-9 h-9 rounded-full bg-coral/20 flex items-center justify-center text-coral font-semibold text-sm shrink-0">
                     {f.username.charAt(0).toUpperCase()}
                   </div>
-                  <span className="text-cream font-medium truncate">@{f.username}</span>
+                  <span className="text-cream font-medium truncate">{f.username}</span>
                 </div>
                 <div className="flex gap-2 items-center shrink-0">
                   <button
@@ -202,7 +202,7 @@ export default function FriendsTab({ addToast }: FriendsTabProps) {
                     key={p.friendshipId}
                     className="glass rounded-xl p-3 flex items-center justify-between gap-2"
                   >
-                    <span className="text-cream font-medium">@{p.other.username}</span>
+                    <span className="text-cream font-medium">{p.other.username}</span>
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleAccept(p.friendshipId)}
@@ -233,7 +233,7 @@ export default function FriendsTab({ addToast }: FriendsTabProps) {
                     key={p.friendshipId}
                     className="glass rounded-xl p-3 flex items-center justify-between"
                   >
-                    <span className="text-cream font-medium">@{p.other.username}</span>
+                    <span className="text-cream font-medium">{p.other.username}</span>
                     <button
                       onClick={() => handleReject(p.friendshipId)}
                       className="text-cream-dim text-xs hover:text-danger transition-colors"

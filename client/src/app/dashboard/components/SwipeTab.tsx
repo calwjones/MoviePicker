@@ -711,7 +711,7 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
                               : 'glass text-cream-dim hover:text-cream'
                         }`}
                       >
-                        @{f.username}
+                        {f.username}
                         {invited ? ' ✓' : ''}
                       </button>
                     );

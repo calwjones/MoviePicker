@@ -35,7 +35,7 @@ export default function GlobalInviteListener() {
       setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 5000);
     };
     const onFriendRequest = (data: { from?: { username?: string } }) => {
-      pushToast(`@${data?.from?.username ?? 'someone'} sent you a friend request`);
+      pushToast(`${data?.from?.username ?? 'someone'} sent you a friend request`);
     };
     const onFriendAccepted = () => {
       pushToast('Friend request accepted');

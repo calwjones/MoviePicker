@@ -78,7 +78,7 @@ function DashboardContent() {
               onClick={() => router.push('/profile')}
               className="text-cream-dim text-sm hover:text-coral transition-colors"
             >
-              @{user.username}
+              {user.username}
             </button>
           )}
           {user?.isGuest && (
