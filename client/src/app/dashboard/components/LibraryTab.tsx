@@ -33,6 +33,12 @@ interface LibraryTabProps {
 export default function LibraryTab({ addToast }: LibraryTabProps) {
   const { user } = useAuth();
   const hasLetterboxd = !!user?.letterboxdUsername;
+  const [letterboxdDismissed, setLetterboxdDismissed] = useState(false);
+
+  useEffect(() => {
+    setLetterboxdDismissed(localStorage.getItem('letterboxdImportDismissed') === '1');
+  }, []);
+
   const [watchlist, setWatchlist] = useState<UserMovie[]>([]);
   const [libraryLoading, setLibraryLoading] = useState(false);
   const [libraryFilter, setLibraryFilter] = useState<'watchlist' | 'watched' | 'all'>('watchlist');
@@ -641,8 +647,22 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
         )}
 
         {/* Letterboxd import (first-time only — once stored, resync lives in the list header) */}
-        {!hasLetterboxd && (
+        {!hasLetterboxd && !letterboxdDismissed && (
         <div className="mt-3 pt-3 border-t border-cream-dim/10 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-cream-dim text-xs">Already on Letterboxd?</p>
+            <button
+              type="button"
+              onClick={() => {
+                localStorage.setItem('letterboxdImportDismissed', '1');
+                setLetterboxdDismissed(true);
+              }}
+              title="You can still connect from your profile"
+              className="text-cream-dim/50 hover:text-cream transition-colors text-xs"
+            >
+              Hide
+            </button>
+          </div>
           <LetterboxdImport mode="library" onSuccess={() => loadWatchlist()} />
 
           <button
