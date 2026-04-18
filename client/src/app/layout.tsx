@@ -8,13 +8,6 @@ import GlobalInviteListener from "@/components/GlobalInviteListener";
 export const metadata: Metadata = {
   title: "MatchSticked",
   description: "Pick a movie together. No more scrolling debates.",
-  icons: {
-    icon: [
-      { url: "/match.svg", type: "image/svg+xml" },
-      { url: "/favicon.ico", sizes: "any" },
-    ],
-    apple: "/match.svg",
-  },
 };
 
 export default function RootLayout({

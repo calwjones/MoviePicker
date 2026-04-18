@@ -98,74 +98,88 @@ body {
   background-position: -10px center;
 }
 
-/* Match-strike loader */
+/* Match-strike loader
+   Match local origin = head center. Stick extends down (+y), flame extends up (-y).
+   Strike pose: rotate(-135deg) puts stick up-right (off-frame "hand"), head touching strip.
+   Lifted pose: rotate(0) → head at top, stick straight down to box.
+*/
 @keyframes ms-match-strike {
   0% {
-    transform: translate(102px, 76px) rotate(40deg);
-    opacity: 1;
+    transform: translate(36px, 80px) rotate(-135deg);
+    opacity: 0;
+    animation-timing-function: ease-out;
   }
-  6% {
-    transform: translate(102px, 76px) rotate(40deg);
+  3% {
+    transform: translate(36px, 80px) rotate(-135deg);
     opacity: 1;
+    animation-timing-function: cubic-bezier(0.55, 0, 0.45, 1);
   }
-  26% {
-    transform: translate(40px, 76px) rotate(40deg);
+  14% {
+    transform: translate(108px, 80px) rotate(-135deg);
     opacity: 1;
+    animation-timing-function: cubic-bezier(0.2, 1, 0.3, 1);
   }
-  38% {
-    transform: translate(70px, 70px) rotate(0deg);
+  24% {
+    transform: translate(70px, 42px) rotate(0deg);
     opacity: 1;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
   }
-  90% {
-    transform: translate(70px, 70px) rotate(0deg);
+  88% {
+    transform: translate(70px, 42px) rotate(0deg);
     opacity: 1;
+    animation-timing-function: ease-in;
   }
   100% {
-    transform: translate(70px, 70px) rotate(0deg);
+    transform: translate(70px, 36px) rotate(0deg);
     opacity: 0;
   }
 }
 
 @keyframes ms-flame-ignite {
   0%,
-  26% {
+  13% {
     opacity: 0;
     transform: scale(0);
   }
-  32% {
-    opacity: 1;
-    transform: scale(1.2);
+  17% {
+    opacity: 0.9;
+    transform: scale(1.3);
+    animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
   }
-  42% {
+  27% {
     opacity: 1;
     transform: scale(1);
+    animation-timing-function: linear;
   }
-  90% {
+  88% {
     opacity: 1;
     transform: scale(1);
+    animation-timing-function: ease-in;
   }
   100% {
     opacity: 0;
-    transform: scale(0.5);
+    transform: scale(0.7);
   }
 }
 
 @keyframes ms-spark-burst {
   0%,
-  22% {
+  10% {
     opacity: 0;
     transform: scale(0.3);
   }
-  26% {
+  14% {
     opacity: 1;
-    transform: scale(1.1);
+    transform: scale(1);
+    animation-timing-function: cubic-bezier(0.4, 0, 1, 1);
   }
-  34% {
+  24% {
     opacity: 0;
-    transform: scale(1.8);
+    transform: scale(2.4);
   }
   100% {
     opacity: 0;
+    transform: scale(2.4);
   }
 }
 
@@ -175,55 +189,56 @@ body {
     transform: scale(1, 1);
   }
   20% {
-    transform: scale(1.06, 0.95);
+    transform: scale(1.05, 0.94);
   }
   40% {
-    transform: scale(0.96, 1.07);
+    transform: scale(0.94, 1.07);
   }
   60% {
-    transform: scale(1.04, 0.97);
+    transform: scale(1.06, 0.96);
   }
   80% {
-    transform: scale(0.97, 1.04);
+    transform: scale(0.96, 1.05);
   }
 }
 
 .ms-match {
-  animation: ms-match-strike 3.4s cubic-bezier(0.45, 0, 0.25, 1) infinite;
-  transform-box: fill-box;
-  transform-origin: center;
+  animation: ms-match-strike 3.0s linear infinite;
+  transform-box: view-box;
+  transform-origin: 0 0;
 }
 
 .ms-flame {
-  animation: ms-flame-ignite 3.4s ease-out infinite;
+  animation: ms-flame-ignite 3.0s linear infinite;
   transform-box: fill-box;
   transform-origin: center bottom;
 }
 
-.ms-flame-core {
-  animation: ms-flicker 0.7s ease-in-out infinite;
+.ms-flame-core-wrap {
+  animation: ms-flicker 0.85s ease-in-out infinite;
   transform-box: fill-box;
   transform-origin: center bottom;
 }
 
 .ms-sparks {
-  animation: ms-spark-burst 3.4s ease-out infinite;
-  transform-box: fill-box;
-  transform-origin: center;
+  animation: ms-spark-burst 3.0s linear infinite;
+  transform-box: view-box;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .ms-match,
   .ms-flame,
-  .ms-flame-core,
+  .ms-flame-core-wrap,
   .ms-sparks {
     animation: none;
   }
   .ms-match {
-    transform: translate(70px, 70px);
+    transform: translate(70px, 42px);
   }
-  .ms-flame,
-  .ms-sparks {
+  .ms-flame {
     opacity: 1;
+  }
+  .ms-sparks {
+    opacity: 0;
   }
 }
