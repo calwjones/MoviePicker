@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { authApi } from '@/lib/api';
+import { FullPageSpinner } from '@/components/LoadingSpinner';
 
 function VerifyContent() {
   const searchParams = useSearchParams();
@@ -68,11 +69,7 @@ function VerifyContent() {
 
 export default function VerifyPage() {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center min-h-dvh">
-        <div className="w-12 h-12 border-3 border-coral border-t-transparent rounded-full animate-spin" />
-      </div>
-    }>
+    <Suspense fallback={<FullPageSpinner />}>
       <VerifyContent />
     </Suspense>
   );

@@ -97,3 +97,133 @@ body {
   background-size: 20px 20px;
   background-position: -10px center;
 }
+
+/* Match-strike loader */
+@keyframes ms-match-strike {
+  0% {
+    transform: translate(102px, 76px) rotate(40deg);
+    opacity: 1;
+  }
+  6% {
+    transform: translate(102px, 76px) rotate(40deg);
+    opacity: 1;
+  }
+  26% {
+    transform: translate(40px, 76px) rotate(40deg);
+    opacity: 1;
+  }
+  38% {
+    transform: translate(70px, 70px) rotate(0deg);
+    opacity: 1;
+  }
+  90% {
+    transform: translate(70px, 70px) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(70px, 70px) rotate(0deg);
+    opacity: 0;
+  }
+}
+
+@keyframes ms-flame-ignite {
+  0%,
+  26% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  32% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  42% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  90% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+
+@keyframes ms-spark-burst {
+  0%,
+  22% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  26% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+  34% {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes ms-flicker {
+  0%,
+  100% {
+    transform: scale(1, 1);
+  }
+  20% {
+    transform: scale(1.06, 0.95);
+  }
+  40% {
+    transform: scale(0.96, 1.07);
+  }
+  60% {
+    transform: scale(1.04, 0.97);
+  }
+  80% {
+    transform: scale(0.97, 1.04);
+  }
+}
+
+.ms-match {
+  animation: ms-match-strike 3.4s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.ms-flame {
+  animation: ms-flame-ignite 3.4s ease-out infinite;
+  transform-box: fill-box;
+  transform-origin: center bottom;
+}
+
+.ms-flame-core {
+  animation: ms-flicker 0.7s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center bottom;
+}
+
+.ms-sparks {
+  animation: ms-spark-burst 3.4s ease-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ms-match,
+  .ms-flame,
+  .ms-flame-core,
+  .ms-sparks {
+    animation: none;
+  }
+  .ms-match {
+    transform: translate(70px, 70px);
+  }
+  .ms-flame,
+  .ms-sparks {
+    opacity: 1;
+  }
+}

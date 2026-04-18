@@ -12,6 +12,7 @@ import ToastContainer from '@/components/ToastContainer';
 import ClientRouletteWheel from '@/components/ClientRouletteWheel';
 import MatchesRevealView from '@/components/MatchesRevealView';
 import StreamingProvidersList from '@/components/StreamingProviders';
+import { FullPageSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/useToast';
 import type { SessionMovie, Movie, SearchResult } from '@shared/types';
 
@@ -450,7 +451,7 @@ function DiscoverSwipePageInner() {
 
 export default function DiscoverSwipePage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center min-h-dvh"><div className="w-12 h-12 border-3 border-coral border-t-transparent rounded-full animate-spin" /></div>}>
+    <Suspense fallback={<FullPageSpinner />}>
       <DiscoverSwipePageInner />
     </Suspense>
   );

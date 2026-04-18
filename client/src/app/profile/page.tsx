@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { authApi, providerApi } from '@/lib/api';
 import { getBaseName } from '@/components/StreamingProviders';
 import LetterboxdImport from '@/components/LetterboxdImport';
+import { FullPageSpinner } from '@/components/LoadingSpinner';
 
 const USERNAME_RE = /^[a-z0-9_-]{3,30}$/;
 const USERNAME_COOLDOWN_DAYS = 30;
@@ -149,11 +150,7 @@ export default function ProfilePage() {
   const hiddenCount = providerOptions.length - visibleProviders.length;
 
   if (loading || !user) {
-    return (
-      <div className="flex items-center justify-center min-h-dvh">
-        <div className="w-12 h-12 border-3 border-coral border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <FullPageSpinner />;
   }
 
   const normalizedName = name.trim().replace(/^@+/, '').toLowerCase();

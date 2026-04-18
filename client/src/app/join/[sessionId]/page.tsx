@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { guestApi, sessionApi } from '@/lib/api';
 import { connectSocket, getSocket } from '@/lib/socket';
+import { FullPageSpinner } from '@/components/LoadingSpinner';
 
 type LobbyState = 'loading' | 'join' | 'waiting' | 'starting';
 
@@ -101,11 +102,7 @@ export default function JoinPage() {
   }, [lobbyState, user, autoJoinAttempted, handleJoinWithAccount]);
 
   if (lobbyState === 'loading') {
-    return (
-      <div className="flex items-center justify-center min-h-dvh">
-        <div className="w-10 h-10 border-3 border-coral border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <FullPageSpinner />;
   }
 
   return (

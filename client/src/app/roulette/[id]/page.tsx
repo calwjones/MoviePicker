@@ -8,6 +8,7 @@ import { swipeApi } from '@/lib/api';
 import { connectSocket, getSocket } from '@/lib/socket';
 import StreamingProvidersList from '@/components/StreamingProviders';
 import InCinemaBadge from '@/components/InCinemaBadge';
+import { FullPageSpinner } from '@/components/LoadingSpinner';
 
 interface Movie {
   id: string;
@@ -288,11 +289,7 @@ export default function RoulettePage() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-dvh">
-        <div className="w-12 h-12 border-3 border-coral border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <FullPageSpinner />;
   }
 
   if (matches.length <= 1) {

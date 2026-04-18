@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { FullPageSpinner } from '@/components/LoadingSpinner';
 
 export default function Home() {
   const { user, loading } = useAuth();
@@ -16,15 +17,7 @@ export default function Home() {
   }, [user, loading, router]);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-dvh">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-          className="w-12 h-12 border-3 border-coral border-t-transparent rounded-full"
-        />
-      </div>
-    );
+    return <FullPageSpinner />;
   }
 
   return (

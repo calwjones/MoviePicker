@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { authApi } from '@/lib/api';
+import { FullPageSpinner } from '@/components/LoadingSpinner';
 
 function AuthForm() {
   const searchParams = useSearchParams();
@@ -199,11 +200,7 @@ function AuthForm() {
 
 export default function AuthPage() {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center min-h-dvh">
-        <div className="w-12 h-12 border-3 border-coral border-t-transparent rounded-full animate-spin" />
-      </div>
-    }>
+    <Suspense fallback={<FullPageSpinner />}>
       <AuthForm />
     </Suspense>
   );

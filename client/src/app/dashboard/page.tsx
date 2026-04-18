@@ -12,6 +12,7 @@ import SwipeTab from './components/SwipeTab';
 import FriendsTab from './components/FriendsTab';
 import HistoryTab from './components/HistoryTab';
 import OnboardingModal from '@/components/OnboardingModal';
+import { FullPageSpinner } from '@/components/LoadingSpinner';
 
 type Tab = 'browse' | 'library' | 'swipe' | 'friends' | 'history';
 const ALL_TABS: readonly Tab[] = ['browse', 'library', 'swipe', 'friends', 'history'];
@@ -55,11 +56,7 @@ function DashboardContent() {
   };
 
   if (authLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-dvh">
-        <div className="w-12 h-12 border-3 border-coral border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <FullPageSpinner />;
   }
 
   const tabs: Tab[] = user?.isGuest
@@ -127,11 +124,7 @@ function DashboardContent() {
 
 export default function DashboardPage() {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center min-h-dvh">
-        <div className="w-12 h-12 border-3 border-coral border-t-transparent rounded-full animate-spin" />
-      </div>
-    }>
+    <Suspense fallback={<FullPageSpinner />}>
       <DashboardContent />
     </Suspense>
   );

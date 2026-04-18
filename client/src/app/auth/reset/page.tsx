@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { authApi } from '@/lib/api';
+import { FullPageSpinner } from '@/components/LoadingSpinner';
 
 function ResetContent() {
   const searchParams = useSearchParams();
@@ -119,11 +120,7 @@ function ResetContent() {
 
 export default function ResetPage() {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center min-h-dvh">
-        <div className="w-12 h-12 border-3 border-coral border-t-transparent rounded-full animate-spin" />
-      </div>
-    }>
+    <Suspense fallback={<FullPageSpinner />}>
       <ResetContent />
     </Suspense>
   );

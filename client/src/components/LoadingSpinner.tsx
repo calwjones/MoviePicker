@@ -1,5 +1,7 @@
 'use client';
 
+import MatchStrikeLoader from './MatchStrikeLoader';
+
 const sizes = {
   sm: 'w-5 h-5 border-2',
   md: 'w-8 h-8 border-2',
@@ -15,7 +17,7 @@ export default function LoadingSpinner({ size = 'lg' }: { size?: 'sm' | 'md' | '
 export function FullPageSpinner() {
   return (
     <div className="flex items-center justify-center min-h-dvh">
-      <LoadingSpinner />
+      <MatchStrikeLoader size={160} />
     </div>
   );
 }
