@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { useAuthGuard } from '@/hooks/useAuthGuard';
 import { discoverApi, movieApi } from '@/lib/api';
 import { getErrorMessage } from '@/lib/errors';
+import { clearSwipeFilters } from '@/lib/filters';
 import SwipeView from '@/components/SwipeView';
 import InCinemaBadge from '@/components/InCinemaBadge';
 import ToastContainer from '@/components/ToastContainer';
@@ -314,6 +315,7 @@ function DiscoverSwipePageInner() {
   };
 
   const handleDoneExit = () => {
+    clearSwipeFilters();
     router.push('/dashboard');
   };
 

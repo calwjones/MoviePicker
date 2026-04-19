@@ -8,6 +8,7 @@ import { sessionApi, swipeApi } from '@/lib/api';
 import { getErrorMessage } from '@/lib/errors';
 import { connectSocket, getSocket } from '@/lib/socket';
 import { enqueueSwipe, flushQueue, hasQueuedSwipes } from '@/lib/swipeQueue';
+import { clearSwipeFilters } from '@/lib/filters';
 import SwipeView from '@/components/SwipeView';
 import InCinemaBadge from '@/components/InCinemaBadge';
 import ToastContainer from '@/components/ToastContainer';
@@ -392,6 +393,7 @@ export default function SessionPage() {
   };
 
   const handleDoneExit = () => {
+    clearSwipeFilters();
     router.push('/dashboard');
   };
 
