@@ -110,6 +110,7 @@ function DiscoverSwipePageInner() {
     return {
       movies: (res.data.movies ?? []) as SearchResult[],
       totalPages: (res.data.totalPages ?? 1) as number,
+      providerDropped: Boolean(res.data.providerDropped),
     };
   }, [queryFilters]);
 
@@ -125,6 +126,12 @@ function DiscoverSwipePageInner() {
           setLoading(false);
           return;
         }
+        if (result.providerDropped) {
+          addToast('No matches on your selected streamers — showing broadly available titles.', {
+            variant: 'info',
+            duration: 6000,
+          });
+        }
         const capped = result.movies.slice(0, queryFilters.batchSize);
         setMovies(capped.map(toAdapterSessionMovie));
         setSeenTmdbIds(new Set(capped.map((m) => m.tmdbId)));
@@ -137,7 +144,7 @@ function DiscoverSwipePageInner() {
       }
     })();
     return () => { cancelled = true; };
-  }, [user, authLoading, fetchPage, queryFilters.batchSize]);
+  }, [user, authLoading, fetchPage, queryFilters.batchSize, addToast]);
 
   const handleSwipe = useCallback(async (direction: 'left' | 'right') => {
     if (currentIndex >= movies.length) return;

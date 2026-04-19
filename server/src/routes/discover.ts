@@ -17,6 +17,7 @@ const POOL_CACHE_TTL_MS = 2 * 60 * 1000;
 interface PoolCacheEntry {
   merged: TmdbSearchResult[];
   maxTmdbTotalPages: number;
+  providerDropped: boolean;
   expires: number;
 }
 
@@ -58,6 +59,40 @@ function samplePages(windowSize: number, count: number): number[] {
   return pool.slice(0, Math.min(count, windowSize));
 }
 
+type BaseOpts = {
+  genreIds?: number[];
+  minRating?: number;
+  releaseDateGte?: string;
+  releaseDateLte?: string;
+  watchProviderIds?: number[];
+};
+
+async function fetchPool(baseOpts: BaseOpts, voteCountA: number, voteCountB: number): Promise<{ merged: TmdbSearchResult[]; maxTmdbTotalPages: number }> {
+  const tmdbPages = samplePages(TMDB_PAGE_WINDOW, TMDB_PAGES_PER_POOL);
+  const [topRatedBatches, mostVotedBatches] = await Promise.all([
+    Promise.all(tmdbPages.map((p) => discoverMovies({ ...baseOpts, sortBy: 'vote_average.desc', voteCountGte: voteCountA, page: p }))),
+    Promise.all(tmdbPages.map((p) => discoverMovies({ ...baseOpts, sortBy: 'vote_count.desc', voteCountGte: voteCountB, page: p }))),
+  ]);
+
+  const seen = new Set<number>();
+  const merged: TmdbSearchResult[] = [];
+  for (const batch of [...topRatedBatches, ...mostVotedBatches]) {
+    for (const r of batch.results) {
+      if (seen.has(r.id)) continue;
+      seen.add(r.id);
+      merged.push(r);
+    }
+  }
+
+  const maxTmdbTotalPages = Math.max(
+    ...topRatedBatches.map((b) => b.totalPages),
+    ...mostVotedBatches.map((b) => b.totalPages),
+    1,
+  );
+
+  return { merged, maxTmdbTotalPages };
+}
+
 router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const genreNames = typeof req.query.genres === 'string' && req.query.genres.length > 0
@@ -97,42 +132,38 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
       releaseDateLte = `${decade + 9}-12-31`;
     }
 
-    const baseOpts = { genreIds, minRating, releaseDateGte, releaseDateLte, watchProviderIds };
+    const baseOpts: BaseOpts = { genreIds, minRating, releaseDateGte, releaseDateLte, watchProviderIds };
     const cacheKey = poolCacheKey(baseOpts);
 
     const cachedPool = poolCache.get(cacheKey);
     const poolFresh = cachedPool && Date.now() < cachedPool.expires;
 
-    const poolPromise: Promise<{ merged: TmdbSearchResult[]; maxTmdbTotalPages: number }> = poolFresh
-      ? Promise.resolve({ merged: cachedPool.merged, maxTmdbTotalPages: cachedPool.maxTmdbTotalPages })
+    const poolPromise: Promise<{ merged: TmdbSearchResult[]; maxTmdbTotalPages: number; providerDropped: boolean }> = poolFresh
+      ? Promise.resolve({
+        merged: cachedPool.merged,
+        maxTmdbTotalPages: cachedPool.maxTmdbTotalPages,
+        providerDropped: cachedPool.providerDropped,
+      })
       : (async () => {
-        const tmdbPages = samplePages(TMDB_PAGE_WINDOW, TMDB_PAGES_PER_POOL);
-        const [topRatedBatches, mostVotedBatches] = await Promise.all([
-          Promise.all(tmdbPages.map((p) => discoverMovies({ ...baseOpts, sortBy: 'vote_average.desc', voteCountGte: 1500, page: p }))),
-          Promise.all(tmdbPages.map((p) => discoverMovies({ ...baseOpts, sortBy: 'vote_count.desc', voteCountGte: BAYESIAN_PRIOR_VOTES, page: p }))),
-        ]);
-
-        const seen = new Set<number>();
-        const merged: TmdbSearchResult[] = [];
-        for (const batch of [...topRatedBatches, ...mostVotedBatches]) {
-          for (const r of batch.results) {
-            if (seen.has(r.id)) continue;
-            seen.add(r.id);
-            merged.push(r);
-          }
+        let result = await fetchPool(baseOpts, 1500, BAYESIAN_PRIOR_VOTES);
+        let dropped = false;
+        if (result.merged.length === 0) {
+          result = await fetchPool(baseOpts, 100, 100);
         }
-
-        const maxTmdbTotalPages = Math.max(
-          ...topRatedBatches.map((b) => b.totalPages),
-          ...mostVotedBatches.map((b) => b.totalPages),
-          1,
-        );
-
-        poolCache.set(cacheKey, { merged, maxTmdbTotalPages, expires: Date.now() + POOL_CACHE_TTL_MS });
-        return { merged, maxTmdbTotalPages };
+        if (result.merged.length === 0 && watchProviderIds && watchProviderIds.length > 0) {
+          dropped = true;
+          result = await fetchPool({ ...baseOpts, watchProviderIds: undefined }, 100, 100);
+        }
+        poolCache.set(cacheKey, {
+          merged: result.merged,
+          maxTmdbTotalPages: result.maxTmdbTotalPages,
+          providerDropped: dropped,
+          expires: Date.now() + POOL_CACHE_TTL_MS,
+        });
+        return { ...result, providerDropped: dropped };
       })();
 
-    const [{ merged, maxTmdbTotalPages }, library, inCinemaSet] = await Promise.all([
+    const [{ merged, maxTmdbTotalPages, providerDropped }, library, inCinemaSet] = await Promise.all([
       poolPromise,
       prisma.userMovie.findMany({
         where: { userId: req.userId! },
@@ -155,7 +186,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
 
     const totalPages = Math.max(1, Math.ceil(maxTmdbTotalPages / TMDB_PAGES_PER_POOL));
 
-    res.json({ movies, totalPages, page: safePage });
+    res.json({ movies, totalPages, page: safePage, providerDropped });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal server error' });
