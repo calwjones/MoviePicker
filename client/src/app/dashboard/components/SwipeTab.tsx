@@ -530,6 +530,12 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
 
                 {streamingProviders.length > 0 && (() => {
                   const selectedSet = new Set(filters.streamingProviders || []);
+                  const confirmedIds = new Set(user?.preferredStreamingProviderIds ?? []);
+                  const confirmedSet = new Set(
+                    streamingProviders
+                      .filter((p) => confirmedIds.has(providerIdByBase[p.name]))
+                      .map((p) => p.name),
+                  );
                   const defaultSlice = streamingProviders.filter((p) => PREFERRED_PROVIDERS.includes(p.name));
                   const extraSelected = streamingProviders.filter(
                     (p) => !PREFERRED_PROVIDERS.includes(p.name) && selectedSet.has(p.name),
@@ -540,10 +546,18 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
                   const hiddenCount = streamingProviders.length - visible.length;
                   return (
                     <div>
-                      <label className="text-cream-dim text-sm mb-2 block">Streaming Service</label>
+                      <label className="text-cream-dim text-sm mb-2 block">
+                        Streaming Service
+                        {confirmedSet.size > 0 && (
+                          <span className="ml-2 text-[10px] text-cream-dim/70">
+                            <span className="text-coral">★</span> = from your profile
+                          </span>
+                        )}
+                      </label>
                       <div className="flex flex-wrap gap-2">
                         {visible.map((provider) => {
                           const selected = selectedSet.has(provider.name);
+                          const confirmed = confirmedSet.has(provider.name);
                           return (
                             <button
                               key={provider.name}
@@ -555,12 +569,22 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
                                     : [...(p.streamingProviders || []), provider.name],
                                 }))
                               }
-                              className={`flex items-center gap-1.5 pl-1 pr-3 py-1 rounded-full text-xs transition-all hover:-translate-y-0.5 ${
+                              className={`relative flex items-center gap-1.5 pl-1 pr-3 py-1 rounded-full text-xs transition-all hover:-translate-y-0.5 ${
                                 selected ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
                               }`}
                             >
                               <img src={provider.logoUrl} alt="" className="w-5 h-5 rounded" />
                               <span>{provider.name}</span>
+                              {confirmed && (
+                                <span
+                                  aria-label="From your profile"
+                                  className={`absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] leading-none ${
+                                    selected ? 'bg-charcoal text-coral' : 'bg-coral text-charcoal'
+                                  }`}
+                                >
+                                  ★
+                                </span>
+                              )}
                             </button>
                           );
                         })}
