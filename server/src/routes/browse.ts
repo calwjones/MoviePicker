@@ -244,6 +244,11 @@ function filterAndCap(results: TmdbSearchResult[], excluded: Set<number>): TmdbS
   return out;
 }
 
+function parseSections(raw: unknown): Set<string> {
+  if (typeof raw !== 'string' || raw.length === 0) return new Set();
+  return new Set(raw.split(',').map((s) => s.trim()).filter(Boolean));
+}
+
 router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
@@ -254,13 +259,34 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
       getHistoryCount(userId),
     ]);
 
-    const editorialPicks = pickRandom(EDITORIAL_ROW_DEFS, EDITORIAL_PICK_COUNT);
-    const genrePicks = pickRandom(genrePool, GENRE_PICK_COUNT);
+    const requestedSections = parseSections(req.query.sections);
+    const editorialPicks = requestedSections.size > 0
+      ? EDITORIAL_ROW_DEFS.filter((d) => requestedSections.has(d.id))
+      : pickRandom(EDITORIAL_ROW_DEFS, EDITORIAL_PICK_COUNT);
+    const genrePicks = requestedSections.size > 0
+      ? genrePool.filter((g) => requestedSections.has(`genre_${g.id}`))
+      : pickRandom(genrePool, GENRE_PICK_COUNT);
+
+    const adhocGenreIds = requestedSections.size > 0
+      ? Array.from(requestedSections)
+        .filter((k) => k.startsWith('genre_'))
+        .map((k) => parseInt(k.slice('genre_'.length), 10))
+        .filter((n) => Number.isFinite(n) && n > 0 && !genrePicks.some((g) => g.id === n))
+      : [];
+    const adhocGenres = adhocGenreIds
+      .map((id) => {
+        const name = Object.entries(TMDB_GENRE_IDS).find(([, v]) => v === id)?.[0];
+        return name ? { id, name } : null;
+      })
+      .filter((g): g is { id: number; name: string } => g !== null);
+    const allGenrePicks = [...genrePicks, ...adhocGenres];
+
+    const includeForYou = requestedSections.size === 0 || requestedSections.has('for_you');
 
     const [editorialResults, genreRowResults, forYouRecs, inCinemaSet] = await Promise.all([
       Promise.all(editorialPicks.map((def) => fetchCached(def.id, def.loader))),
       Promise.all(
-        genrePicks.map((g) =>
+        allGenrePicks.map((g) =>
           fetchCached(`genre_${g.id}`, () =>
             fetchPages(
               (page) => discoverMovies({ genreIds: [g.id], page }).then((r) => r.results),
@@ -269,7 +295,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
           ),
         ),
       ),
-      historyCount > 0 ? buildForYouRecommendations(userId, ROW_CAP) : Promise.resolve([]),
+      includeForYou && historyCount > 0 ? buildForYouRecommendations(userId, ROW_CAP) : Promise.resolve([]),
       getInCinemaIds(),
     ]);
 
@@ -284,12 +310,13 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
       .filter((row) => row.movies.length > 0);
 
     const personalised: BrowseRow[] = [];
-    genrePicks.forEach((genre, i) => {
+    allGenrePicks.forEach((genre, i) => {
       const filtered = filterAndCap(shuffled(genreRowResults[i] ?? []), library);
       if (filtered.length === 0) return;
+      const isUserTop = genrePicks.some((g) => g.id === genre.id);
       personalised.push({
         id: `genre_${genre.id}`,
-        title: `Because you like ${genre.name}`,
+        title: isUserTop ? `Because you like ${genre.name}` : genre.name,
         movies: filtered.map(shape),
       });
     });

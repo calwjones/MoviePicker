@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { browseApi, movieApi } from '@/lib/api';
 import MoviePoster from '@/components/MoviePoster';
@@ -18,17 +18,64 @@ interface BrowseTabProps {
   addToast: (message: string) => void;
 }
 
+interface SectionChip {
+  key: string;
+  label: string;
+}
+
+const EDITORIAL_CHIPS: SectionChip[] = [
+  { key: 'trending', label: 'Trending' },
+  { key: 'top_rated', label: 'All-time greats' },
+  { key: 'now_playing', label: 'New releases' },
+  { key: 'hidden_gems', label: 'Hidden gems' },
+  { key: 'critically_acclaimed', label: 'Critically acclaimed' },
+  { key: 'decade_80s', label: '80s' },
+  { key: 'decade_90s', label: '90s' },
+  { key: 'decade_00s', label: '2000s' },
+  { key: 'decade_10s', label: '2010s' },
+];
+
+const GENRE_CHIPS: SectionChip[] = [
+  { key: 'genre_28', label: 'Action' },
+  { key: 'genre_35', label: 'Comedy' },
+  { key: 'genre_18', label: 'Drama' },
+  { key: 'genre_99', label: 'Documentary' },
+  { key: 'genre_27', label: 'Horror' },
+  { key: 'genre_10749', label: 'Romance' },
+  { key: 'genre_878', label: 'Sci-Fi' },
+  { key: 'genre_53', label: 'Thriller' },
+];
+
+const SECTION_STORAGE_KEY = 'moviepicker_browse_sections';
+
 export default function BrowseTab({ addToast }: BrowseTabProps) {
   const [rows, setRows] = useState<BrowseRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [recDetail, setRecDetail] = useState<SearchResult | null>(null);
+  const [activeSections, setActiveSections] = useState<string[]>([]);
 
-  const loadRows = useCallback(async (mode: 'initial' | 'refresh') => {
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(SECTION_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) setActiveSections(parsed.filter((s) => typeof s === 'string'));
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SECTION_STORAGE_KEY, JSON.stringify(activeSections));
+    } catch { /* ignore */ }
+  }, [activeSections]);
+
+  const loadRows = useCallback(async (mode: 'initial' | 'refresh', sections: string[]) => {
     if (mode === 'initial') setLoading(true);
     else setRefreshing(true);
     try {
-      const res = await browseApi.get();
+      const res = await browseApi.get(sections);
       setRows(res.data.rows || []);
     } catch {
       if (mode === 'initial') addToast('Failed to load browse');
@@ -39,8 +86,18 @@ export default function BrowseTab({ addToast }: BrowseTabProps) {
   }, [addToast]);
 
   useEffect(() => {
-    loadRows('initial');
-  }, [loadRows]);
+    loadRows('initial', activeSections);
+  }, [loadRows, activeSections]);
+
+  const toggleSection = useCallback((key: string) => {
+    setActiveSections((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
+    );
+  }, []);
+
+  const clearSections = useCallback(() => setActiveSections([]), []);
+
+  const activeSet = useMemo(() => new Set(activeSections), [activeSections]);
 
   const handleAddRecommendation = async (rec: SearchResult) => {
     try {
@@ -70,15 +127,44 @@ export default function BrowseTab({ addToast }: BrowseTabProps) {
       <div className="glass rounded-2xl p-4 flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold font-display">Browse</h2>
-          <p className="text-cream-dim text-xs">Discover movies outside your library</p>
+          <p className="text-cream-dim text-xs">
+            {activeSections.length > 0
+              ? `Showing ${activeSections.length} pinned section${activeSections.length === 1 ? '' : 's'}`
+              : 'Discover movies outside your library'}
+          </p>
         </div>
         <button
-          onClick={() => loadRows('refresh')}
+          onClick={() => loadRows('refresh', activeSections)}
           disabled={refreshing}
           className="text-cream-dim text-xs hover:text-cream transition-colors disabled:opacity-50"
         >
           {refreshing ? 'Refreshing…' : 'Refresh'}
         </button>
+      </div>
+
+      {/* Section chips */}
+      <div className="glass rounded-2xl p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-cream-dim text-xs">Pin sections you want to see</p>
+          {activeSections.length > 0 && (
+            <button
+              onClick={clearSections}
+              className="text-danger text-xs hover:underline"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {EDITORIAL_CHIPS.map((chip) => (
+            <ChipButton key={chip.key} chip={chip} active={activeSet.has(chip.key)} onToggle={toggleSection} />
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {GENRE_CHIPS.map((chip) => (
+            <ChipButton key={chip.key} chip={chip} active={activeSet.has(chip.key)} onToggle={toggleSection} />
+          ))}
+        </div>
       </div>
 
       {loading ? (
@@ -89,7 +175,11 @@ export default function BrowseTab({ addToast }: BrowseTabProps) {
         </div>
       ) : rows.length === 0 ? (
         <div className="glass rounded-2xl p-8 text-center">
-          <p className="text-cream-dim text-sm">Nothing to browse right now — try again in a minute.</p>
+          <p className="text-cream-dim text-sm">
+            {activeSections.length > 0
+              ? 'Your pinned sections are empty — try different chips or clear them.'
+              : 'Nothing to browse right now — try again in a minute.'}
+          </p>
         </div>
       ) : (
         <div className="space-y-5">
@@ -110,6 +200,27 @@ export default function BrowseTab({ addToast }: BrowseTabProps) {
         onAdd={handleAddRecommendation}
       />
     </motion.div>
+  );
+}
+
+function ChipButton({
+  chip,
+  active,
+  onToggle,
+}: {
+  chip: SectionChip;
+  active: boolean;
+  onToggle: (key: string) => void;
+}) {
+  return (
+    <button
+      onClick={() => onToggle(chip.key)}
+      className={`px-3 py-1.5 rounded-full text-xs transition-all hover:-translate-y-0.5 ${
+        active ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
+      }`}
+    >
+      {chip.label}
+    </button>
   );
 }
 
