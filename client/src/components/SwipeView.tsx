@@ -75,7 +75,7 @@ export default function SwipeView({
 
   if (done) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-dvh px-6 text-center">
+      <div className="flex flex-col items-center min-h-dvh px-6 pt-8 pb-12 text-center">
         {doneContent}
       </div>
     );
