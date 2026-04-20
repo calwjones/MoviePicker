@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import MoviePoster from '@/components/MoviePoster';
 import InCinemaBadge from '@/components/InCinemaBadge';
@@ -21,6 +22,7 @@ interface MatchesRevealViewProps {
   onRevealAll: () => void;
   postRevealTitle: string;
   renderCardBadge?: (item: RevealItem) => React.ReactNode;
+  onToggleWatched?: (item: RevealItem, nextWatched: boolean) => Promise<boolean> | boolean;
   actions: React.ReactNode;
 }
 
@@ -35,9 +37,46 @@ export default function MatchesRevealView({
   onRevealAll,
   postRevealTitle,
   renderCardBadge,
+  onToggleWatched,
   actions,
 }: MatchesRevealViewProps) {
   const fullyRevealed = revealIndex >= items.length - 1;
+  const [watchedIds, setWatchedIds] = useState<Set<string>>(new Set());
+  const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
+
+  const handleToggle = async (item: RevealItem) => {
+    if (!onToggleWatched) return;
+    const already = watchedIds.has(item.id);
+    const next = !already;
+    setTogglingIds((prev) => {
+      const s = new Set(prev);
+      s.add(item.id);
+      return s;
+    });
+    setWatchedIds((prev) => {
+      const s = new Set(prev);
+      if (next) s.add(item.id);
+      else s.delete(item.id);
+      return s;
+    });
+    try {
+      const ok = await onToggleWatched(item, next);
+      if (ok === false) {
+        setWatchedIds((prev) => {
+          const s = new Set(prev);
+          if (already) s.add(item.id);
+          else s.delete(item.id);
+          return s;
+        });
+      }
+    } finally {
+      setTogglingIds((prev) => {
+        const s = new Set(prev);
+        s.delete(item.id);
+        return s;
+      });
+    }
+  };
 
   if (!revealed) {
     return (
@@ -108,6 +147,20 @@ export default function MatchesRevealView({
                   )}
                   {renderCardBadge && (
                     <div className="absolute top-2 right-2">{renderCardBadge(item)}</div>
+                  )}
+                  {onToggleWatched && revealedThis && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleToggle(item); }}
+                      disabled={togglingIds.has(item.id)}
+                      aria-label={watchedIds.has(item.id) ? 'Mark as not watched' : 'Mark as watched'}
+                      className={`absolute ${renderCardBadge ? 'top-11' : 'top-2'} right-2 w-7 h-7 flex items-center justify-center rounded-full text-xs font-bold transition-colors disabled:opacity-80 ${
+                        watchedIds.has(item.id)
+                          ? 'bg-success/90 text-charcoal'
+                          : 'bg-charcoal/70 text-cream border border-cream/40 hover:bg-charcoal/90'
+                      }`}
+                    >
+                      {watchedIds.has(item.id) ? '✓' : '👁'}
+                    </button>
                   )}
                   <div className="absolute bottom-2 left-2 right-2">
                     <p className="text-sm font-semibold truncate">{item.movie.title}</p>

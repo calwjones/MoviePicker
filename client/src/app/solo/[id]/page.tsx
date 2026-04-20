@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useAuthGuard } from '@/hooks/useAuthGuard';
-import { sessionApi, swipeApi } from '@/lib/api';
+import { sessionApi, swipeApi, movieApi } from '@/lib/api';
 import { getErrorMessage } from '@/lib/errors';
 import { enqueueSwipe, flushQueue, hasQueuedSwipes } from '@/lib/swipeQueue';
 import { clearSwipeFilters } from '@/lib/filters';
@@ -262,6 +262,21 @@ export default function SoloSessionPage() {
       onStartReveal={startReveal}
       onRevealAll={revealAll}
       postRevealTitle="Your Shortlist"
+      onToggleWatched={async (item, nextWatched) => {
+        try {
+          await movieApi.markWatched(item.movie.id, nextWatched);
+          addToast(
+            nextWatched
+              ? `"${item.movie.title}" moved to Watched`
+              : `"${item.movie.title}" back on your watchlist`,
+            { variant: 'success' },
+          );
+          return true;
+        } catch {
+          addToast('Failed to update', { variant: 'error' });
+          return false;
+        }
+      }}
       actions={
         <>
           <button

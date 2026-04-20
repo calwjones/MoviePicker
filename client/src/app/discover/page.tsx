@@ -96,6 +96,7 @@ function DiscoverSwipePageInner() {
 
   const [addedTmdbIds, setAddedTmdbIds] = useState<Set<number>>(new Set());
   const [addingTmdbId, setAddingTmdbId] = useState<number | null>(null);
+  const movieIdByTmdb = useRef<Map<number, string>>(new Map());
 
   const [enrichedTmdbIds, setEnrichedTmdbIds] = useState<Set<number>>(new Set());
   const [enrichingTmdbId, setEnrichingTmdbId] = useState<number | null>(null);
@@ -304,13 +305,44 @@ function DiscoverSwipePageInner() {
   const handleAddToWatchlist = async (tmdbId: number) => {
     setAddingTmdbId(tmdbId);
     try {
-      await movieApi.add(tmdbId);
+      const res = await movieApi.add(tmdbId);
+      const movieId = res.data.movie?.id as string | undefined;
+      if (movieId) movieIdByTmdb.current.set(tmdbId, movieId);
       setAddedTmdbIds((prev) => new Set(prev).add(tmdbId));
       addToast('Added to watchlist', { variant: 'success' });
     } catch {
       addToast('Failed to add movie', { variant: 'error' });
     } finally {
       setAddingTmdbId(null);
+    }
+  };
+
+  const handleToggleWatchedOnReveal = async (
+    item: { movie: Movie },
+    nextWatched: boolean,
+  ): Promise<boolean> => {
+    const tmdbId = item.movie.tmdbId;
+    if (!tmdbId) return false;
+    try {
+      let movieId = movieIdByTmdb.current.get(tmdbId);
+      if (!movieId) {
+        const addRes = await movieApi.add(tmdbId);
+        movieId = addRes.data.movie?.id as string | undefined;
+        if (!movieId) throw new Error('missing movie id');
+        movieIdByTmdb.current.set(tmdbId, movieId);
+        setAddedTmdbIds((prev) => new Set(prev).add(tmdbId));
+      }
+      await movieApi.markWatched(movieId, nextWatched);
+      addToast(
+        nextWatched
+          ? `"${item.movie.title}" moved to Watched`
+          : `"${item.movie.title}" back on your watchlist`,
+        { variant: 'success' },
+      );
+      return true;
+    } catch {
+      addToast('Failed to update', { variant: 'error' });
+      return false;
     }
   };
 
@@ -370,6 +402,7 @@ function DiscoverSwipePageInner() {
       revealIndex={revealIndex}
       onStartReveal={startReveal}
       onRevealAll={revealAll}
+      onToggleWatched={handleToggleWatchedOnReveal}
       renderCardBadge={(item) => {
         const tmdbId = item.movie.tmdbId;
         if (!tmdbId) return null;
