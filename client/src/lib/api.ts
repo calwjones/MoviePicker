@@ -147,7 +147,10 @@ export const providerApi = {
 };
 
 export const browseApi = {
-  get: () => api.get('/browse'),
+  get: (sections?: string[]) =>
+    api.get('/browse', sections && sections.length > 0
+      ? { params: { sections: sections.join(',') } }
+      : undefined),
 };
 
 export const friendsApi = {
@@ -168,6 +171,10 @@ export const friendsApi = {
   declineInvite: (inviteId: string) => api.post(`/friends/invites/${inviteId}/decline`),
   inviteToSession: (sessionId: string, friendIds: string[]) =>
     api.post(`/sessions/${sessionId}/invite`, { friendIds }),
+};
+
+export const popularApi = {
+  allTime: () => api.get('/popular/all-time'),
 };
 
 export const discoverApi = {

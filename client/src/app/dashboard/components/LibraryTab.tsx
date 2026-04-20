@@ -13,7 +13,9 @@ import RecDetailSheet from '@/components/RecDetailSheet';
 import MovieDetailModal from '@/components/MovieDetailModal';
 import LetterboxdImport from '@/components/LetterboxdImport';
 import LetterboxdResyncButton from '@/components/LetterboxdResyncButton';
+import OnboardingSeedGrid from '@/components/OnboardingSeedGrid';
 import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 import { DECADE_OPTIONS } from '@/lib/decades';
 import type { Movie, UserMovie, SearchResult } from '@shared/types';
 
@@ -32,8 +34,10 @@ interface LibraryTabProps {
 
 export default function LibraryTab({ addToast }: LibraryTabProps) {
   const { user } = useAuth();
+  const router = useRouter();
   const hasLetterboxd = !!user?.letterboxdUsername;
   const [letterboxdDismissed, setLetterboxdDismissed] = useState(false);
+  const [seedGridOpen, setSeedGridOpen] = useState(false);
 
   useEffect(() => {
     setLetterboxdDismissed(localStorage.getItem('letterboxdImportDismissed') === '1');
@@ -952,10 +956,31 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
         {libraryLoading ? (
           <SkeletonList count={6} />
         ) : watchlist.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-cream-dim mb-2">Your watchlist is empty</p>
-            <p className="text-cream-dim text-sm">Search for movies above, or import your Letterboxd export.</p>
-          </div>
+          libraryFilter === 'watched' ? (
+            <div className="text-center py-8">
+              <p className="text-cream-dim mb-2">Nothing marked watched yet</p>
+              <p className="text-cream-dim text-sm">Movies you mark as watched will show up here.</p>
+            </div>
+          ) : (
+            <div className="text-center py-8 space-y-3">
+              <p className="text-cream-dim">Your watchlist is empty</p>
+              <p className="text-cream-dim text-sm">Tap a few picks you&apos;d happily watch to get started.</p>
+              <div className="flex flex-col gap-2 max-w-xs mx-auto pt-2">
+                <button
+                  onClick={() => setSeedGridOpen(true)}
+                  className="w-full py-2.5 bg-coral text-charcoal rounded-xl font-semibold hover:bg-coral-dark transition-colors"
+                >
+                  Tap a few picks
+                </button>
+                <button
+                  onClick={() => router.push('/discover')}
+                  className="w-full py-2 text-cream-dim text-sm hover:text-cream transition-colors"
+                >
+                  Or discover something new
+                </button>
+              </div>
+            </div>
+          )
         ) : (
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
             {visibleWatchlist.map((um) => (
@@ -1016,6 +1041,39 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
         onAdd={handleAddRecommendation}
         onDismiss={handleDismissRec}
       />
+
+      {/* Seed grid modal */}
+      <AnimatePresence>
+        {seedGridOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-charcoal/85 backdrop-blur-sm z-40"
+              onClick={() => setSeedGridOpen(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 40, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 40, scale: 0.95 }}
+              transition={{ type: 'spring', damping: 22, stiffness: 260 }}
+              className="fixed inset-0 z-50 flex items-center justify-center px-4 pointer-events-none"
+            >
+              <div className="glass rounded-3xl p-6 w-full max-w-md pointer-events-auto max-h-[90vh] overflow-y-auto">
+                <OnboardingSeedGrid
+                  onDone={() => {
+                    setSeedGridOpen(false);
+                    loadWatchlist();
+                    addToast('Added to your watchlist');
+                  }}
+                  onSkip={() => setSeedGridOpen(false)}
+                />
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Movie Detail Modal */}
       <MovieDetailModal

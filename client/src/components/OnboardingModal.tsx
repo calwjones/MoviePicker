@@ -6,9 +6,10 @@ import { providerApi } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { getBaseName } from './StreamingProviders';
 import LetterboxdImport from './LetterboxdImport';
+import OnboardingSeedGrid from './OnboardingSeedGrid';
 
 type Path = 'together' | 'solo' | 'discover';
-type Step = 0 | 1 | 2 | 3;
+type Step = 0 | 1 | 2 | 3 | 4;
 
 interface OnboardingModalProps {
   open: boolean;
@@ -57,7 +58,7 @@ export default function OnboardingModal({ open, onClose, onPickPath }: Onboardin
   useEffect(() => { if (open) setStep(0); }, [open]);
 
   useEffect(() => {
-    if (step !== 2 || providerOptions.length > 0) return;
+    if (step !== 3 || providerOptions.length > 0) return;
     setProvidersLoading(true);
     providerApi.list()
       .then((res) => {
@@ -94,7 +95,7 @@ export default function OnboardingModal({ open, onClose, onPickPath }: Onboardin
     }
   };
 
-  const goNext = () => setStep((s) => (s < 3 ? ((s + 1) as Step) : s));
+  const goNext = () => setStep((s) => (s < 4 ? ((s + 1) as Step) : s));
   const goBack = () => setStep((s) => (s > 0 ? ((s - 1) as Step) : s));
 
   return (
@@ -116,7 +117,7 @@ export default function OnboardingModal({ open, onClose, onPickPath }: Onboardin
           >
             <div className="glass rounded-3xl p-6 w-full max-w-md space-y-5 pointer-events-auto max-h-[90vh] overflow-y-auto">
               <div className="flex justify-center gap-1.5">
-                {[0, 1, 2, 3].map((i) => (
+                {[0, 1, 2, 3, 4].map((i) => (
                   <div
                     key={i}
                     className={`h-1.5 rounded-full transition-all ${
@@ -185,6 +186,18 @@ export default function OnboardingModal({ open, onClose, onPickPath }: Onboardin
 
               {step === 2 && (
                 <>
+                  <OnboardingSeedGrid onDone={goNext} onSkip={goNext} />
+                  <button
+                    onClick={goBack}
+                    className="w-full py-2 text-cream-dim/70 text-xs hover:text-cream transition-colors"
+                  >
+                    Back
+                  </button>
+                </>
+              )}
+
+              {step === 3 && (
+                <>
                   <div className="text-center">
                     <h2 className="text-2xl font-bold text-cream mb-1" style={{ fontFamily: 'var(--font-playfair)' }}>
                       Where do you watch?
@@ -232,7 +245,7 @@ export default function OnboardingModal({ open, onClose, onPickPath }: Onboardin
                 </>
               )}
 
-              {step === 3 && (
+              {step === 4 && (
                 <>
                   <div className="text-center">
                     <h2 className="text-2xl font-bold text-cream mb-1" style={{ fontFamily: 'var(--font-playfair)' }}>
