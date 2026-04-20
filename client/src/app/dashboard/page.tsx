@@ -1,21 +1,33 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useCallback, useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/useToast';
+import { friendsApi } from '@/lib/api';
+import { connectSocket, getSocket } from '@/lib/socket';
 import ToastContainer from '@/components/ToastContainer';
 import BrowseTab from './components/BrowseTab';
 import LibraryTab from './components/LibraryTab';
 import SwipeTab from './components/SwipeTab';
 import FriendsTab from './components/FriendsTab';
 import HistoryTab from './components/HistoryTab';
+import NotificationsTab from './components/NotificationsTab';
 import OnboardingModal from '@/components/OnboardingModal';
 import { FullPageSpinner } from '@/components/LoadingSpinner';
 
-type Tab = 'browse' | 'library' | 'swipe' | 'friends' | 'history';
-const ALL_TABS: readonly Tab[] = ['browse', 'library', 'swipe', 'friends', 'history'];
+type Tab = 'browse' | 'library' | 'swipe' | 'friends' | 'history' | 'notifications';
+const ALL_TABS: readonly Tab[] = ['browse', 'library', 'swipe', 'friends', 'history', 'notifications'];
+
+const TAB_LABELS: Record<Tab, string> = {
+  browse: 'Browse',
+  library: 'Library',
+  swipe: 'Swipe',
+  friends: 'Friends',
+  history: 'History',
+  notifications: 'Alerts',
+};
 
 function DashboardContent() {
   const { user, loading: authLoading, logout, completeOnboarding } = useAuth();
@@ -24,6 +36,7 @@ function DashboardContent() {
   const { toasts, addToast } = useToast();
   const [tab, setTab] = useState<Tab>('browse');
   const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [inviteCount, setInviteCount] = useState(0);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -34,10 +47,34 @@ function DashboardContent() {
   useEffect(() => {
     const t = searchParams.get('tab');
     if (t && ALL_TABS.includes(t as Tab)) {
-      if (t === 'friends' && user?.isGuest) return;
+      if ((t === 'friends' || t === 'notifications') && user?.isGuest) return;
       setTab(t as Tab);
     }
   }, [searchParams, user]);
+
+  const refreshInvites = useCallback(async () => {
+    try {
+      const res = await friendsApi.invites();
+      setInviteCount((res.data.invites ?? []).length);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (authLoading || !user || user.isGuest) return;
+    refreshInvites();
+    connectSocket();
+    const socket = getSocket();
+    socket.on('session-invite', refreshInvites);
+    return () => {
+      socket.off('session-invite', refreshInvites);
+    };
+  }, [user, authLoading, refreshInvites]);
+
+  useEffect(() => {
+    if (tab === 'notifications') refreshInvites();
+  }, [tab, refreshInvites]);
 
   useEffect(() => {
     if (authLoading || !user || user.isGuest) return;
@@ -61,7 +98,7 @@ function DashboardContent() {
 
   const tabs: Tab[] = user?.isGuest
     ? ['browse', 'library', 'swipe', 'history']
-    : ['browse', 'library', 'swipe', 'friends', 'history'];
+    : ['browse', 'library', 'swipe', 'friends', 'history', 'notifications'];
 
   return (
     <div className="min-h-dvh px-6 py-8 w-full max-w-5xl mx-auto lg:px-12 flex flex-col items-stretch">
@@ -90,18 +127,30 @@ function DashboardContent() {
         </div>
       </div>
 
-      <div className="flex gap-2 mb-6">
-        {tabs.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors capitalize ${
-              tab === t ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
-            }`}
-          >
-            {t}
-          </button>
-        ))}
+      <div className="flex gap-2 mb-6 overflow-x-auto -mx-1 px-1">
+        {tabs.map((t) => {
+          const showBadge = t === 'notifications' && inviteCount > 0;
+          return (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`shrink-0 py-2 px-4 sm:flex-1 sm:px-2 rounded-xl text-sm font-medium transition-colors relative ${
+                tab === t ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
+              }`}
+            >
+              {TAB_LABELS[t]}
+              {showBadge && (
+                <span
+                  className={`ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold ${
+                    tab === t ? 'bg-charcoal text-coral' : 'bg-coral text-charcoal'
+                  }`}
+                >
+                  {inviteCount}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       <AnimatePresence mode="wait">
@@ -110,6 +159,7 @@ function DashboardContent() {
         {tab === 'swipe' && <SwipeTab key="swipe" addToast={addToast} />}
         {tab === 'friends' && <FriendsTab key="friends" addToast={addToast} />}
         {tab === 'history' && <HistoryTab key="history" addToast={addToast} />}
+        {tab === 'notifications' && <NotificationsTab key="notifications" addToast={addToast} />}
       </AnimatePresence>
 
       <ToastContainer toasts={toasts} />
