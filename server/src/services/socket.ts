@@ -54,7 +54,10 @@ export function setupSocketHandlers(io: Server): void {
 
     socket.on('join-session', async (sessionId: string) => {
       try {
-        const session = await prisma.swipeSession.findUnique({ where: { id: sessionId } });
+        const session = await prisma.swipeSession.findUnique({
+          where: { id: sessionId },
+          include: { participants: true },
+        });
         if (!session) {
           socket.emit('error', { message: 'Not authorized for this session' });
           return;
@@ -72,53 +75,41 @@ export function setupSocketHandlers(io: Server): void {
           });
         };
 
-        if (socket.guestId && session.guestId === socket.guestId) {
-          socket.join(`session:${sessionId}`);
-          socket.to(`session:${sessionId}`).emit('partner-online');
-          if (!alreadyAnnounced) {
-            announcedJoins.add(joinedKey);
-            socket.to(`session:${sessionId}`).emit('participant-joined', {
-              displayName: session.guestName ?? 'Guest',
-              type: 'guest',
-            });
-          }
-          emitRouletteState();
-          return;
-        }
-
-        if (session.type === 'solo' && session.userId === socket.userId) {
-          socket.join(`session:${sessionId}`);
-          emitRouletteState();
-          return;
-        }
-
-        if (session.type === 'group') {
-          const isHost = session.userId === socket.userId;
-          const isUser2 = session.user2Id === socket.userId;
-          if (!isHost && !isUser2) {
+        if (session.type === 'solo') {
+          if (session.userId !== socket.userId) {
             socket.emit('error', { message: 'Not authorized for this session' });
             return;
           }
           socket.join(`session:${sessionId}`);
-          if (!isHost) {
-            socket.to(`session:${sessionId}`).emit('partner-online');
-            if (!alreadyAnnounced) {
-              announcedJoins.add(joinedKey);
-              const joiner = await prisma.user.findUnique({
-                where: { id: socket.userId },
-                select: { username: true },
-              });
-              socket.to(`session:${sessionId}`).emit('participant-joined', {
-                displayName: joiner?.username ?? 'Player',
-                type: 'registered',
-              });
-            }
-          }
           emitRouletteState();
           return;
         }
 
-        socket.emit('error', { message: 'Not authorized for this session' });
+        const participant = session.participants.find((p) => {
+          if (p.leftAt) return false;
+          if (socket.guestId) return p.guestToken === socket.guestId;
+          return p.userId === socket.userId;
+        });
+
+        if (!participant) {
+          socket.emit('error', { message: 'Not authorized for this session' });
+          return;
+        }
+
+        socket.join(`session:${sessionId}`);
+        if (!participant.isHost) {
+          socket.to(`session:${sessionId}`).emit('partner-online');
+          if (!alreadyAnnounced) {
+            announcedJoins.add(joinedKey);
+            socket.to(`session:${sessionId}`).emit('participant-joined', {
+              displayName: participant.displayName,
+              type: socket.guestId ? 'guest' : 'registered',
+            });
+          }
+        }
+        const activeCount = session.participants.filter((p) => !p.leftAt).length;
+        io.to(`session:${sessionId}`).emit('participant-count', { count: activeCount });
+        emitRouletteState();
       } catch {
         socket.emit('error', { message: 'Failed to join session' });
       }

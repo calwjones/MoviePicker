@@ -16,16 +16,13 @@ type SessionWithMovies = {
 } & Record<string, unknown>;
 
 function assertGroupJoinable(
-  session: { type: string; status: string; userId: string | null; user2Id: string | null } | null,
+  session: { type: string; status: string; userId: string | null } | null,
   userId: string,
 ): { status: number; error: string } | null {
   if (!session) return { status: 404, error: 'Session not found' };
   if (session.type !== 'group') return { status: 400, error: 'Not a group session' };
   if (session.status !== 'waiting') return { status: 400, error: 'Session has already started' };
   if (session.userId === userId) return { status: 400, error: 'You are the host' };
-  if (session.user2Id && session.user2Id !== userId) {
-    return { status: 400, error: 'Session already has a second participant' };
-  }
   return null;
 }
 
@@ -83,58 +80,59 @@ function parseBatchSize(value: unknown): number | null {
 }
 
 async function buildGroupPool(
-  hostId: string,
-  user2Id: string | null,
+  sessionId: string,
   filters: MovieFilters,
   batchSize: number | null,
   excludeMovieIds: Set<string> = new Set(),
 ): Promise<Movie[]> {
   const MIN_SHARED = 15;
 
-  const hostMovies = await prisma.userMovie.findMany({
-    where: { userId: hostId, onWatchlist: true, watched: false },
-    include: { movie: true },
+  const participants = await prisma.sessionParticipant.findMany({
+    where: { sessionId, leftAt: null },
+    select: { userId: true, isHost: true },
   });
-  const hostPool = applyMovieFilters(
-    hostMovies.map((um) => um.movie).filter((m) => !excludeMovieIds.has(m.id)),
-    filters,
-  );
 
+  const userIds = participants.map((p) => p.userId).filter((x): x is string => !!x);
   const capped = (pool: Movie[]) => (batchSize != null ? pool.slice(0, batchSize) : pool);
 
-  if (!user2Id) {
-    return capped(shuffle([...hostPool]));
+  if (userIds.length === 0) return [];
+
+  const perUserPools: Movie[][] = [];
+  for (const uid of userIds) {
+    const userMovies = await prisma.userMovie.findMany({
+      where: { userId: uid, onWatchlist: true, watched: false },
+      include: { movie: true },
+    });
+    perUserPools.push(applyMovieFilters(
+      userMovies.map((um) => um.movie).filter((m) => !excludeMovieIds.has(m.id)),
+      filters,
+    ));
   }
 
-  const user2Movies = await prisma.userMovie.findMany({
-    where: { userId: user2Id, onWatchlist: true, watched: false },
-    include: { movie: true },
-  });
-  const user2Pool = applyMovieFilters(
-    user2Movies.map((um) => um.movie).filter((m) => !excludeMovieIds.has(m.id)),
-    filters,
-  );
+  if (perUserPools.length === 1) {
+    return capped(shuffle([...perUserPools[0]]));
+  }
 
-  const user2Ids = new Set(user2Pool.map((m) => m.id));
-  const intersection = hostPool.filter((m) => user2Ids.has(m.id));
+  const movieIdSets = perUserPools.map((pool) => new Set(pool.map((m) => m.id)));
+  const basePool = perUserPools[0];
+  const intersection = basePool.filter((m) => movieIdSets.slice(1).every((s) => s.has(m.id)));
 
-  let pool: Movie[];
   if (intersection.length >= MIN_SHARED) {
-    pool = shuffle([...intersection]);
-  } else {
-    const intersectionIds = new Set(intersection.map((m) => m.id));
-    const unionMap = new Map<string, Movie>();
-    for (const m of [...hostPool, ...user2Pool]) {
+    return capped(shuffle([...intersection]));
+  }
+
+  const intersectionIds = new Set(intersection.map((m) => m.id));
+  const unionMap = new Map<string, Movie>();
+  for (const pool of perUserPools) {
+    for (const m of pool) {
       if (!intersectionIds.has(m.id)) unionMap.set(m.id, m);
     }
-    const fillCap = batchSize != null
-      ? Math.max(0, batchSize - intersection.length)
-      : unionMap.size;
-    const fill = shuffle(Array.from(unionMap.values())).slice(0, fillCap);
-    pool = shuffle([...intersection, ...fill]);
   }
-
-  return capped(pool);
+  const fillCap = batchSize != null
+    ? Math.max(0, batchSize - intersection.length)
+    : unionMap.size;
+  const fill = shuffle(Array.from(unionMap.values())).slice(0, fillCap);
+  return capped(shuffle([...intersection, ...fill]));
 }
 
 async function sampleSoloBatch(
@@ -182,6 +180,19 @@ router.post('/group', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
 
+    const host = await prisma.user.findUnique({
+      where: { id: req.userId! },
+      select: { username: true },
+    });
+    await prisma.sessionParticipant.create({
+      data: {
+        sessionId: session.id,
+        userId: req.userId!,
+        displayName: host?.username ?? 'Host',
+        isHost: true,
+      },
+    });
+
     const shortCode = await assignShortCode(session.id);
 
     const shareLink = `${CLIENT_URL}/join/${session.id}`;
@@ -203,12 +214,23 @@ router.post('/:id/join', authenticate, async (req: AuthRequest, res: Response) =
       return;
     }
 
-    const updated = await prisma.swipeSession.update({
-      where: { id: sessionId },
-      data: { user2Id: req.userId },
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId! },
+      select: { username: true },
     });
 
-    res.json({ session: updated });
+    await prisma.sessionParticipant.upsert({
+      where: { sessionId_userId: { sessionId, userId: req.userId! } },
+      update: { leftAt: null, displayName: user?.username ?? 'Player' },
+      create: {
+        sessionId,
+        userId: req.userId!,
+        displayName: user?.username ?? 'Player',
+        isHost: false,
+      },
+    });
+
+    res.json({ session });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal server error' });
@@ -307,8 +329,7 @@ router.post('/:id/start', authenticate, async (req: AuthRequest, res: Response) 
     }
 
     const moviePool = await buildGroupPool(
-      session.userId!,
-      session.user2Id ?? null,
+      sessionId,
       (session.filters ?? {}) as MovieFilters,
       session.batchSize,
     );
@@ -369,8 +390,7 @@ router.post('/:id/another-batch', authenticate, async (req: AuthRequest, res: Re
       newMovies = await sampleSoloBatch(session.userId!, filters, batchSize, seenMovieIds);
     } else {
       newMovies = await buildGroupPool(
-        session.userId!,
-        session.user2Id ?? null,
+        sessionId,
         filters,
         batchSize,
         seenMovieIds,
@@ -420,12 +440,15 @@ router.get('/active', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const groupSession = await prisma.swipeSession.findFirst({
       where: {
-        OR: [
-          { userId: req.userId, type: 'group', status: { in: ['waiting', 'swiping'] } },
-          { user2Id: req.userId, type: 'group', status: { in: ['waiting', 'swiping'] } },
-        ],
+        type: 'group',
+        status: { in: ['waiting', 'swiping'] },
+        participants: { some: { userId: req.userId, leftAt: null } },
       },
-      include: { movies: { include: { movie: true } }, matches: { include: { movie: true } } },
+      include: {
+        movies: { include: { movie: true } },
+        matches: { include: { movie: true } },
+        participants: true,
+      },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -490,6 +513,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
       include: {
         movies: { include: { movie: true } },
         matches: { include: { movie: true } },
+        participants: true,
       },
     });
 
@@ -498,8 +522,8 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const { isUser1, isUser2, isGuest } = resolveSessionRole(req, session);
-    if (!isUser1 && !isUser2 && !isGuest) {
+    const { isSolo, isUser1, isUser2 } = await resolveSessionRole(req, session);
+    if (!isUser1 && !isUser2 && !(isSolo && isUser1)) {
       res.status(403).json({ error: 'You are not part of this session' });
       return;
     }
@@ -516,7 +540,7 @@ router.get('/history/all', authenticate, async (req: AuthRequest, res: Response)
       where: {
         OR: [
           { userId: req.userId!, type: { in: ['solo', 'group', 'guest'] } },
-          { user2Id: req.userId! },
+          { participants: { some: { userId: req.userId! } } },
         ],
       },
       include: {

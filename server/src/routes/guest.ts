@@ -21,9 +21,9 @@ router.post('/join/:sessionId', async (req: Request, res: Response) => {
       return;
     }
 
-    const session = await prisma.swipeSession.findUnique({
-      where: { id: sessionId },
-    });
+    const trimmedName = displayName.trim();
+
+    const session = await prisma.swipeSession.findUnique({ where: { id: sessionId } });
 
     if (!session) {
       res.status(404).json({ error: 'Session not found' });
@@ -35,22 +35,26 @@ router.post('/join/:sessionId', async (req: Request, res: Response) => {
       return;
     }
 
-    let guestId = session.guestId;
-    if (!guestId) {
-      guestId = uuidv4();
+    const guestId = uuidv4();
+
+    await prisma.sessionParticipant.create({
+      data: {
+        sessionId,
+        guestToken: guestId,
+        displayName: trimmedName,
+        isHost: false,
+      },
+    });
+
+    if (!session.guestId) {
       await prisma.swipeSession.update({
         where: { id: sessionId },
-        data: { guestId, guestName: displayName.trim() },
+        data: { guestId, guestName: trimmedName },
       });
-    } else {
-      if (session.guestName?.toLowerCase() !== displayName.trim().toLowerCase()) {
-        res.status(409).json({ error: 'This session already has a guest' });
-        return;
-      }
     }
 
     const token = jwt.sign(
-      { guestId, sessionId, displayName: displayName.trim() },
+      { guestId, sessionId, displayName: trimmedName },
       JWT_SECRET,
       { expiresIn: '24h' }
     );

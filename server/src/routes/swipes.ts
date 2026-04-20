@@ -9,26 +9,50 @@ import { clearSessionState } from '../services/socket';
 const router = Router();
 
 async function getCompromises(sessionId: string) {
-  const [oneSided, inCinemaSet] = await Promise.all([
-    prisma.sessionMovie.findMany({
-      where: {
-        sessionId,
-        OR: [
-          { user1Swipe: 'right', user2Swipe: 'left' },
-          { user1Swipe: 'left', user2Swipe: 'right' },
-        ],
-      },
-      include: { movie: true },
-      orderBy: { movie: { tmdbRating: 'desc' } },
-      take: 3,
+  const [movieAggregates, inCinemaSet] = await Promise.all([
+    prisma.sessionSwipe.groupBy({
+      by: ['movieId', 'direction'],
+      where: { sessionId },
+      _count: { _all: true },
     }),
     getInCinemaIds(),
   ]);
-  return oneSided.map((sm) => ({
-    id: sm.id,
-    movieId: sm.movieId,
-    movie: attachInCinema(sm.movie, inCinemaSet),
-  }));
+
+  type Agg = { right: number; left: number };
+  const perMovie = new Map<string, Agg>();
+  for (const row of movieAggregates) {
+    const agg = perMovie.get(row.movieId) ?? { right: 0, left: 0 };
+    if (row.direction === 'right') agg.right = row._count._all;
+    else if (row.direction === 'left') agg.left = row._count._all;
+    perMovie.set(row.movieId, agg);
+  }
+
+  const contested = Array.from(perMovie.entries())
+    .filter(([, agg]) => agg.right > 0 && agg.left > 0)
+    .map(([movieId, agg]) => ({ movieId, score: agg.right - agg.left }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3);
+
+  if (contested.length === 0) return [];
+  const movies = await prisma.movie.findMany({
+    where: { id: { in: contested.map((c) => c.movieId) } },
+  });
+  const byId = new Map(movies.map((m) => [m.id, m]));
+  return contested
+    .map((c) => {
+      const movie = byId.get(c.movieId);
+      if (!movie) return null;
+      return {
+        id: c.movieId,
+        movieId: c.movieId,
+        movie: attachInCinema(movie, inCinemaSet),
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null);
+}
+
+async function countActiveParticipants(sessionId: string): Promise<number> {
+  return prisma.sessionParticipant.count({ where: { sessionId, leftAt: null } });
 }
 
 router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
@@ -40,59 +64,81 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const session = await prisma.swipeSession.findUnique({ where: { id: sessionId } });
+    const session = await prisma.swipeSession.findUnique({
+      where: { id: sessionId },
+      include: { participants: true },
+    });
 
     if (!session) {
       res.status(404).json({ error: 'Session not found' });
       return;
     }
 
-    const { isSolo, isUser1, isUser2 } = resolveSessionRole(req, session);
+    const { isSolo, isUser1, participantId } = await resolveSessionRole(req, session);
 
     if (isSolo && !isUser1) {
       res.status(403).json({ error: 'You are not the owner of this solo session' });
       return;
     }
 
-    if (!isSolo && !isUser1 && !isUser2) {
+    if (!isSolo && !participantId) {
       res.status(403).json({ error: 'You are not part of this session' });
       return;
     }
 
-    const swipeField = isUser1 ? 'user1Swipe' as const : 'user2Swipe' as const;
-    const sessionMovie = await prisma.sessionMovie.update({
-      where: {
-        sessionId_movieId: { sessionId, movieId },
-      },
-      data: { [swipeField]: direction },
-    });
-
-    const updated = await prisma.sessionMovie.findUnique({
-      where: { id: sessionMovie.id },
-    });
-
     let isMatch = false;
-    if (isSolo && direction === 'right') {
-      await prisma.match.upsert({
-        where: { sessionId_movieId: { sessionId, movieId } },
-        update: {},
-        create: { sessionId, movieId },
+
+    if (isSolo) {
+      if (direction === 'right') {
+        await prisma.match.upsert({
+          where: { sessionId_movieId: { sessionId, movieId } },
+          update: {},
+          create: { sessionId, movieId },
+        });
+        isMatch = true;
+      }
+    } else {
+      await prisma.sessionSwipe.upsert({
+        where: {
+          sessionId_movieId_participantId: { sessionId, movieId, participantId: participantId! },
+        },
+        update: { direction, swipedAt: new Date() },
+        create: { sessionId, movieId, participantId: participantId!, direction },
       });
-      isMatch = true;
-    } else if (!isSolo && updated?.user1Swipe === 'right' && updated?.user2Swipe === 'right') {
-      await prisma.match.upsert({
-        where: { sessionId_movieId: { sessionId, movieId } },
-        update: {},
-        create: { sessionId, movieId },
-      });
-      isMatch = true;
+
+      if (direction === 'right') {
+        const [rightCount, activeCount] = await Promise.all([
+          prisma.sessionSwipe.count({
+            where: { sessionId, movieId, direction: 'right' },
+          }),
+          countActiveParticipants(sessionId),
+        ]);
+        if (rightCount >= activeCount && activeCount > 0) {
+          await prisma.match.upsert({
+            where: { sessionId_movieId: { sessionId, movieId } },
+            update: {},
+            create: { sessionId, movieId },
+          });
+          isMatch = true;
+        }
+      }
     }
 
-    const countWhere = isUser1
-      ? { sessionId, user1Swipe: { not: null } }
-      : { sessionId, user2Swipe: { not: null } };
-    const swiped = await prisma.sessionMovie.count({ where: countWhere });
+    let swiped = 0;
     const total = await prisma.sessionMovie.count({ where: { sessionId } });
+    if (isSolo) {
+      await prisma.sessionMovie.update({
+        where: { sessionId_movieId: { sessionId, movieId } },
+        data: { user1Swipe: direction },
+      });
+      swiped = await prisma.sessionMovie.count({
+        where: { sessionId, user1Swipe: { not: null } },
+      });
+    } else {
+      swiped = await prisma.sessionSwipe.count({
+        where: { sessionId, participantId: participantId! },
+      });
+    }
     const progress = total > 0 ? Math.round((swiped / total) * 100) : 0;
 
     emit(`session:${sessionId}`, 'swipe-update', {
@@ -101,6 +147,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       progress,
       swiped,
       total,
+      participantId,
     });
 
     res.json({ success: true, isMatch });
@@ -119,7 +166,10 @@ router.post('/undo', authenticate, async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const session = await prisma.swipeSession.findUnique({ where: { id: sessionId } });
+    const session = await prisma.swipeSession.findUnique({
+      where: { id: sessionId },
+      include: { participants: true },
+    });
 
     if (!session) {
       res.status(404).json({ error: 'Session not found' });
@@ -131,45 +181,66 @@ router.post('/undo', authenticate, async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const { isSolo, isUser1, isUser2 } = resolveSessionRole(req, session);
+    const { isSolo, isUser1, participantId } = await resolveSessionRole(req, session);
 
     if (isSolo && !isUser1) {
       res.status(403).json({ error: 'You are not the owner of this solo session' });
       return;
     }
 
-    if (!isSolo && !isUser1 && !isUser2) {
+    if (!isSolo && !participantId) {
       res.status(403).json({ error: 'You are not part of this session' });
       return;
     }
 
-    const swipeField = isUser1 ? 'user1Swipe' as const : 'user2Swipe' as const;
-
-    const sessionMovie = await prisma.sessionMovie.findUnique({
-      where: { sessionId_movieId: { sessionId, movieId } },
-    });
-
-    if (!sessionMovie) {
-      res.status(404).json({ error: 'Movie not found in session' });
-      return;
+    if (isSolo) {
+      const sm = await prisma.sessionMovie.findUnique({
+        where: { sessionId_movieId: { sessionId, movieId } },
+      });
+      if (!sm) {
+        res.status(404).json({ error: 'Movie not found in session' });
+        return;
+      }
+      const wasRight = sm.user1Swipe === 'right';
+      await prisma.sessionMovie.update({
+        where: { sessionId_movieId: { sessionId, movieId } },
+        data: { user1Swipe: null },
+      });
+      if (wasRight) {
+        await prisma.match.deleteMany({ where: { sessionId, movieId } });
+      }
+    } else {
+      const existing = await prisma.sessionSwipe.findUnique({
+        where: {
+          sessionId_movieId_participantId: { sessionId, movieId, participantId: participantId! },
+        },
+      });
+      if (!existing) {
+        res.status(404).json({ error: 'No swipe to undo' });
+        return;
+      }
+      await prisma.sessionSwipe.delete({
+        where: {
+          sessionId_movieId_participantId: { sessionId, movieId, participantId: participantId! },
+        },
+      });
+      // If this movie had a match, it's no longer valid (someone just un-right-swiped).
+      if (existing.direction === 'right') {
+        await prisma.match.deleteMany({ where: { sessionId, movieId } });
+      }
     }
 
-    const wasRight = sessionMovie[swipeField] === 'right';
-
-    await prisma.sessionMovie.update({
-      where: { sessionId_movieId: { sessionId, movieId } },
-      data: { [swipeField]: null },
-    });
-
-    if (wasRight) {
-      await prisma.match.deleteMany({ where: { sessionId, movieId } });
+    let swiped = 0;
+    let total = await prisma.sessionMovie.count({ where: { sessionId } });
+    if (isSolo) {
+      swiped = await prisma.sessionMovie.count({
+        where: { sessionId, user1Swipe: { not: null } },
+      });
+    } else {
+      swiped = await prisma.sessionSwipe.count({
+        where: { sessionId, participantId: participantId! },
+      });
     }
-
-    const countWhere = isUser1
-      ? { sessionId, user1Swipe: { not: null } }
-      : { sessionId, user2Swipe: { not: null } };
-    const swiped = await prisma.sessionMovie.count({ where: countWhere });
-    const total = await prisma.sessionMovie.count({ where: { sessionId } });
     const progress = total > 0 ? Math.round((swiped / total) * 100) : 0;
 
     emit(`session:${sessionId}`, 'swipe-update', {
@@ -178,6 +249,7 @@ router.post('/undo', authenticate, async (req: AuthRequest, res: Response) => {
       progress,
       swiped,
       total,
+      participantId,
     });
 
     res.json({ success: true });
@@ -193,7 +265,7 @@ router.post('/done', authenticate, async (req: AuthRequest, res: Response) => {
 
     const session = await prisma.swipeSession.findUnique({
       where: { id: sessionId },
-      include: { movies: true },
+      include: { movies: true, participants: true },
     });
 
     if (!session) {
@@ -201,25 +273,47 @@ router.post('/done', authenticate, async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const { isSolo, isUser1, isUser2 } = resolveSessionRole(req, session);
+    const { isSolo, isUser1, participantId } = await resolveSessionRole(req, session);
 
     if (isSolo && !isUser1) {
       res.status(403).json({ error: 'You are not the owner of this solo session' });
       return;
     }
 
-    if (!isSolo && !isUser1 && !isUser2) {
+    if (!isSolo && !participantId) {
       res.status(403).json({ error: 'You are not part of this session' });
       return;
     }
 
-    const swipeField = isUser1 ? 'user1Swipe' as const : 'user2Swipe' as const;
-    const allSwiped = (session.movies as { user1Swipe: string | null; user2Swipe: string | null }[]).every((m) => m[swipeField] !== null);
+    const totalMovies = session.movies.length;
 
-    const otherField = isUser1 ? 'user2Swipe' as const : 'user1Swipe' as const;
-    const partnerDone = isSolo ? true : (session.movies as { user1Swipe: string | null; user2Swipe: string | null }[]).every((m) => m[otherField] !== null);
+    let allSwiped = false;
+    let everyoneDone = false;
 
-    if (allSwiped && partnerDone) {
+    if (isSolo) {
+      allSwiped = (session.movies as { user1Swipe: string | null }[]).every(
+        (m) => m.user1Swipe !== null,
+      );
+      everyoneDone = allSwiped;
+    } else {
+      const mySwipes = await prisma.sessionSwipe.count({
+        where: { sessionId, participantId: participantId! },
+      });
+      allSwiped = mySwipes >= totalMovies;
+
+      const swipeCounts = await prisma.sessionSwipe.groupBy({
+        by: ['participantId'],
+        where: { sessionId },
+        _count: { _all: true },
+      });
+      const activeParticipants = session.participants.filter((p) => p.leftAt === null);
+      everyoneDone = activeParticipants.every((p) => {
+        const row = swipeCounts.find((r) => r.participantId === p.id);
+        return row?._count._all === totalMovies;
+      });
+    }
+
+    if (allSwiped && everyoneDone) {
       await prisma.swipeSession.update({
         where: { id: sessionId },
         data: { status: 'completed' },
@@ -251,9 +345,10 @@ router.post('/done', authenticate, async (req: AuthRequest, res: Response) => {
 
       emit(`session:${sessionId}`, 'partner-done', {
         finishedByRole: isUser1 ? 'user1' : 'user2',
+        participantId,
       });
 
-      res.json({ status: 'waiting', userDone: allSwiped, partnerDone });
+      res.json({ status: 'waiting', userDone: allSwiped, partnerDone: everyoneDone });
     }
   } catch (error) {
     console.error(error);
@@ -265,21 +360,24 @@ router.get('/matches/:sessionId', authenticate, async (req: AuthRequest, res: Re
   try {
     const sid = req.params.sessionId as string;
 
-    const session = await prisma.swipeSession.findUnique({ where: { id: sid } });
+    const session = await prisma.swipeSession.findUnique({
+      where: { id: sid },
+      include: { participants: true },
+    });
 
     if (!session) {
       res.status(404).json({ error: 'Session not found' });
       return;
     }
 
-    const { isSolo, isUser1, isUser2, isGuest } = resolveSessionRole(req, session);
+    const { isSolo, isUser1, isUser2 } = await resolveSessionRole(req, session);
 
     if (isSolo) {
       if (!isUser1) {
         res.status(403).json({ error: 'You are not part of this session' });
         return;
       }
-    } else if (!isGuest && !isUser1 && !isUser2) {
+    } else if (!isUser1 && !isUser2) {
       res.status(403).json({ error: 'You are not part of this session' });
       return;
     }
@@ -310,7 +408,7 @@ router.post('/matches/:matchId/watched', authenticate, async (req: AuthRequest, 
 
     const match = await prisma.match.findUnique({
       where: { id: matchId },
-      include: { session: true },
+      include: { session: { include: { participants: true } } },
     });
 
     if (!match) {
@@ -318,7 +416,7 @@ router.post('/matches/:matchId/watched', authenticate, async (req: AuthRequest, 
       return;
     }
 
-    const { isSolo, isUser1, isUser2 } = resolveSessionRole(req, match.session);
+    const { isSolo, isUser1, isUser2 } = await resolveSessionRole(req, match.session);
 
     if (isSolo) {
       if (!isUser1) {
@@ -357,7 +455,7 @@ router.post('/matches/:matchId/rate', authenticate, async (req: AuthRequest, res
 
     const match = await prisma.match.findUnique({
       where: { id: matchId },
-      include: { session: true },
+      include: { session: { include: { participants: true } } },
     });
 
     if (!match) {
@@ -365,7 +463,7 @@ router.post('/matches/:matchId/rate', authenticate, async (req: AuthRequest, res
       return;
     }
 
-    const { isSolo, isUser1, isUser2 } = resolveSessionRole(req, match.session);
+    const { isSolo, isUser1, isUser2 } = await resolveSessionRole(req, match.session);
 
     if (isSolo) {
       if (!isUser1) {

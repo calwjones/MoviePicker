@@ -26,6 +26,7 @@ model User {
   userMovies        UserMovie[]
   soloSessions      SwipeSession[]
   groupSessionsAsP2 SwipeSession[] @relation("SessionUser2")
+  sessionParticipations SessionParticipant[]
   friendshipsSent      Friendship[]    @relation("FriendshipRequester")
   friendshipsReceived  Friendship[]    @relation("FriendshipAddressee")
   invitesSent          SessionInvite[] @relation("SessionInviteFrom")
@@ -126,8 +127,44 @@ model SwipeSession {
   movies  SessionMovie[]
   matches Match[]
   invites SessionInvite[]
+  participants SessionParticipant[]
 
   @@map("swipe_sessions")
+}
+
+model SessionParticipant {
+  id          String    @id @default(uuid())
+  sessionId   String    @map("session_id")
+  userId      String?   @map("user_id")
+  guestToken  String?   @map("guest_token")
+  displayName String    @map("display_name")
+  isHost      Boolean   @default(false) @map("is_host")
+  joinedAt    DateTime  @default(now()) @map("joined_at")
+  leftAt      DateTime? @map("left_at")
+
+  session SwipeSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  swipes  SessionSwipe[]
+
+  @@unique([sessionId, userId])
+  @@unique([sessionId, guestToken])
+  @@index([sessionId])
+  @@map("session_participants")
+}
+
+model SessionSwipe {
+  id            String   @id @default(uuid())
+  sessionId     String   @map("session_id")
+  movieId       String   @map("movie_id")
+  participantId String   @map("participant_id")
+  direction     String
+  swipedAt      DateTime @default(now()) @map("swiped_at")
+
+  participant SessionParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, movieId, participantId])
+  @@index([sessionId, movieId])
+  @@map("session_swipes")
 }
 
 model SessionMovie {
