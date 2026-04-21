@@ -114,6 +114,7 @@ function DiscoverSwipePageInner() {
       movies: (res.data.movies ?? []) as SearchResult[],
       totalPages: (res.data.totalPages ?? 1) as number,
       providerDropped: Boolean(res.data.providerDropped),
+      minRatingDropped: Boolean(res.data.minRatingDropped),
     };
   }, [queryFilters]);
 
@@ -134,6 +135,12 @@ function DiscoverSwipePageInner() {
             variant: 'info',
             duration: 6000,
           });
+        }
+        if (result.minRatingDropped) {
+          addToast(
+            `No movies at ${queryFilters.minRating}+ rating — showing the highest-rated available.`,
+            { variant: 'info', duration: 6000 },
+          );
         }
         const capped = result.movies.slice(0, queryFilters.batchSize);
         setMovies(capped.map(toAdapterSessionMovie));
