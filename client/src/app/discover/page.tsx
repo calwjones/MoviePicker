@@ -92,6 +92,7 @@ function DiscoverSwipePageInner() {
   const [revealIndex, setRevealIndex] = useState(-1);
   const [rouletteOpen, setRouletteOpen] = useState(false);
   const [previousPickIds, setPreviousPickIds] = useState<string[]>([]);
+  const [spinsLeft, setSpinsLeft] = useState(3);
   const revealTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const [addedTmdbIds, setAddedTmdbIds] = useState<Set<number>>(new Set());
@@ -239,6 +240,7 @@ function DiscoverSwipePageInner() {
       setRevealed(false);
       setRevealIndex(-1);
       setPreviousPickIds([]);
+      setSpinsLeft(3);
     } catch (err) {
       addToast(getErrorMessage(err, 'Failed to load more movies'), { variant: 'error' });
     } finally {
@@ -300,6 +302,7 @@ function DiscoverSwipePageInner() {
     setWinnerFull(null);
     setRouletteOpen(false);
     setPreviousPickIds([]);
+    setSpinsLeft(3);
   };
 
   const handleAddToWatchlist = async (tmdbId: number) => {
@@ -381,6 +384,8 @@ function DiscoverSwipePageInner() {
       shortlist={rouletteShortlist}
       onResult={handleRouletteResult}
       onBack={handleBackToShortlist}
+      spinsLeft={spinsLeft}
+      onSpinsLeftChange={setSpinsLeft}
     />
   ) : shortlist.length === 0 ? (
     <DiscoverEmptyShortlist
@@ -503,14 +508,23 @@ function DiscoverRouletteStage({
   shortlist,
   onResult,
   onBack,
+  spinsLeft,
+  onSpinsLeftChange,
 }: {
   shortlist: SessionMovie[];
   onResult: (sm: SessionMovie) => void;
   onBack: () => void;
+  spinsLeft: number;
+  onSpinsLeftChange: (n: number) => void;
 }) {
   return (
     <div className="w-full flex flex-col items-center">
-      <ClientRouletteWheel movies={shortlist} onResult={onResult} />
+      <ClientRouletteWheel
+        movies={shortlist}
+        onResult={onResult}
+        spinsLeft={spinsLeft}
+        onSpinsLeftChange={onSpinsLeftChange}
+      />
       <button
         onClick={onBack}
         className="mt-4 py-2 px-6 glass rounded-xl text-cream-dim text-sm font-medium hover:bg-card-hover transition-colors"

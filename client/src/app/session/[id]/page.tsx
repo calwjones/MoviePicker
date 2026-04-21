@@ -54,6 +54,7 @@ export default function SessionPage() {
   const [revealIndex, setRevealIndex] = useState(-1);
   const [rouletteOpen, setRouletteOpen] = useState(false);
   const [previousPickIds, setPreviousPickIds] = useState<string[]>([]);
+  const [spinsLeft, setSpinsLeft] = useState(3);
   const revealTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const matchesRef = useRef<Match[]>([]);
   const { toasts, addToast, removeToast } = useToast();
@@ -270,6 +271,13 @@ export default function SessionPage() {
       setWinner(null);
       setRouletteOpen(false);
       setPreviousPickIds([]);
+      setSpinsLeft(3);
+    };
+    const handleRouletteState = (data: { spinsLeft: number }) => {
+      if (typeof data?.spinsLeft === 'number') setSpinsLeft(data.spinsLeft);
+    };
+    const handleRouletteResult = (data: { spinsLeft: number }) => {
+      if (typeof data?.spinsLeft === 'number') setSpinsLeft(data.spinsLeft);
     };
 
     const handleParticipantJoined = () => {
@@ -286,6 +294,8 @@ export default function SessionPage() {
     socket.on('matches-reveal-all', handleMatchesRevealAll);
     socket.on('roulette-opened', handleRouletteOpened);
     socket.on('roulette-closed', handleRouletteClosed);
+    socket.on('roulette-state', handleRouletteState);
+    socket.on('roulette-result', handleRouletteResult);
     socket.on('disconnect', handleDisconnect);
     socket.on('connect', handleConnect);
     if (socket.connected) hasConnectedRef.current = true;
@@ -301,6 +311,8 @@ export default function SessionPage() {
       socket.off('matches-reveal-all', handleMatchesRevealAll);
       socket.off('roulette-opened', handleRouletteOpened);
       socket.off('roulette-closed', handleRouletteClosed);
+      socket.off('roulette-state', handleRouletteState);
+      socket.off('roulette-result', handleRouletteResult);
       socket.off('disconnect', handleDisconnect);
       socket.off('connect', handleConnect);
     };
@@ -452,6 +464,8 @@ export default function SessionPage() {
       matches={rouletteMatches}
       onResult={handleRouletteResult}
       onBack={handleBackToShortlist}
+      spinsLeft={spinsLeft}
+      onSpinsLeftChange={setSpinsLeft}
     />
   ) : sessionComplete && !matchesFetched ? (
     <div className="flex flex-col items-center gap-3">
@@ -605,11 +619,15 @@ function GroupRouletteStage({
   matches,
   onResult,
   onBack,
+  spinsLeft,
+  onSpinsLeftChange,
 }: {
   sessionId: string;
   matches: Match[];
   onResult: (sm: SessionMovie) => void;
   onBack: () => void;
+  spinsLeft: number;
+  onSpinsLeftChange: (n: number) => void;
 }) {
   return (
     <div className="w-full flex flex-col items-center">
@@ -617,6 +635,8 @@ function GroupRouletteStage({
         movies={matches.map(matchToSessionMovie)}
         onResult={onResult}
         sessionId={sessionId}
+        spinsLeft={spinsLeft}
+        onSpinsLeftChange={onSpinsLeftChange}
       />
       <button
         onClick={onBack}

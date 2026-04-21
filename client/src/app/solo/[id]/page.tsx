@@ -37,6 +37,7 @@ export default function SoloSessionPage() {
   const [revealIndex, setRevealIndex] = useState(-1);
   const [rouletteOpen, setRouletteOpen] = useState(false);
   const [previousPickIds, setPreviousPickIds] = useState<string[]>([]);
+  const [spinsLeft, setSpinsLeft] = useState(3);
   const revealTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const { toasts, addToast, removeToast } = useToast();
 
@@ -179,6 +180,7 @@ export default function SoloSessionPage() {
       setRevealed(false);
       setRevealIndex(-1);
       setPreviousPickIds([]);
+      setSpinsLeft(3);
     } catch (err) {
       addToast(getErrorMessage(err, 'Failed to load more movies'), { variant: 'error' });
     } finally {
@@ -217,6 +219,7 @@ export default function SoloSessionPage() {
     setWinner(null);
     setRouletteOpen(false);
     setPreviousPickIds([]);
+    setSpinsLeft(3);
   };
 
   const handleDoneExit = async () => {
@@ -241,6 +244,8 @@ export default function SoloSessionPage() {
       shortlist={rouletteMovies}
       onResult={handleRouletteResult}
       onBack={handleBackToShortlist}
+      spinsLeft={spinsLeft}
+      onSpinsLeftChange={setSpinsLeft}
     />
   ) : shortlist.length === 0 ? (
     <EmptyShortlist
@@ -328,14 +333,23 @@ function RouletteStage({
   shortlist,
   onResult,
   onBack,
+  spinsLeft,
+  onSpinsLeftChange,
 }: {
   shortlist: SessionMovie[];
   onResult: (sm: SessionMovie) => void;
   onBack: () => void;
+  spinsLeft: number;
+  onSpinsLeftChange: (n: number) => void;
 }) {
   return (
     <div className="w-full flex flex-col items-center">
-      <ClientRouletteWheel movies={shortlist} onResult={onResult} />
+      <ClientRouletteWheel
+        movies={shortlist}
+        onResult={onResult}
+        spinsLeft={spinsLeft}
+        onSpinsLeftChange={onSpinsLeftChange}
+      />
       <button
         onClick={onBack}
         className="mt-4 py-2.5 px-6 text-cream-dim/70 text-sm hover:text-cream transition-colors"

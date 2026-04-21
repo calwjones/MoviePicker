@@ -9,16 +9,10 @@ import { getErrorMessage } from '@/lib/errors';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { connectSocket, getSocket } from '@/lib/socket';
 import { getBaseName } from '@/components/StreamingProviders';
-import { DECADE_OPTIONS } from '@/lib/decades';
 import FilterSummary from '@/components/FilterSummary';
+import FilterEditor from '@/components/FilterEditor';
 import { useAuth } from '@/context/AuthContext';
 import type { Filters } from '@shared/types';
-
-const GENRE_OPTIONS = [
-  'Action', 'Adventure', 'Animation', 'Comedy', 'Crime', 'Documentary',
-  'Drama', 'Family', 'Fantasy', 'History', 'Horror', 'Music',
-  'Mystery', 'Romance', 'Science Fiction', 'Thriller', 'War', 'Western',
-];
 
 interface ProviderChip {
   name: string;
@@ -348,31 +342,6 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
     startSoloSession();
   };
 
-  const handleStartDiscover = () => {
-    const params = new URLSearchParams();
-    if (filters.genres && filters.genres.length > 0) params.set('genres', filters.genres.join(','));
-    if (filters.decade) params.set('decade', filters.decade);
-    if (filters.minRating > 0) params.set('minRating', String(filters.minRating));
-    if (batchSize != null) params.set('batchSize', String(batchSize));
-    const names = filters.streamingProviders ?? [];
-    if (names.length > 0) {
-      const ids = names.map((n) => providerIdByBase[n]).filter((n): n is number => typeof n === 'number' && n > 0);
-      if (ids.length > 0) params.set('providers', ids.join(','));
-    } else {
-      params.set('providers', 'none');
-    }
-    router.push(`/discover?${params.toString()}`);
-  };
-
-  const toggleGenre = (genre: string) => {
-    setFilters((prev) => ({
-      ...prev,
-      genres: (prev.genres || []).includes(genre)
-        ? (prev.genres || []).filter((g) => g !== genre)
-        : [...(prev.genres || []), genre],
-    }));
-  };
-
   const clearFilters = () => {
     setFilters({ genres: [], decade: '', minRating: 0, maxRuntime: 0, streamingProviders: [] });
   };
@@ -412,150 +381,20 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <div className="glass rounded-2xl p-6">
-              <div className="space-y-4">
-                <div>
-                  <label className="text-cream-dim text-sm mb-2 block">Genres</label>
-                  <div className="flex flex-wrap gap-2">
-                    {GENRE_OPTIONS.map((genre) => (
-                      <button
-                        key={genre}
-                        onClick={() => toggleGenre(genre)}
-                        className={`px-3 py-1.5 rounded-full text-xs transition-all hover:-translate-y-0.5 ${
-                          (filters.genres || []).includes(genre)
-                            ? 'bg-coral text-charcoal'
-                            : 'glass text-cream-dim'
-                        }`}
-                      >
-                        {genre}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-cream-dim text-sm mb-2 block">Decade</label>
-                  <div className="flex flex-wrap gap-2">
-                    {DECADE_OPTIONS.map((decade) => (
-                      <button
-                        key={decade}
-                        onClick={() => setFilters((p) => ({ ...p, decade: p.decade === decade ? '' : decade }))}
-                        className={`px-3 py-1.5 rounded-full text-xs transition-all hover:-translate-y-0.5 ${
-                          filters.decade === decade ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
-                        }`}
-                      >
-                        {decade}s
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {streamingProviders.length > 0 && (() => {
-                  const selectedSet = new Set(filters.streamingProviders || []);
-                  const confirmedIds = new Set(user?.preferredStreamingProviderIds ?? []);
-                  const confirmedSet = new Set(
-                    streamingProviders
-                      .filter((p) => confirmedIds.has(providerIdByBase[p.name]))
-                      .map((p) => p.name),
-                  );
-                  const defaultSlice = streamingProviders.filter((p) => PREFERRED_PROVIDERS.includes(p.name));
-                  const extraSelected = streamingProviders.filter(
-                    (p) => !PREFERRED_PROVIDERS.includes(p.name) && selectedSet.has(p.name),
-                  );
-                  const visible = providersExpanded
-                    ? streamingProviders
-                    : [...defaultSlice, ...extraSelected];
-                  const hiddenCount = streamingProviders.length - visible.length;
-                  return (
-                    <div>
-                      <label className="text-cream-dim text-sm mb-2 block">
-                        Streaming Service
-                        {confirmedSet.size > 0 && (
-                          <span className="ml-2 text-[10px] text-cream-dim/70">
-                            <span className="text-coral">★</span> = from your profile
-                          </span>
-                        )}
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        {visible.map((provider) => {
-                          const selected = selectedSet.has(provider.name);
-                          const confirmed = confirmedSet.has(provider.name);
-                          return (
-                            <button
-                              key={provider.name}
-                              onClick={() =>
-                                setFilters((p) => ({
-                                  ...p,
-                                  streamingProviders: selected
-                                    ? (p.streamingProviders || []).filter((s) => s !== provider.name)
-                                    : [...(p.streamingProviders || []), provider.name],
-                                }))
-                              }
-                              className={`relative flex items-center gap-1.5 pl-1 pr-3 py-1 rounded-full text-xs transition-all hover:-translate-y-0.5 ${
-                                selected ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
-                              }`}
-                            >
-                              <img src={provider.logoUrl} alt="" className="w-5 h-5 rounded" />
-                              <span>{provider.name}</span>
-                              {confirmed && (
-                                <span
-                                  aria-label="From your profile"
-                                  className={`absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] leading-none ${
-                                    selected ? 'bg-charcoal text-coral' : 'bg-coral text-charcoal'
-                                  }`}
-                                >
-                                  ★
-                                </span>
-                              )}
-                            </button>
-                          );
-                        })}
-                        {hiddenCount > 0 && !providersExpanded && (
-                          <button
-                            onClick={() => setProvidersExpanded(true)}
-                            className="px-3 py-1 rounded-full text-xs glass text-cream-dim hover:text-cream transition-colors"
-                          >
-                            +{hiddenCount} more
-                          </button>
-                        )}
-                        {providersExpanded && (
-                          <button
-                            onClick={() => setProvidersExpanded(false)}
-                            className="px-3 py-1 rounded-full text-xs glass text-cream-dim hover:text-cream transition-colors"
-                          >
-                            Show less
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                <div>
-                  <label className="text-cream-dim text-sm mb-2 block">
-                    Min TMDb Rating: {filters.minRating > 0 ? filters.minRating : 'Any'}
-                  </label>
-                  <input
-                    type="range" min="0" max="9" step="0.5"
-                    value={filters.minRating}
-                    onChange={(e) => setFilters((p) => ({ ...p, minRating: parseFloat(e.target.value) }))}
-                    className="w-full accent-coral"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-cream-dim text-sm mb-2 block">
-                    Max Runtime: {filters.maxRuntime > 0 ? `${filters.maxRuntime} min` : 'Any'}
-                  </label>
-                  <input
-                    type="range" min="0" max="240" step="15"
-                    value={filters.maxRuntime}
-                    onChange={(e) => setFilters((p) => ({ ...p, maxRuntime: parseInt(e.target.value) }))}
-                    className="w-full accent-coral"
-                  />
-                </div>
-              </div>
-            </div>
+            <FilterEditor
+              filters={filters}
+              onChange={setFilters}
+              streamingProviders={streamingProviders}
+              confirmedProviderNames={new Set(
+                streamingProviders
+                  .filter((p) => new Set(user?.preferredStreamingProviderIds ?? []).has(providerIdByBase[p.name]))
+                  .map((p) => p.name),
+              )}
+              batchSize={batchSize}
+              onBatchSizeChange={setBatchSize}
+              providersExpanded={providersExpanded}
+              onProvidersExpandedChange={setProvidersExpanded}
+            />
           </motion.div>
         )}
       </AnimatePresence>
@@ -722,33 +561,9 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
       {/* Primary action buttons — hidden while lobby is open */}
       {!groupSessionId && (
         <div className="space-y-3">
-          <div className="glass rounded-2xl p-4">
-            <p className="text-cream-dim text-xs mb-2">Batch size</p>
-            <div className="flex flex-wrap gap-2">
-              {[10, 20, 50, 100].map((size) => (
-                <button
-                  key={size}
-                  onClick={() => setBatchSize(size)}
-                  className={`px-3 py-1.5 rounded-full text-xs transition-all ${
-                    batchSize === size ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
-                  }`}
-                >
-                  {size}
-                </button>
-              ))}
-              <button
-                onClick={() => setBatchSize(null)}
-                className={`px-3 py-1.5 rounded-full text-xs transition-all ${
-                  batchSize === null ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
-                }`}
-              >
-                All
-              </button>
-            </div>
-          </div>
           {poolSize === 0 && !poolSizeLoading && (
             <p className="text-center text-xs text-cream-dim">
-              Library is empty — Solo and Watch Together need your library. Try Discover to swipe TMDb directly.
+              Library is empty — Solo and Watch Together need your library. Head to Browse to discover by filters.
             </p>
           )}
           <div className="flex gap-3">
@@ -778,16 +593,6 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
                   <LoadingSpinner size="sm" /> Creating...
                 </span>
               ) : 'Together'}
-            </motion.button>
-
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={handleStartDiscover}
-              disabled={anyLoading}
-              className="flex-1 py-4 glass text-coral font-semibold rounded-xl text-base outline outline-1 outline-coral/60 hover:bg-card-hover transition-all disabled:opacity-50"
-            >
-              Discover
             </motion.button>
           </div>
 

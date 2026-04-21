@@ -9,8 +9,8 @@ import MoviePoster from '@/components/MoviePoster';
 const TILE_WIDTH = 132;
 const TILE_GAP = 12;
 const TILE_STEP = TILE_WIDTH + TILE_GAP;
-const LOOPS = 8;
-const SPIN_DURATION_MS = 2800;
+const LOOPS = 10;
+const SPIN_DURATION_MS = 4500;
 
 interface ClientRouletteWheelProps {
   movies: SessionMovie[];
@@ -18,6 +18,8 @@ interface ClientRouletteWheelProps {
   maxSpins?: number;
   children?: React.ReactNode;
   sessionId?: string;
+  spinsLeft?: number;
+  onSpinsLeftChange?: (n: number) => void;
 }
 
 export default function ClientRouletteWheel({
@@ -26,13 +28,22 @@ export default function ClientRouletteWheel({
   maxSpins = 3,
   children,
   sessionId,
+  spinsLeft: spinsLeftProp,
+  onSpinsLeftChange,
 }: ClientRouletteWheelProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [spinning, setSpinning] = useState(false);
-  const [spinsLeft, setSpinsLeft] = useState(maxSpins);
+  const [internalSpinsLeft, setInternalSpinsLeft] = useState(maxSpins);
   const [hasLanded, setHasLanded] = useState(false);
   const [winnerIndex, setWinnerIndex] = useState<number | null>(null);
   const [trackX, setTrackX] = useState(0);
+
+  const controlledSpins = typeof spinsLeftProp === 'number';
+  const spinsLeft = controlledSpins ? (spinsLeftProp as number) : internalSpinsLeft;
+  const setSpinsLeft = useCallback((n: number) => {
+    if (!controlledSpins) setInternalSpinsLeft(n);
+    onSpinsLeftChange?.(n);
+  }, [controlledSpins, onSpinsLeftChange]);
 
   const tiles = useMemo(() => {
     const out: { sm: SessionMovie; key: string; loopIndex: number; originalIndex: number }[] = [];
@@ -98,7 +109,7 @@ export default function ClientRouletteWheel({
       socket.off('roulette-state', handleState);
       socket.off('roulette-error', handleError);
     };
-  }, [sessionId, runSpinAnimation]);
+  }, [sessionId, runSpinAnimation, setSpinsLeft]);
 
   const spin = () => {
     if (spinning || movies.length === 0 || spinsLeft <= 0) return;
@@ -113,7 +124,7 @@ export default function ClientRouletteWheel({
     }
 
     const winner = Math.floor(Math.random() * movies.length);
-    setSpinsLeft((s) => s - 1);
+    setSpinsLeft(Math.max(0, spinsLeft - 1));
     runSpinAnimation(winner);
   };
 

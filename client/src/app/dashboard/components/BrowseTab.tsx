@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { browseApi, movieApi, providerApi } from '@/lib/api';
 import MoviePoster from '@/components/MoviePoster';
 import InCinemaBadge from '@/components/InCinemaBadge';
 import RecDetailSheet from '@/components/RecDetailSheet';
 import FilterSummary from '@/components/FilterSummary';
+import FilterEditor, { PREFERRED_PROVIDERS, type ProviderChip } from '@/components/FilterEditor';
 import { getBaseName } from '@/components/StreamingProviders';
+import { useAuth } from '@/context/AuthContext';
 import type { SearchResult, Filters } from '@shared/types';
 
 interface BrowseRow {
@@ -19,10 +21,15 @@ interface BrowseRow {
 
 interface BrowseTabProps {
   addToast: (message: string) => void;
-  onEditFilters?: () => void;
 }
 
 type ProviderIdMap = Record<string, number>;
+
+const RENTAL_PROVIDERS = new Set([
+  'Google Play Movies', 'YouTube', 'Apple TV', 'iTunes', 'Amazon Video',
+  'Microsoft Store', 'Xbox', 'Rakuten TV', 'Chili', 'Sky Store',
+  'Fandango At Home', 'Vudu', 'Redbox',
+]);
 
 const DEFAULT_FILTERS: Filters = {
   genres: [],
@@ -62,8 +69,9 @@ const GENRE_CHIPS: SectionChip[] = [
 
 const SECTION_STORAGE_KEY = 'moviepicker_browse_sections';
 
-export default function BrowseTab({ addToast, onEditFilters }: BrowseTabProps) {
+export default function BrowseTab({ addToast }: BrowseTabProps) {
   const router = useRouter();
+  const { user } = useAuth();
   const [rows, setRows] = useState<BrowseRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -72,6 +80,9 @@ export default function BrowseTab({ addToast, onEditFilters }: BrowseTabProps) {
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [batchSize, setBatchSize] = useState<number | null>(50);
   const [providerIdByBase, setProviderIdByBase] = useState<ProviderIdMap>({});
+  const [streamingProviders, setStreamingProviders] = useState<ProviderChip[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
+  const [providersExpanded, setProvidersExpanded] = useState(false);
 
   useEffect(() => {
     try {
@@ -102,16 +113,66 @@ export default function BrowseTab({ addToast, onEditFilters }: BrowseTabProps) {
   useEffect(() => {
     providerApi.list()
       .then((res) => {
-        const raw = res.data.providers as { id: number; name: string; displayPriority?: number }[];
+        const raw = res.data.providers as { id: number; name: string; logoUrl: string; displayPriority?: number }[];
+        const seen = new Map<string, ProviderChip>();
         const baseToId: ProviderIdMap = {};
         for (const p of raw) {
           const base = getBaseName(p.name);
-          if (baseToId[base] == null) baseToId[base] = p.id;
+          const priority = p.displayPriority ?? 9999;
+          const existing = seen.get(base);
+          if (!existing || priority < existing.displayPriority) {
+            seen.set(base, { name: base, logoUrl: p.logoUrl, displayPriority: priority });
+            baseToId[base] = p.id;
+          } else if (baseToId[base] == null) {
+            baseToId[base] = p.id;
+          }
         }
         setProviderIdByBase(baseToId);
+        const preferredRank = (name: string) => {
+          const idx = PREFERRED_PROVIDERS.indexOf(name);
+          return idx === -1 ? Infinity : idx;
+        };
+        const tier = (p: ProviderChip) => {
+          if (PREFERRED_PROVIDERS.includes(p.name)) return 0;
+          if (RENTAL_PROVIDERS.has(p.name)) return 2;
+          return 1;
+        };
+        setStreamingProviders(
+          Array.from(seen.values()).sort((a, b) => {
+            const ta = tier(a);
+            const tb = tier(b);
+            if (ta !== tb) return ta - tb;
+            if (ta === 0) return preferredRank(a.name) - preferredRank(b.name);
+            return a.displayPriority - b.displayPriority;
+          }),
+        );
       })
       .catch(() => { /* ignore */ });
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem('moviepicker_filters', JSON.stringify(filters));
+  }, [filters]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      'moviepicker_batch_size',
+      batchSize === null ? 'all' : String(batchSize),
+    );
+  }, [batchSize]);
+
+  const clearFilters = useCallback(() => {
+    setFilters(DEFAULT_FILTERS);
+  }, []);
+
+  const confirmedProviderNames = useMemo(() => {
+    const confirmedIds = new Set(user?.preferredStreamingProviderIds ?? []);
+    return new Set(
+      streamingProviders
+        .filter((p) => confirmedIds.has(providerIdByBase[p.name]))
+        .map((p) => p.name),
+    );
+  }, [streamingProviders, providerIdByBase, user]);
 
   const handleStartDiscover = useCallback(() => {
     const params = new URLSearchParams();
@@ -128,10 +189,6 @@ export default function BrowseTab({ addToast, onEditFilters }: BrowseTabProps) {
     }
     router.push(`/discover?${params.toString()}`);
   }, [filters, batchSize, providerIdByBase, router]);
-
-  const handleEditFilters = useCallback(() => {
-    if (onEditFilters) onEditFilters();
-  }, [onEditFilters]);
 
   useEffect(() => {
     try {
@@ -202,18 +259,47 @@ export default function BrowseTab({ addToast, onEditFilters }: BrowseTabProps) {
       className="space-y-4"
     >
       {/* Discover hero */}
-      <div className="glass rounded-2xl p-4 space-y-3">
-        <div>
-          <h2 className="text-lg font-semibold font-display">Discover</h2>
-          <p className="text-cream-dim text-xs">Swipe through a fresh, filtered pool.</p>
+      <div className="space-y-3">
+        <div className="glass rounded-2xl p-4 space-y-3">
+          <div>
+            <h2 className="text-lg font-semibold font-display">Discover</h2>
+            <p className="text-cream-dim text-xs">Swipe through a fresh, filtered pool.</p>
+          </div>
+          <FilterSummary
+            filters={filters}
+            onEdit={() => setShowFilters(!showFilters)}
+            onClear={clearFilters}
+            open={showFilters}
+          />
+          <button
+            onClick={handleStartDiscover}
+            className="w-full py-3 bg-coral text-charcoal font-semibold rounded-xl text-sm hover:bg-coral-dark transition-colors"
+          >
+            Start discovering
+          </button>
         </div>
-        <FilterSummary filters={filters} onEdit={handleEditFilters} />
-        <button
-          onClick={handleStartDiscover}
-          className="w-full py-3 bg-coral text-charcoal font-semibold rounded-xl text-sm hover:bg-coral-dark transition-colors"
-        >
-          Start discovering
-        </button>
+
+        <AnimatePresence>
+          {showFilters && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <FilterEditor
+                filters={filters}
+                onChange={setFilters}
+                streamingProviders={streamingProviders}
+                confirmedProviderNames={confirmedProviderNames}
+                batchSize={batchSize}
+                onBatchSizeChange={setBatchSize}
+                providersExpanded={providersExpanded}
+                onProvidersExpandedChange={setProvidersExpanded}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Header */}
