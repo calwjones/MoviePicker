@@ -1,11 +1,16 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import type { SessionMovie } from '@shared/types';
 import { getSocket } from '@/lib/socket';
+import MoviePoster from '@/components/MoviePoster';
 
-const SEGMENT_FILLS = ['#1A1A1A', '#222222', '#1E1E1E'];
+const TILE_WIDTH = 132;
+const TILE_GAP = 12;
+const TILE_STEP = TILE_WIDTH + TILE_GAP;
+const LOOPS = 8;
+const SPIN_DURATION_MS = 2800;
 
 interface ClientRouletteWheelProps {
   movies: SessionMovie[];
@@ -18,222 +23,57 @@ interface ClientRouletteWheelProps {
 export default function ClientRouletteWheel({
   movies,
   onResult,
-  maxSpins = 3, // solo fallback only; group sessions get authoritative spinsLeft from server via roulette-state
+  maxSpins = 3,
   children,
   sessionId,
 }: ClientRouletteWheelProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
   const [spinning, setSpinning] = useState(false);
-  const [rotation, setRotation] = useState(0);
   const [spinsLeft, setSpinsLeft] = useState(maxSpins);
-  const [canvasSize, setCanvasSize] = useState(320);
   const [hasLanded, setHasLanded] = useState(false);
-  const animationRef = useRef<number>(0);
-  const rotationRef = useRef(0);
+  const [winnerIndex, setWinnerIndex] = useState<number | null>(null);
+  const [trackX, setTrackX] = useState(0);
 
-  useEffect(() => { rotationRef.current = rotation; }, [rotation]);
+  const tiles = useMemo(() => {
+    const out: { sm: SessionMovie; key: string; loopIndex: number; originalIndex: number }[] = [];
+    for (let loop = 0; loop < LOOPS; loop++) {
+      movies.forEach((sm, idx) => {
+        out.push({ sm, key: `${loop}-${idx}`, loopIndex: loop, originalIndex: idx });
+      });
+    }
+    return out;
+  }, [movies]);
 
-  useEffect(() => {
-    const updateSize = () => {
-      const width = window.innerWidth >= 1024
-        ? Math.min(window.innerWidth * 0.35, 500)
-        : Math.min(window.innerWidth - 48, 380);
-      setCanvasSize(width);
-    };
-    updateSize();
-    window.addEventListener('resize', updateSize);
-    return () => window.removeEventListener('resize', updateSize);
-  }, []);
+  const runSpinAnimation = useCallback((winner: number) => {
+    if (winner < 0 || winner >= movies.length) return;
+    const track = trackRef.current;
+    if (!track) return;
 
-  const drawWheel = useCallback((currentRotation: number) => {
-    const canvas = canvasRef.current;
-    if (!canvas || movies.length === 0) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = canvasSize * dpr;
-    canvas.height = canvasSize * dpr;
-    ctx.scale(dpr, dpr);
-
-    const size = canvasSize;
-    const center = size / 2;
-    const outerRadius = center - 6;
-    const innerRadius = outerRadius - 8;
-    const segmentAngle = (2 * Math.PI) / movies.length;
-
-    ctx.clearRect(0, 0, size, size);
-
-    const ringGrad = ctx.createLinearGradient(0, 0, size, size);
-    ringGrad.addColorStop(0, '#3A3A3A');
-    ringGrad.addColorStop(0.3, '#2A2A2A');
-    ringGrad.addColorStop(0.5, '#3E3E3E');
-    ringGrad.addColorStop(0.7, '#2A2A2A');
-    ringGrad.addColorStop(1, '#383838');
-    ctx.beginPath();
-    ctx.arc(center, center, outerRadius, 0, 2 * Math.PI);
-    ctx.fillStyle = ringGrad;
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.arc(center, center, outerRadius, 0, 2 * Math.PI);
-    ctx.strokeStyle = 'rgba(161, 47, 10, 0.15)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    movies.forEach((sm, i) => {
-      const startAngle = currentRotation + i * segmentAngle;
-      const endAngle = startAngle + segmentAngle;
-
-      ctx.beginPath();
-      ctx.moveTo(center, center);
-      ctx.arc(center, center, innerRadius, startAngle, endAngle);
-      ctx.closePath();
-      ctx.fillStyle = SEGMENT_FILLS[i % SEGMENT_FILLS.length];
-      ctx.fill();
-
-      ctx.beginPath();
-      ctx.moveTo(center, center);
-      ctx.lineTo(
-        center + Math.cos(startAngle) * innerRadius,
-        center + Math.sin(startAngle) * innerRadius
-      );
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      ctx.save();
-      ctx.translate(center, center);
-
-      const midAngle = startAngle + segmentAngle / 2;
-      const normalizedAngle = ((midAngle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-      const flipped = normalizedAngle > Math.PI / 2 && normalizedAngle < (3 * Math.PI) / 2;
-
-      const maxFontSize = Math.min(13, segmentAngle * innerRadius * 0.35);
-      const fontSize = Math.max(7, Math.min(maxFontSize, 110 / movies.length));
-      ctx.font = `500 ${fontSize}px "Inter", "DM Sans", system-ui, sans-serif`;
-
-      const maxTextLen = Math.floor((innerRadius - 40) / (fontSize * 0.55));
-      const title = sm.movie.title.length > maxTextLen
-        ? sm.movie.title.slice(0, maxTextLen - 1) + '\u2026'
-        : sm.movie.title;
-
-      if (flipped) {
-        ctx.rotate(midAngle + Math.PI);
-        ctx.textAlign = 'left';
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-        ctx.fillText(title, -(innerRadius - 18), fontSize / 3 + 1);
-        ctx.fillStyle = '#D4CFC7';
-        ctx.fillText(title, -(innerRadius - 18), fontSize / 3);
-      } else {
-        ctx.rotate(midAngle);
-        ctx.textAlign = 'right';
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-        ctx.fillText(title, innerRadius - 18, fontSize / 3 + 1);
-        ctx.fillStyle = '#D4CFC7';
-        ctx.fillText(title, innerRadius - 18, fontSize / 3);
-      }
-      ctx.restore();
-    });
-
-    const innerShadow = ctx.createRadialGradient(center, center, 0, center, center, innerRadius);
-    innerShadow.addColorStop(0, 'rgba(0, 0, 0, 0.4)');
-    innerShadow.addColorStop(0.15, 'rgba(0, 0, 0, 0.1)');
-    innerShadow.addColorStop(0.3, 'transparent');
-    ctx.beginPath();
-    ctx.arc(center, center, innerRadius, 0, 2 * Math.PI);
-    ctx.fillStyle = innerShadow;
-    ctx.fill();
-
-    const hubRadius = Math.max(20, center * 0.14);
-
-    ctx.beginPath();
-    ctx.arc(center, center, hubRadius + 4, 0, 2 * Math.PI);
-    ctx.fillStyle = 'rgba(161, 47, 10, 0.08)';
-    ctx.fill();
-
-    const hubGrad = ctx.createRadialGradient(center, center, 0, center, center, hubRadius);
-    hubGrad.addColorStop(0, '#2A2A2A');
-    hubGrad.addColorStop(1, '#151515');
-    ctx.beginPath();
-    ctx.arc(center, center, hubRadius, 0, 2 * Math.PI);
-    ctx.fillStyle = hubGrad;
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.arc(center, center, hubRadius, 0, 2 * Math.PI);
-    ctx.strokeStyle = 'rgba(161, 47, 10, 0.4)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    const pointerW = 14;
-    const pointerH = 22;
-    ctx.beginPath();
-    ctx.moveTo(center - pointerW, 2);
-    ctx.lineTo(center + pointerW, 2);
-    ctx.lineTo(center, pointerH + 2);
-    ctx.closePath();
-
-    const pGrad = ctx.createLinearGradient(center, 0, center, pointerH + 2);
-    pGrad.addColorStop(0, '#A12F0A');
-    pGrad.addColorStop(1, '#7A2308');
-    ctx.fillStyle = pGrad;
-    ctx.fill();
-
-    ctx.shadowColor = 'rgba(161, 47, 10, 0.4)';
-    ctx.shadowBlur = 8;
-    ctx.fill();
-    ctx.shadowColor = 'transparent';
-    ctx.shadowBlur = 0;
-  }, [movies, canvasSize]);
-
-  useEffect(() => {
-    drawWheel(rotation);
-  }, [movies, rotation, drawWheel, canvasSize]);
-
-  useEffect(() => {
-    return () => {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
-    };
-  }, []);
-
-  const runSpinAnimation = useCallback((winnerIndex: number) => {
-    if (winnerIndex < 0 || winnerIndex >= movies.length) return;
     setSpinning(true);
     setHasLanded(false);
+    setWinnerIndex(null);
 
-    const segmentAngle = (2 * Math.PI) / movies.length;
-    const currentRotation = rotationRef.current;
+    const viewportWidth = track.parentElement?.clientWidth ?? window.innerWidth;
+    const centerOffset = viewportWidth / 2 - TILE_WIDTH / 2;
 
-    const desiredMod = ((-Math.PI / 2 - winnerIndex * segmentAngle - segmentAngle / 2) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-    const currentMod = ((currentRotation % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-    let extra = desiredMod - currentMod;
-    if (extra < 0) extra += 2 * Math.PI;
-    const totalSpins = 7;
-    const targetRotation = currentRotation + totalSpins * 2 * Math.PI + extra;
+    const landingLoop = LOOPS - 2;
+    const tileIndexInTrack = landingLoop * movies.length + winner;
+    const targetX = centerOffset - tileIndexInTrack * TILE_STEP;
 
-    const startRotation = currentRotation;
-    const startTime = Date.now();
-    const duration = 4500;
+    setTrackX(0);
 
-    const animate = () => {
-      const elapsed = Date.now() - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      const r = startRotation + (targetRotation - startRotation) * eased;
-      setRotation(r);
-      if (progress < 1) {
-        animationRef.current = requestAnimationFrame(animate);
-      } else {
-        setSpinning(false);
-        const result = movies[winnerIndex];
-        setHasLanded(true);
-        onResult(result);
-      }
-    };
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setTrackX(targetX);
+      });
+    });
 
-    animationRef.current = requestAnimationFrame(animate);
+    window.setTimeout(() => {
+      setSpinning(false);
+      setHasLanded(true);
+      setWinnerIndex(winner);
+      onResult(movies[winner]);
+    }, SPIN_DURATION_MS + 50);
   }, [movies, onResult]);
 
   useEffect(() => {
@@ -272,9 +112,9 @@ export default function ClientRouletteWheel({
       }
     }
 
-    const winnerIndex = Math.floor(Math.random() * movies.length);
+    const winner = Math.floor(Math.random() * movies.length);
     setSpinsLeft((s) => s - 1);
-    runSpinAnimation(winnerIndex);
+    runSpinAnimation(winner);
   };
 
   return (
@@ -290,20 +130,61 @@ export default function ClientRouletteWheel({
       <p className="text-cream-dim text-sm mb-6">
         {spinsLeft} {spinsLeft === 1 ? 'spin' : 'spins'} remaining
       </p>
-      <div
-        className="relative mb-6 rounded-full"
-        style={{
-          boxShadow: spinning
-            ? '0 0 60px rgba(161, 47, 10, 0.15), 0 0 120px rgba(161, 47, 10, 0.05)'
-            : '0 0 40px rgba(161, 47, 10, 0.08), 0 0 80px rgba(161, 47, 10, 0.03)',
-          transition: 'box-shadow 0.5s ease',
-        }}
-      >
-        <canvas
-          ref={canvasRef}
-          style={{ width: canvasSize, height: canvasSize }}
-          className="rounded-full"
-        />
+
+      <div className="relative w-full max-w-2xl lg:max-w-3xl mb-6">
+        {/* edge fades */}
+        <div className="pointer-events-none absolute inset-y-0 left-0 w-16 z-10 bg-gradient-to-r from-charcoal to-transparent" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-16 z-10 bg-gradient-to-l from-charcoal to-transparent" />
+
+        {/* center indicator */}
+        <div className="pointer-events-none absolute inset-y-0 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center">
+          <div className="w-0 h-0 border-l-[8px] border-r-[8px] border-t-[10px] border-l-transparent border-r-transparent border-t-coral" />
+          <div className="flex-1 w-[2px] bg-coral/40" />
+          <div className="w-0 h-0 border-l-[8px] border-r-[8px] border-b-[10px] border-l-transparent border-r-transparent border-b-coral" />
+        </div>
+
+        <div className="overflow-hidden py-4">
+          <div
+            ref={trackRef}
+            className="flex"
+            style={{
+              gap: `${TILE_GAP}px`,
+              transform: `translateX(${trackX}px)`,
+              transition: spinning
+                ? `transform ${SPIN_DURATION_MS}ms cubic-bezier(0.15, 0.95, 0.25, 1)`
+                : 'none',
+              willChange: 'transform',
+            }}
+          >
+            {tiles.map((t) => {
+              const isWinner =
+                hasLanded && winnerIndex !== null && t.originalIndex === winnerIndex && t.loopIndex === LOOPS - 2;
+              return (
+                <div
+                  key={t.key}
+                  className={`shrink-0 aspect-[2/3] rounded-xl overflow-hidden relative ${
+                    isWinner ? 'ring-2 ring-coral shadow-[0_0_30px_rgba(161,47,10,0.6)]' : ''
+                  }`}
+                  style={{ width: TILE_WIDTH }}
+                >
+                  <MoviePoster posterUrl={t.sm.movie.posterUrl} title={t.sm.movie.title} />
+                  {!isWinner && <div className="absolute inset-0 bg-charcoal/30" />}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {hasLanded && winnerIndex !== null && (
+          <motion.p
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center text-cream text-sm font-medium mt-2"
+            style={{ fontFamily: 'var(--font-playfair)' }}
+          >
+            {movies[winnerIndex].movie.title}
+          </motion.p>
+        )}
       </div>
 
       {!hasLanded && (

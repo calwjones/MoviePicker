@@ -10,6 +10,7 @@ import { connectSocket, getSocket } from '@/lib/socket';
 import { enqueueSwipe, flushQueue, hasQueuedSwipes } from '@/lib/swipeQueue';
 import { clearSwipeFilters } from '@/lib/filters';
 import SwipeView from '@/components/SwipeView';
+import PresenceRow, { type PresenceParticipant } from '@/components/PresenceRow';
 import InCinemaBadge from '@/components/InCinemaBadge';
 import ToastContainer from '@/components/ToastContainer';
 import ClientRouletteWheel from '@/components/ClientRouletteWheel';
@@ -36,6 +37,7 @@ export default function SessionPage() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [partnerProgress, setPartnerProgress] = useState(0);
   const [partnerOnline, setPartnerOnline] = useState(false);
+  const [participants, setParticipants] = useState<PresenceParticipant[]>([]);
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(true);
   const [swiping, setSwiping] = useState(false);
@@ -119,11 +121,41 @@ export default function SessionPage() {
     setPartnerProgress(total > 0 ? Math.round((partnerSwipedCount / total) * 100) : 0);
   }, []);
 
+  const refreshParticipants = useCallback(async () => {
+    try {
+      const res = await sessionApi.get(sessionId);
+      const raw = (res.data.session?.participants ?? []) as Array<{
+        id: string;
+        displayName: string;
+        isHost: boolean;
+        leftAt: string | null;
+      }>;
+      setParticipants(
+        raw
+          .filter((p) => !p.leftAt)
+          .map((p) => ({ id: p.id, displayName: p.displayName, isHost: p.isHost, online: true })),
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [sessionId]);
+
   useEffect(() => {
     if (!sessionId || !user || authLoading) return;
     sessionApi.get(sessionId).then((res) => {
       const { session, isUser1: iu1 } = res.data;
       setIsHost(iu1);
+      const rawParticipants = (session?.participants ?? []) as Array<{
+        id: string;
+        displayName: string;
+        isHost: boolean;
+        leftAt: string | null;
+      }>;
+      setParticipants(
+        rawParticipants
+          .filter((p) => !p.leftAt)
+          .map((p) => ({ id: p.id, displayName: p.displayName, isHost: p.isHost, online: true })),
+      );
       const swipeField = iu1 ? 'user1Swipe' : 'user2Swipe';
       const unswiped = session.movies.filter((m: SessionMovie) => m[swipeField] === null);
       const swiped = session.movies.filter((m: SessionMovie) => m[swipeField] !== null);
@@ -240,11 +272,16 @@ export default function SessionPage() {
       setPreviousPickIds([]);
     };
 
+    const handleParticipantJoined = () => {
+      refreshParticipants();
+    };
+
     socket.on('swipe-update', handleSwipeUpdate);
     socket.on('session-complete', handleSessionComplete);
     socket.on('new-batch', handleNewBatch);
     socket.on('partner-done', handlePartnerDone);
     socket.on('partner-online', handlePartnerOnline);
+    socket.on('participant-joined', handleParticipantJoined);
     socket.on('matches-revealed', handleMatchesRevealed);
     socket.on('matches-reveal-all', handleMatchesRevealAll);
     socket.on('roulette-opened', handleRouletteOpened);
@@ -259,6 +296,7 @@ export default function SessionPage() {
       socket.off('new-batch', handleNewBatch);
       socket.off('partner-done', handlePartnerDone);
       socket.off('partner-online', handlePartnerOnline);
+      socket.off('participant-joined', handleParticipantJoined);
       socket.off('matches-revealed', handleMatchesRevealed);
       socket.off('matches-reveal-all', handleMatchesRevealAll);
       socket.off('roulette-opened', handleRouletteOpened);
@@ -266,7 +304,7 @@ export default function SessionPage() {
       socket.off('disconnect', handleDisconnect);
       socket.off('connect', handleConnect);
     };
-  }, [sessionId, addToast, removeToast, applySessionBatch, isHost]);
+  }, [sessionId, addToast, removeToast, applySessionBatch, isHost, refreshParticipants]);
 
   const handleSwipe = useCallback(async (direction: 'left' | 'right') => {
     if (currentIndex >= movies.length || swiping) return;
@@ -501,10 +539,19 @@ export default function SessionPage() {
         loading={loading}
         done={done}
         headerRight={
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${partnerOnline ? 'bg-success animate-pulse' : 'bg-cream-dim'}`} />
-            <span className="text-cream-dim text-xs">Partner: {Math.min(partnerProgress, 100)}%</span>
-          </div>
+          participants.length > 1 ? (
+            <div className="flex items-center gap-2">
+              <PresenceRow participants={participants} />
+              <span className="text-cream-dim text-xs hidden sm:inline">
+                {Math.min(partnerProgress, 100)}%
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${partnerOnline ? 'bg-success animate-pulse' : 'bg-cream-dim'}`} />
+              <span className="text-cream-dim text-xs">Partner: {Math.min(partnerProgress, 100)}%</span>
+            </div>
+          )
         }
         doneContent={doneContent}
       />

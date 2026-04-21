@@ -9,8 +9,8 @@ import { getErrorMessage } from '@/lib/errors';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { connectSocket, getSocket } from '@/lib/socket';
 import { getBaseName } from '@/components/StreamingProviders';
-import MoodPicker, { MOOD_PRESETS, type MoodPreset } from '@/components/MoodPicker';
 import { DECADE_OPTIONS } from '@/lib/decades';
+import FilterSummary from '@/components/FilterSummary';
 import { useAuth } from '@/context/AuthContext';
 import type { Filters } from '@shared/types';
 
@@ -81,7 +81,6 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
   const [poolSize, setPoolSize] = useState<number>(0);
   const [poolSizeLoading, setPoolSizeLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [activeMood, setActiveMood] = useState<string | null>(null);
   const [streamingProviders, setStreamingProviders] = useState<ProviderChip[]>([]);
   const [providerIdByBase, setProviderIdByBase] = useState<ProviderIdMap>({});
   const [providersExpanded, setProvidersExpanded] = useState(false);
@@ -89,7 +88,6 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
   const [soloLoading, setSoloLoading] = useState(false);
   const [startLoading, setStartLoading] = useState(false);
   const [sessionError, setSessionError] = useState('');
-  const [moodPickerOpen, setMoodPickerOpen] = useState(false);
 
   const [groupSessionId, setGroupSessionId] = useState<string | null>(null);
   const [shareLink, setShareLink] = useState<string | null>(null);
@@ -347,7 +345,7 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
   };
 
   const handleStartSolo = () => {
-    setMoodPickerOpen(true);
+    startSoloSession();
   };
 
   const handleStartDiscover = () => {
@@ -366,33 +364,6 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
     router.push(`/discover?${params.toString()}`);
   };
 
-  const handleMoodPick = (preset: MoodPreset) => {
-    setMoodPickerOpen(false);
-    setActiveMood(preset.label);
-    const nextFilters: Filters = {
-      ...filters,
-      genres: [...preset.genres],
-      minRating: preset.minRating,
-      maxRuntime: preset.maxRuntime,
-      decade: preset.decade,
-    };
-    setFilters(nextFilters);
-    const active: Record<string, unknown> = {};
-    if (nextFilters.genres.length > 0) active.genres = nextFilters.genres;
-    if (nextFilters.decade) active.decade = nextFilters.decade;
-    if (nextFilters.minRating > 0) active.minRating = nextFilters.minRating;
-    if (nextFilters.maxRuntime > 0) active.maxRuntime = nextFilters.maxRuntime;
-    if (nextFilters.streamingProviders && nextFilters.streamingProviders.length > 0) {
-      active.streamingProviders = nextFilters.streamingProviders;
-    }
-    startSoloSession(Object.keys(active).length > 0 ? active : undefined);
-  };
-
-  const handleMoodSkip = () => {
-    setMoodPickerOpen(false);
-    startSoloSession();
-  };
-
   const toggleGenre = (genre: string) => {
     setFilters((prev) => ({
       ...prev,
@@ -402,26 +373,7 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
     }));
   };
 
-  const applyMood = (label: string) => {
-    if (activeMood === label) {
-      setActiveMood(null);
-      clearFilters();
-      return;
-    }
-    const preset = MOOD_PRESETS.find((m) => m.label === label)!;
-    setActiveMood(label);
-    setFilters((prev) => ({
-      ...prev,
-      genres: [...preset.genres],
-      minRating: preset.minRating,
-      maxRuntime: preset.maxRuntime,
-      decade: preset.decade,
-    }));
-    setShowFilters(true);
-  };
-
   const clearFilters = () => {
-    setActiveMood(null);
     setFilters({ genres: [], decade: '', minRating: 0, maxRuntime: 0, streamingProviders: [] });
   };
 
@@ -445,53 +397,23 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
       </div>
 
       {/* Filters */}
-      <div className="glass rounded-2xl p-6">
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className="w-full flex items-center justify-between"
-        >
-          <h2 className="text-xl font-semibold font-display">Filters</h2>
-          <div className="flex items-center gap-3">
-            {showFilters && (
-              <button
-                onClick={(e) => { e.stopPropagation(); clearFilters(); }}
-                className="text-danger text-xs hover:underline"
-              >
-                Clear all
-              </button>
-            )}
-            <span className="text-cream-dim text-sm">{showFilters ? 'Hide' : 'Show'}</span>
-          </div>
-        </button>
+      <FilterSummary
+        filters={filters}
+        open={showFilters}
+        onEdit={() => setShowFilters(!showFilters)}
+        onClear={clearFilters}
+      />
 
-        <AnimatePresence>
-          {showFilters && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden"
-            >
-              <div className="pt-4 space-y-4">
-                <div>
-                  <label className="text-cream-dim text-sm mb-2 block">Mood</label>
-                  <div className="flex flex-wrap gap-2">
-                    {MOOD_PRESETS.map(({ label }) => (
-                      <button
-                        key={label}
-                        onClick={() => applyMood(label)}
-                        className={`px-3 py-1.5 rounded-full text-xs transition-all hover:-translate-y-0.5 ${
-                          activeMood === label
-                            ? 'bg-coral text-charcoal'
-                            : 'glass text-cream-dim'
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
+      <AnimatePresence>
+        {showFilters && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="glass rounded-2xl p-6">
+              <div className="space-y-4">
                 <div>
                   <label className="text-cream-dim text-sm mb-2 block">Genres</label>
                   <div className="flex flex-wrap gap-2">
@@ -633,10 +555,10 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
                   />
                 </div>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Error */}
       {sessionError && (
@@ -900,12 +822,6 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
         </div>
       )}
 
-      <MoodPicker
-        open={moodPickerOpen}
-        onClose={() => setMoodPickerOpen(false)}
-        onPick={handleMoodPick}
-        onSkip={handleMoodSkip}
-      />
     </motion.div>
   );
 }

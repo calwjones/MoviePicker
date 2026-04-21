@@ -154,7 +154,9 @@ function DashboardContent() {
       </div>
 
       <AnimatePresence mode="wait">
-        {tab === 'browse' && <BrowseTab key="browse" addToast={addToast} />}
+        {tab === 'browse' && (
+          <BrowseTab key="browse" addToast={addToast} onEditFilters={() => setTab('swipe')} />
+        )}
         {tab === 'library' && <LibraryTab key="library" addToast={addToast} />}
         {tab === 'swipe' && <SwipeTab key="swipe" addToast={addToast} />}
         {tab === 'friends' && <FriendsTab key="friends" addToast={addToast} />}

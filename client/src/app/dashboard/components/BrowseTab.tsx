@@ -1,12 +1,15 @@
 'use client';
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { browseApi, movieApi } from '@/lib/api';
+import { browseApi, movieApi, providerApi } from '@/lib/api';
 import MoviePoster from '@/components/MoviePoster';
 import InCinemaBadge from '@/components/InCinemaBadge';
 import RecDetailSheet from '@/components/RecDetailSheet';
-import type { SearchResult } from '@shared/types';
+import FilterSummary from '@/components/FilterSummary';
+import { getBaseName } from '@/components/StreamingProviders';
+import type { SearchResult, Filters } from '@shared/types';
 
 interface BrowseRow {
   id: string;
@@ -16,7 +19,18 @@ interface BrowseRow {
 
 interface BrowseTabProps {
   addToast: (message: string) => void;
+  onEditFilters?: () => void;
 }
+
+type ProviderIdMap = Record<string, number>;
+
+const DEFAULT_FILTERS: Filters = {
+  genres: [],
+  decade: '',
+  minRating: 0,
+  maxRuntime: 0,
+  streamingProviders: [],
+};
 
 interface SectionChip {
   key: string;
@@ -48,12 +62,76 @@ const GENRE_CHIPS: SectionChip[] = [
 
 const SECTION_STORAGE_KEY = 'moviepicker_browse_sections';
 
-export default function BrowseTab({ addToast }: BrowseTabProps) {
+export default function BrowseTab({ addToast, onEditFilters }: BrowseTabProps) {
+  const router = useRouter();
   const [rows, setRows] = useState<BrowseRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [recDetail, setRecDetail] = useState<SearchResult | null>(null);
   const [activeSections, setActiveSections] = useState<string[]>([]);
+  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
+  const [batchSize, setBatchSize] = useState<number | null>(50);
+  const [providerIdByBase, setProviderIdByBase] = useState<ProviderIdMap>({});
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('moviepicker_filters');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed.streamingProviders)) {
+          parsed.streamingProviders = Array.from(
+            new Set(parsed.streamingProviders.map((s: string) => getBaseName(s))),
+          );
+        }
+        setFilters((prev) => ({ ...prev, ...parsed }));
+      }
+    } catch { /* ignore */ }
+
+    try {
+      const savedBatch = localStorage.getItem('moviepicker_batch_size');
+      if (savedBatch !== null) {
+        if (savedBatch === 'all') setBatchSize(null);
+        else {
+          const parsed = parseInt(savedBatch, 10);
+          if (!Number.isNaN(parsed) && parsed > 0) setBatchSize(parsed);
+        }
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    providerApi.list()
+      .then((res) => {
+        const raw = res.data.providers as { id: number; name: string; displayPriority?: number }[];
+        const baseToId: ProviderIdMap = {};
+        for (const p of raw) {
+          const base = getBaseName(p.name);
+          if (baseToId[base] == null) baseToId[base] = p.id;
+        }
+        setProviderIdByBase(baseToId);
+      })
+      .catch(() => { /* ignore */ });
+  }, []);
+
+  const handleStartDiscover = useCallback(() => {
+    const params = new URLSearchParams();
+    if (filters.genres && filters.genres.length > 0) params.set('genres', filters.genres.join(','));
+    if (filters.decade) params.set('decade', filters.decade);
+    if (filters.minRating > 0) params.set('minRating', String(filters.minRating));
+    if (batchSize != null) params.set('batchSize', String(batchSize));
+    const names = filters.streamingProviders ?? [];
+    if (names.length > 0) {
+      const ids = names.map((n) => providerIdByBase[n]).filter((n): n is number => typeof n === 'number' && n > 0);
+      if (ids.length > 0) params.set('providers', ids.join(','));
+    } else {
+      params.set('providers', 'none');
+    }
+    router.push(`/discover?${params.toString()}`);
+  }, [filters, batchSize, providerIdByBase, router]);
+
+  const handleEditFilters = useCallback(() => {
+    if (onEditFilters) onEditFilters();
+  }, [onEditFilters]);
 
   useEffect(() => {
     try {
@@ -123,6 +201,21 @@ export default function BrowseTab({ addToast }: BrowseTabProps) {
       exit={{ opacity: 0, x: 20 }}
       className="space-y-4"
     >
+      {/* Discover hero */}
+      <div className="glass rounded-2xl p-4 space-y-3">
+        <div>
+          <h2 className="text-lg font-semibold font-display">Discover</h2>
+          <p className="text-cream-dim text-xs">Swipe through a fresh, filtered pool.</p>
+        </div>
+        <FilterSummary filters={filters} onEdit={handleEditFilters} />
+        <button
+          onClick={handleStartDiscover}
+          className="w-full py-3 bg-coral text-charcoal font-semibold rounded-xl text-sm hover:bg-coral-dark transition-colors"
+        >
+          Start discovering
+        </button>
+      </div>
+
       {/* Header */}
       <div className="glass rounded-2xl p-4 flex items-center justify-between">
         <div>
