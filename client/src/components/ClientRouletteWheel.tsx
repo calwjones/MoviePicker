@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import type { SessionMovie } from '@shared/types';
+import type { SessionMovie } from '@matchsticked/shared';
 import { getSocket } from '@/lib/socket';
 import MoviePoster from '@/components/MoviePoster';
 

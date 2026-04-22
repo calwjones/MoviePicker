@@ -17,7 +17,7 @@ import OnboardingSeedGrid from '@/components/OnboardingSeedGrid';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { DECADE_OPTIONS } from '@/lib/decades';
-import type { Movie, UserMovie, SearchResult } from '@shared/types';
+import type { Movie, UserMovie, SearchResult } from '@matchsticked/shared';
 
 const GENRE_OPTIONS = [
   'Action', 'Adventure', 'Animation', 'Comedy', 'Crime', 'Documentary',

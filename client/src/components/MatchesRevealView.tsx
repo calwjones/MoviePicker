@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import MoviePoster from '@/components/MoviePoster';
 import InCinemaBadge from '@/components/InCinemaBadge';
-import type { Movie } from '@shared/types';
+import type { Movie } from '@matchsticked/shared';
 
 export interface RevealItem {
   id: string;

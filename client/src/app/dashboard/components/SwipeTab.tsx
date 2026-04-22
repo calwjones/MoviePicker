@@ -12,7 +12,7 @@ import { getBaseName } from '@/components/StreamingProviders';
 import FilterSummary from '@/components/FilterSummary';
 import FilterEditor from '@/components/FilterEditor';
 import { useAuth } from '@/context/AuthContext';
-import type { Filters } from '@shared/types';
+import type { Filters } from '@matchsticked/shared';
 
 interface ProviderChip {
   name: string;

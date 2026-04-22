@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { Movie, UserMovie } from '@shared/types';
+import type { Movie, UserMovie } from '@matchsticked/shared';
 import MoviePoster from './MoviePoster';
 import InCinemaBadge from './InCinemaBadge';
 import StreamingProvidersList from './StreamingProviders';

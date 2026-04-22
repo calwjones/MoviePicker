@@ -15,7 +15,7 @@ import MatchesRevealView from '@/components/MatchesRevealView';
 import StreamingProvidersList from '@/components/StreamingProviders';
 import { FullPageSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/useToast';
-import type { SessionMovie, Movie, SearchResult } from '@shared/types';
+import type { SessionMovie, Movie, SearchResult } from '@matchsticked/shared';
 
 function toAdapterMovie(r: SearchResult): Movie {
   return {

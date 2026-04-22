@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { SessionMovie } from '@shared/types';
+import type { SessionMovie } from '@matchsticked/shared';
 import SkeletonCard from '@/components/SkeletonCard';
 import MoviePoster from '@/components/MoviePoster';
 import MovieDetailModal from '@/components/MovieDetailModal';

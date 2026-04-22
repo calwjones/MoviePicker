@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { movieApi } from '@/lib/api';
-import type { Movie, SearchResult } from '@shared/types';
+import type { Movie, SearchResult } from '@matchsticked/shared';
 import MovieDetailModal from './MovieDetailModal';
 
 interface RecDetailSheetProps {

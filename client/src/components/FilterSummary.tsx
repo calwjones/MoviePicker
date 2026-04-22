@@ -1,6 +1,6 @@
 'use client';
 
-import type { Filters } from '@shared/types';
+import type { Filters } from '@matchsticked/shared';
 
 interface FilterSummaryProps {
   filters: Filters;

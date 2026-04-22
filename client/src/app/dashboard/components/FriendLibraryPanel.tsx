@@ -8,7 +8,7 @@ import InCinemaBadge from '@/components/InCinemaBadge';
 import MovieDetailModal from '@/components/MovieDetailModal';
 import SkeletonList from '@/components/SkeletonList';
 import { DECADE_OPTIONS } from '@/lib/decades';
-import type { Movie } from '@shared/types';
+import type { Movie } from '@matchsticked/shared';
 
 type LibFilter = 'watchlist' | 'watched' | 'all';
 type SortField = 'dateAdded' | 'year' | 'runtime' | 'tmdbRating' | 'userRating';

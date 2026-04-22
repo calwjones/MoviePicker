@@ -1,6 +1,6 @@
 'use client';
 
-import type { Filters } from '@shared/types';
+import type { Filters } from '@matchsticked/shared';
 import { DECADE_OPTIONS } from '@/lib/decades';
 
 const GENRE_OPTIONS = [

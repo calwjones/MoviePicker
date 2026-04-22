@@ -7,7 +7,7 @@ import { sessionApi, swipeApi } from '@/lib/api';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import MoviePoster from '@/components/MoviePoster';
 import StarRating from '@/components/StarRating';
-import type { HistorySession } from '@shared/types';
+import type { HistorySession } from '@matchsticked/shared';
 
 interface HistoryTabProps {
   addToast: (message: string) => void;

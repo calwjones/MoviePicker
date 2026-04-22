@@ -18,7 +18,7 @@ import MatchesRevealView from '@/components/MatchesRevealView';
 import StreamingProvidersList from '@/components/StreamingProviders';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/useToast';
-import type { SessionMovie, Movie, Match } from '@shared/types';
+import type { SessionMovie, Movie, Match } from '@matchsticked/shared';
 
 function matchToSessionMovie(m: Match): SessionMovie {
   return { id: m.id, movieId: m.movieId, movie: m.movie, user1Swipe: null, user2Swipe: null };

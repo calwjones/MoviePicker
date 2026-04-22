@@ -15,7 +15,7 @@ import ClientRouletteWheel from '@/components/ClientRouletteWheel';
 import MatchesRevealView from '@/components/MatchesRevealView';
 import StreamingProvidersList from '@/components/StreamingProviders';
 import { useToast } from '@/hooks/useToast';
-import type { SessionMovie, Movie } from '@shared/types';
+import type { SessionMovie, Movie } from '@matchsticked/shared';
 
 export default function SoloSessionPage() {
   const { id: sessionId } = useParams<{ id: string }>();

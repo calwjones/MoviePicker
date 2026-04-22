@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import MoviePoster from '@/components/MoviePoster';
 import { popularApi, movieApi } from '@/lib/api';
-import type { SearchResult } from '@shared/types';
+import type { SearchResult } from '@matchsticked/shared';
 
 interface OnboardingSeedGridProps {
   onDone: () => void;

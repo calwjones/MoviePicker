@@ -30,3 +30,6 @@ ROADMAP*.md
 claude.md
 CLAUDE.md
 .claude/
+
+# Workspaces not yet ready to commit
+mobile/

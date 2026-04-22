@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { useAuthGuard } from '@/hooks/useAuthGuard';
 import { swipeApi } from '@/lib/api';
-import type { Movie } from '@shared/types';
+import type { Movie } from '@matchsticked/shared';
 import SkeletonList from '@/components/SkeletonList';
 import InCinemaBadge from '@/components/InCinemaBadge';
 import StreamingProvidersList from '@/components/StreamingProviders';

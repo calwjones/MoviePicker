@@ -11,7 +11,7 @@ import FilterSummary from '@/components/FilterSummary';
 import FilterEditor, { PREFERRED_PROVIDERS, type ProviderChip } from '@/components/FilterEditor';
 import { getBaseName } from '@/components/StreamingProviders';
 import { useAuth } from '@/context/AuthContext';
-import type { SearchResult, Filters } from '@shared/types';
+import type { SearchResult, Filters } from '@matchsticked/shared';
 
 interface BrowseRow {
   id: string;
