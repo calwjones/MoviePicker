@@ -4,9 +4,10 @@ import rateLimit from 'express-rate-limit';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../app';
-import { JWT_SECRET } from '../config';
+import { JWT_SECRET, APPLE_BUNDLE_ID } from '../config';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { sendVerificationEmail, sendPasswordResetEmail, sendRegistrationAttemptEmail } from '../services/email';
+import { verifyAppleIdentityToken } from '../services/appleAuth';
 
 const router = Router();
 
@@ -37,6 +38,7 @@ const resetLimiter = buildLimiter(HOUR, 10);
 const resendVerificationLimiter = buildLimiter(HOUR, 5);
 const verifyLimiter = buildLimiter(QUARTER_HOUR, 20);
 const changePasswordLimiter = buildLimiter(QUARTER_HOUR, 10);
+const appleLimiter = buildLimiter(QUARTER_HOUR, 20);
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const USERNAME_RE = /^[a-z0-9_-]{3,30}$/;
@@ -383,6 +385,7 @@ const USER_SELECT = {
   letterboxdUsername: true,
   onboardedAt: true,
   usernameChangedAt: true,
+  notificationPreferences: true,
 } as const;
 
 router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
@@ -505,6 +508,105 @@ router.post('/complete-onboarding', authenticate, async (req: AuthRequest, res: 
     res.json({ user });
   } catch (error) {
     console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+function sanitizeUsernameSeed(seed: string): string {
+  return seed.toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 24);
+}
+
+async function generateUniqueUsername(rawSeed: string): Promise<string> {
+  let base = sanitizeUsernameSeed(rawSeed);
+  if (base.length < 3) base = `user${randomBytes(2).toString('hex')}`;
+  base = base.slice(0, 24);
+  if (!(await prisma.user.findUnique({ where: { username: base } }))) return base;
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const suffix = randomBytes(3).toString('hex');
+    const candidate = `${base.slice(0, 24 - suffix.length - 1)}_${suffix}`;
+    if (!(await prisma.user.findUnique({ where: { username: candidate } }))) return candidate;
+  }
+  throw new Error('Could not allocate unique username after retries');
+}
+
+router.post('/apple', appleLimiter, async (req: Request, res: Response) => {
+  const { identityToken, fullName } = (req.body ?? {}) as {
+    identityToken?: string;
+    fullName?: { givenName?: string | null; familyName?: string | null } | null;
+  };
+
+  if (!identityToken || typeof identityToken !== 'string') {
+    res.status(400).json({ error: 'identityToken is required' });
+    return;
+  }
+
+  let claims;
+  try {
+    claims = await verifyAppleIdentityToken(identityToken, APPLE_BUNDLE_ID);
+  } catch (err) {
+    console.error('[auth] Apple identity verification failed:', err);
+    res.status(401).json({ error: 'Could not verify Apple sign-in' });
+    return;
+  }
+
+  try {
+    const appleSub = claims.sub;
+    // Only trust the email baked into Apple's signed JWT — never a body hint.
+    const tokenEmail =
+      typeof claims.email === 'string' && EMAIL_RE.test(claims.email.trim().toLowerCase())
+        ? claims.email.trim().toLowerCase()
+        : '';
+
+    let user = await prisma.user.findUnique({ where: { appleUserId: appleSub } });
+
+    if (!user && tokenEmail) {
+      const existing = await prisma.user.findUnique({ where: { email: tokenEmail } });
+      if (existing) {
+        user = await prisma.user.update({
+          where: { id: existing.id },
+          data: { appleUserId: appleSub, emailVerified: true },
+        });
+      }
+    }
+
+    if (!user) {
+      if (!tokenEmail) {
+        res.status(400).json({ error: 'Apple did not return an email; please register manually first.' });
+        return;
+      }
+      const seed =
+        (fullName?.givenName ? sanitizeUsernameSeed(fullName.givenName) : '') ||
+        tokenEmail.split('@')[0] ||
+        'user';
+      const username = await generateUniqueUsername(seed);
+      const passwordHash = await bcrypt.hash(randomBytes(32).toString('hex'), 12);
+      user = await prisma.user.create({
+        data: {
+          email: tokenEmail,
+          username,
+          passwordHash,
+          emailVerified: true,
+          appleUserId: appleSub,
+        },
+      });
+    }
+
+    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        emailVerified: user.emailVerified,
+        preferredStreamingProviderIds: user.preferredStreamingProviderIds,
+        letterboxdUsername: user.letterboxdUsername,
+        onboardedAt: user.onboardedAt,
+        notificationPreferences: user.notificationPreferences,
+      },
+      token,
+    });
+  } catch (err) {
+    console.error('[auth] Apple sign-in failed:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

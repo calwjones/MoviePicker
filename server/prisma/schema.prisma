@@ -21,6 +21,8 @@ model User {
   letterboxdUsername       String?   @map("letterboxd_username")
   onboardedAt              DateTime? @map("onboarded_at")
   usernameChangedAt        DateTime? @map("username_changed_at")
+  notificationPreferences  Json      @default("{}") @map("notification_preferences")
+  appleUserId              String?   @unique @map("apple_user_id")
   createdAt                DateTime  @default(now()) @map("created_at")
 
   userMovies        UserMovie[]
@@ -31,6 +33,7 @@ model User {
   friendshipsReceived  Friendship[]    @relation("FriendshipAddressee")
   invitesSent          SessionInvite[] @relation("SessionInviteFrom")
   invitesReceived      SessionInvite[] @relation("SessionInviteTo")
+  deviceTokens         DeviceToken[]
 
   @@index([passwordResetToken])
   @@index([emailVerificationToken])
@@ -196,5 +199,19 @@ model Match {
 
   @@unique([sessionId, movieId])
   @@map("matches")
+}
+
+model DeviceToken {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  expoPushToken String   @unique @map("expo_push_token")
+  platform      String
+  createdAt     DateTime @default(now()) @map("created_at")
+  lastActiveAt  DateTime @default(now()) @map("last_active_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("device_tokens")
 }
 

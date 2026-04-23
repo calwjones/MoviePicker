@@ -13,6 +13,7 @@ export const DATABASE_URL = required('DATABASE_URL');
 export const TMDB_API_KEY = required('TMDB_API_KEY');
 export const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
 export const PORT = parseInt(process.env.PORT || '3001', 10);
+export const APPLE_BUNDLE_ID = process.env.APPLE_BUNDLE_ID || 'com.matchsticked.mobile';
 
 if (NODE_ENV === 'production') {
   if (JWT_SECRET.includes('local-dev') || JWT_SECRET.includes('change-if-you-want')) {
