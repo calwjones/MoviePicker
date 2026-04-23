@@ -5,6 +5,7 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 import { resolveSessionRole } from '../lib/resolveSessionRole';
 import { getInCinemaIds, attachInCinema } from '../services/cinemaStatus';
 import { clearSessionState } from '../services/socket';
+import { sendPush } from '../services/pushSender';
 
 const router = Router();
 
@@ -149,6 +150,33 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       total,
       participantId,
     });
+
+    if (isMatch && !isSolo) {
+      void (async () => {
+        try {
+          const [participants, movie] = await Promise.all([
+            prisma.sessionParticipant.findMany({
+              where: { sessionId, leftAt: null, userId: { not: null } },
+              select: { userId: true },
+            }),
+            prisma.movie.findUnique({ where: { id: movieId }, select: { title: true } }),
+          ]);
+          const userIds = participants
+            .map((p) => p.userId)
+            .filter((id): id is string => Boolean(id));
+          if (userIds.length === 0) return;
+          await sendPush({
+            userIds,
+            category: 'matches',
+            title: 'It’s a match',
+            body: movie?.title ? `Everyone liked ${movie.title}` : 'You all liked the same movie',
+            data: { route: 'matches', sessionId, movieId },
+          });
+        } catch (err) {
+          console.error('[push] match notify failed', err);
+        }
+      })();
+    }
 
     res.json({ success: true, isMatch });
   } catch (error) {
@@ -335,6 +363,34 @@ router.post('/done', authenticate, async (req: AuthRequest, res: Response) => {
 
       emit(`session:${sessionId}`, 'session-complete', { matches, compromises });
       clearSessionState(sessionId);
+
+      if (!isSolo) {
+        void (async () => {
+          try {
+            const participants = await prisma.sessionParticipant.findMany({
+              where: { sessionId, leftAt: null, userId: { not: null } },
+              select: { userId: true },
+            });
+            const userIds = participants
+              .map((p) => p.userId)
+              .filter((id): id is string => Boolean(id));
+            if (userIds.length === 0) return;
+            const summary =
+              matches.length > 0
+                ? `You found ${matches.length} match${matches.length === 1 ? '' : 'es'}`
+                : 'No matches this round';
+            await sendPush({
+              userIds,
+              category: 'sessionComplete',
+              title: 'Session complete',
+              body: summary,
+              data: { route: 'matches', sessionId },
+            });
+          } catch (err) {
+            console.error('[push] session-complete notify failed', err);
+          }
+        })();
+      }
 
       res.json({ status: 'completed', matches, compromises });
     } else {

@@ -6,6 +6,7 @@ import { CLIENT_URL } from '../config';
 import { applyMovieFilters, MovieFilters } from '../lib/filterMovies';
 import { resolveSessionRole } from '../lib/resolveSessionRole';
 import { getInCinemaIds, attachInCinema } from '../services/cinemaStatus';
+import { sendPush } from '../services/pushSender';
 import type { Movie } from '@prisma/client';
 
 const router = Router();
@@ -300,6 +301,16 @@ router.post('/:id/invite', authenticate, async (req: AuthRequest, res: Response)
         inviteId: row.id,
         sessionId,
         hostName: host?.username ?? 'A friend',
+      });
+    }
+
+    if (created.length > 0) {
+      void sendPush({
+        userIds: created.map((c) => c.to_user_id),
+        category: 'invites',
+        title: 'Session invite',
+        body: `${host?.username ?? 'A friend'} invited you to pick a movie`,
+        data: { route: 'session', sessionId },
       });
     }
 

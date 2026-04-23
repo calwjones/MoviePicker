@@ -3,6 +3,7 @@ import { prisma } from '../app';
 import { emit } from '../services/emitter';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { getInCinemaIds, attachInCinema } from '../services/cinemaStatus';
+import { sendPush } from '../services/pushSender';
 
 const router = Router();
 
@@ -154,6 +155,14 @@ router.post('/request', authenticate, async (req: AuthRequest, res: Response) =>
       from: { id: userId, username: requester?.username, avatarUrl: requester?.avatarUrl },
     });
 
+    void sendPush({
+      userIds: [target.id],
+      category: 'friends',
+      title: 'New friend request',
+      body: `${requester?.username ?? 'Someone'} wants to be friends`,
+      data: { route: 'alerts' },
+    });
+
     res.status(201).json({
       friendship: {
         id: rows[0].id,
@@ -185,6 +194,19 @@ router.post('/:id/accept', authenticate, async (req: AuthRequest, res: Response)
       friendshipId: rows[0].id,
       acceptedById: userId,
     });
+
+    const acceptor = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { username: true },
+    });
+    void sendPush({
+      userIds: [rows[0].requester_id],
+      category: 'friends',
+      title: 'Friend request accepted',
+      body: `${acceptor?.username ?? 'Someone'} accepted your friend request`,
+      data: { route: 'friends' },
+    });
+
     res.json({ friendship: { id: rows[0].id, status: rows[0].status } });
   } catch (err) {
     console.error('[friends] accept failed', err);
