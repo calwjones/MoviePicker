@@ -31,17 +31,29 @@ class CookieJar {
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+const SCRAPINGANT_API_KEY = process.env.SCRAPINGANT_API_KEY;
 const SCRAPER_API_KEY = process.env.SCRAPER_API_KEY;
 
 function buildRequestUrl(targetUrl: string, sessionNumber: number): string {
-  if (!SCRAPER_API_KEY) return targetUrl;
-  const params = new URLSearchParams({
-    api_key: SCRAPER_API_KEY,
-    url: targetUrl,
-    keep_headers: 'true',
-    session_number: String(sessionNumber),
-  });
-  return `http://api.scraperapi.com/?${params.toString()}`;
+  if (SCRAPINGANT_API_KEY) {
+    const params = new URLSearchParams({
+      url: targetUrl,
+      'x-api-key': SCRAPINGANT_API_KEY,
+      browser: 'false',
+      proxy_country: 'us',
+    });
+    return `https://api.scrapingant.com/v2/general?${params.toString()}`;
+  }
+  if (SCRAPER_API_KEY) {
+    const params = new URLSearchParams({
+      api_key: SCRAPER_API_KEY,
+      url: targetUrl,
+      keep_headers: 'true',
+      session_number: String(sessionNumber),
+    });
+    return `http://api.scraperapi.com/?${params.toString()}`;
+  }
+  return targetUrl;
 }
 
 function newSessionNumber(): number {
@@ -245,7 +257,7 @@ async function walkPages<T>(
         const snippet = html.slice(0, 800).replace(/\s+/g, ' ');
         console.error('[letterboxd] page 1 parsed 0 entries', {
           url,
-          proxy: !!SCRAPER_API_KEY,
+          proxy: isProxyEnabled(),
           htmlLength: html.length,
           snippet,
         });
@@ -288,5 +300,5 @@ export function createSessionNumber(): number {
 }
 
 export function isProxyEnabled(): boolean {
-  return !!SCRAPER_API_KEY;
+  return !!(SCRAPINGANT_API_KEY || SCRAPER_API_KEY);
 }
