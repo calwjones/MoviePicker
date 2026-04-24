@@ -1,0 +1,16 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": ["TEAMID.com.matchsticked.mobile"],
+        "components": [
+          { "/": "/session/*", "comment": "Open specific swipe session" },
+          { "/": "/join/*", "comment": "Open guest-join flow" },
+          { "/": "/matches/*", "comment": "Open matches reveal" },
+          { "/": "/alerts", "comment": "Open alerts tab" }
+        ]
+      }
+    ]
+  }
+}
