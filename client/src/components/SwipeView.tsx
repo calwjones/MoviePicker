@@ -131,7 +131,7 @@ export default function SwipeView({
               animate={{ opacity: 1, scale: 0.92, rotate: -8, x: '-58%', y: '-52%' }}
               exit={{ opacity: 0, scale: 0.8, x: '-70%', y: '-50%' }}
               transition={{ type: 'spring', stiffness: 200, damping: 22 }}
-              className="absolute top-1/2 left-1/2 pointer-events-none w-full max-w-md lg:max-w-lg aspect-[2/3] rounded-3xl overflow-hidden"
+              className="absolute top-1/2 left-1/2 pointer-events-none w-full max-w-md lg:max-w-lg max-h-full aspect-[2/3] rounded-3xl overflow-hidden"
               style={{ transformOrigin: 'bottom center', zIndex: 1 }}
             >
               <div className="absolute inset-0 bg-card">
@@ -172,7 +172,7 @@ export default function SwipeView({
         {/* Next card — fanned behind right */}
         {currentIndex + 1 < movies.length && (
           <div
-            className="absolute top-1/2 left-1/2 pointer-events-none w-full max-w-md lg:max-w-lg aspect-[2/3] rounded-3xl overflow-hidden"
+            className="absolute top-1/2 left-1/2 pointer-events-none w-full max-w-md lg:max-w-lg max-h-full aspect-[2/3] rounded-3xl overflow-hidden"
             style={{
               transform: 'translate(-42%, -48%) rotate(6deg) scale(0.92)',
               transformOrigin: 'bottom center',
@@ -193,7 +193,7 @@ export default function SwipeView({
           onSwipe={onSwipe}
           onTap={() => { setExpanded(true); onExpand?.(currentMovie); }}
           enableHaptics
-          className="relative w-full max-w-md lg:max-w-lg shrink-0 rounded-3xl overflow-hidden shadow-2xl cursor-grab active:cursor-grabbing aspect-[2/3]"
+          className="relative w-full max-w-md lg:max-w-lg max-h-full shrink-0 rounded-3xl overflow-hidden shadow-2xl cursor-grab active:cursor-grabbing aspect-[2/3]"
         >
           {currentMovie.posterUrl ? (
             <div
