@@ -367,6 +367,7 @@ export default function DiscoverTab({ addToast }: DiscoverTabProps) {
               key={row.id}
               row={row}
               onSelect={(rec) => setRecDetail(rec)}
+              onQuickAdd={handleAddRecommendation}
             />
           ))}
         </div>
@@ -403,8 +404,17 @@ function ChipButton({
   );
 }
 
-function BrowseRowView({ row, onSelect }: { row: BrowseRow; onSelect: (rec: SearchResult) => void }) {
+function BrowseRowView({
+  row,
+  onSelect,
+  onQuickAdd,
+}: {
+  row: BrowseRow;
+  onSelect: (rec: SearchResult) => void;
+  onQuickAdd: (rec: SearchResult) => void;
+}) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [adding, setAdding] = useState<Set<number>>(new Set());
   useLayoutEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollLeft = 0;
   }, [row.movies]);
@@ -426,6 +436,22 @@ function BrowseRowView({ row, onSelect }: { row: BrowseRow; onSelect: (rec: Sear
                   <InCinemaBadge size="sm" />
                 </div>
               )}
+              <button
+                type="button"
+                aria-label={`Add ${rec.title} to watchlist`}
+                disabled={adding.has(rec.tmdbId)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setAdding((prev) => new Set(prev).add(rec.tmdbId));
+                  onQuickAdd(rec);
+                }}
+                className="absolute bottom-1.5 right-1.5 w-7 h-7 rounded-full bg-coral text-charcoal flex items-center justify-center shadow-lg hover:bg-coral-dark active:scale-90 transition-all disabled:opacity-50"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+              </button>
             </div>
             <p className="text-xs font-medium truncate">{rec.title}</p>
             <p className="text-cream-dim text-[10px]">

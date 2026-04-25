@@ -101,7 +101,7 @@ async function buildGroupPool(
   const perUserPools: Movie[][] = [];
   for (const uid of userIds) {
     const userMovies = await prisma.userMovie.findMany({
-      where: { userId: uid, onWatchlist: true, watched: false },
+      where: { userId: uid, onWatchlist: true },
       include: { movie: true },
     });
     perUserPools.push(applyMovieFilters(
@@ -145,7 +145,7 @@ async function sampleSoloBatch(
   const movies = await prisma.movie.findMany({
     where: {
       userMovies: {
-        some: { userId, onWatchlist: true, watched: false },
+        some: { userId, onWatchlist: true },
       },
     },
   });

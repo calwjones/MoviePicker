@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { sessionApi, swipeApi } from '@/lib/api';
+import { movieApi, sessionApi, swipeApi } from '@/lib/api';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import MoviePoster from '@/components/MoviePoster';
 import StarRating from '@/components/StarRating';
@@ -20,6 +20,7 @@ export default function HistoryTab({ addToast }: HistoryTabProps) {
   const [history, setHistory] = useState<HistorySession[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [visibleCount, setVisibleCount] = useState(SESSIONS_PER_PAGE);
+  const [rewatched, setRewatched] = useState<Set<string>>(new Set());
 
   const loadHistory = async () => {
     setHistoryLoading(true);
@@ -50,6 +51,21 @@ export default function HistoryTab({ addToast }: HistoryTabProps) {
       );
     } catch {
       addToast('Failed to mark as watched');
+    }
+  };
+
+  const handleRewatch = async (matchId: string, tmdbId: number | undefined, title: string) => {
+    if (!tmdbId) {
+      addToast('Cannot rewatch this movie');
+      return;
+    }
+    if (rewatched.has(matchId)) return;
+    try {
+      await movieApi.add(tmdbId);
+      setRewatched((prev) => new Set(prev).add(matchId));
+      addToast(`"${title}" is back on your watchlist`);
+    } catch {
+      addToast('Failed to add to watchlist');
     }
   };
 
@@ -143,7 +159,27 @@ export default function HistoryTab({ addToast }: HistoryTabProps) {
                     <div className="flex flex-col items-end gap-1 flex-shrink-0">
                       {match.watched ? (
                         <>
-                          <span className="text-green-400 text-xs">Watched</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-green-400 text-xs">Watched</span>
+                            <button
+                              onClick={() => handleRewatch(match.id, match.movie.tmdbId, match.movie.title)}
+                              disabled={rewatched.has(match.id)}
+                              className="w-5 h-5 rounded-full bg-coral/20 text-coral flex items-center justify-center hover:bg-coral/40 disabled:opacity-50 disabled:cursor-default transition-colors"
+                              aria-label="Add back to watchlist"
+                              title={rewatched.has(match.id) ? 'Added back' : 'Watch again'}
+                            >
+                              {rewatched.has(match.id) ? (
+                                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                              ) : (
+                                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+                                  <line x1="12" y1="5" x2="12" y2="19" />
+                                  <line x1="5" y1="12" x2="19" y2="12" />
+                                </svg>
+                              )}
+                            </button>
+                          </div>
                           <StarRating
                             value={match.userRating}
                             onChange={(rating) => handleRateMatch(match.id, rating)}

@@ -135,7 +135,7 @@ router.get('/mine', authenticate, async (req: AuthRequest, res: Response) => {
 router.get('/pool-size', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const size = await prisma.userMovie.count({
-      where: { userId: req.userId!, onWatchlist: true, watched: false },
+      where: { userId: req.userId!, onWatchlist: true },
     });
     res.json({ size });
   } catch {

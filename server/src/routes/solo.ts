@@ -58,7 +58,6 @@ router.post('/create', authenticate, async (req: AuthRequest, res: Response) => 
         some: {
           userId: req.userId!,
           onWatchlist: true,
-          watched: false,
         },
       },
     };
