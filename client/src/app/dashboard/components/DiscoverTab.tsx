@@ -19,7 +19,7 @@ interface BrowseRow {
   movies: SearchResult[];
 }
 
-interface BrowseTabProps {
+interface DiscoverTabProps {
   addToast: (message: string) => void;
 }
 
@@ -69,7 +69,7 @@ const GENRE_CHIPS: SectionChip[] = [
 
 const SECTION_STORAGE_KEY = 'moviepicker_browse_sections';
 
-export default function BrowseTab({ addToast }: BrowseTabProps) {
+export default function DiscoverTab({ addToast }: DiscoverTabProps) {
   const router = useRouter();
   const { user } = useAuth();
   const [rows, setRows] = useState<BrowseRow[]>([]);
@@ -305,11 +305,11 @@ export default function BrowseTab({ addToast }: BrowseTabProps) {
       {/* Header */}
       <div className="glass rounded-2xl p-4 flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold font-display">Browse</h2>
+          <h2 className="text-lg font-semibold font-display">Sections</h2>
           <p className="text-cream-dim text-xs">
             {activeSections.length > 0
               ? `Showing ${activeSections.length} pinned section${activeSections.length === 1 ? '' : 's'}`
-              : 'Discover movies outside your library'}
+              : 'Pin some chips to explore movies outside your library'}
           </p>
         </div>
         <button

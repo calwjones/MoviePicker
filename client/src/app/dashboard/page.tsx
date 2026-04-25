@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/useToast';
 import { friendsApi } from '@/lib/api';
 import { connectSocket, getSocket } from '@/lib/socket';
 import ToastContainer from '@/components/ToastContainer';
-import BrowseTab from './components/BrowseTab';
+import DiscoverTab from './components/DiscoverTab';
 import LibraryTab from './components/LibraryTab';
 import SwipeTab from './components/SwipeTab';
 import FriendsTab from './components/FriendsTab';
@@ -17,11 +17,11 @@ import NotificationsTab from './components/NotificationsTab';
 import OnboardingModal from '@/components/OnboardingModal';
 import { FullPageSpinner } from '@/components/LoadingSpinner';
 
-type Tab = 'browse' | 'library' | 'swipe' | 'friends' | 'history' | 'notifications';
-const ALL_TABS: readonly Tab[] = ['browse', 'library', 'swipe', 'friends', 'history', 'notifications'];
+type Tab = 'discover' | 'library' | 'swipe' | 'friends' | 'history' | 'notifications';
+const ALL_TABS: readonly Tab[] = ['discover', 'library', 'swipe', 'friends', 'history', 'notifications'];
 
 const TAB_LABELS: Record<Tab, string> = {
-  browse: 'Browse',
+  discover: 'Discover',
   library: 'Library',
   swipe: 'Swipe',
   friends: 'Friends',
@@ -34,7 +34,7 @@ function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toasts, addToast } = useToast();
-  const [tab, setTab] = useState<Tab>('browse');
+  const [tab, setTab] = useState<Tab>('discover');
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [inviteCount, setInviteCount] = useState(0);
 
@@ -45,7 +45,8 @@ function DashboardContent() {
   }, [user, authLoading, router]);
 
   useEffect(() => {
-    const t = searchParams.get('tab');
+    const raw = searchParams.get('tab');
+    const t = raw === 'browse' ? 'discover' : raw;
     if (t && ALL_TABS.includes(t as Tab)) {
       if ((t === 'friends' || t === 'notifications') && user?.isGuest) return;
       setTab(t as Tab);
@@ -97,8 +98,8 @@ function DashboardContent() {
   }
 
   const tabs: Tab[] = user?.isGuest
-    ? ['browse', 'library', 'swipe', 'history']
-    : ['browse', 'library', 'swipe', 'friends', 'history', 'notifications'];
+    ? ['discover', 'library', 'swipe', 'history']
+    : ['discover', 'library', 'swipe', 'friends', 'history', 'notifications'];
 
   return (
     <div className="min-h-dvh px-6 py-8 w-full max-w-5xl mx-auto lg:px-12 flex flex-col items-stretch">
@@ -154,7 +155,7 @@ function DashboardContent() {
       </div>
 
       <AnimatePresence mode="wait">
-        {tab === 'browse' && <BrowseTab key="browse" addToast={addToast} />}
+        {tab === 'discover' && <DiscoverTab key="discover" addToast={addToast} />}
         {tab === 'library' && <LibraryTab key="library" addToast={addToast} />}
         {tab === 'swipe' && <SwipeTab key="swipe" addToast={addToast} />}
         {tab === 'friends' && <FriendsTab key="friends" addToast={addToast} />}
