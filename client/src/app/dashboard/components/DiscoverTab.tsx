@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { browseApi, movieApi, providerApi } from '@/lib/api';
+import { browseApi, categoriesApi, movieApi, providerApi, type CategorySummary } from '@/lib/api';
 import MoviePoster from '@/components/MoviePoster';
 import InCinemaBadge from '@/components/InCinemaBadge';
 import RecDetailSheet from '@/components/RecDetailSheet';
@@ -83,6 +83,7 @@ export default function DiscoverTab({ addToast }: DiscoverTabProps) {
   const [streamingProviders, setStreamingProviders] = useState<ProviderChip[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [providersExpanded, setProvidersExpanded] = useState(false);
+  const [categories, setCategories] = useState<CategorySummary[]>([]);
 
   useEffect(() => {
     try {
@@ -235,6 +236,12 @@ export default function DiscoverTab({ addToast }: DiscoverTabProps) {
     loadRows('initial', activeSections);
   }, [loadRows, activeSections]);
 
+  useEffect(() => {
+    categoriesApi.list()
+      .then((res) => setCategories(res.data.categories ?? []))
+      .catch(() => { /* ignore */ });
+  }, []);
+
   const toggleSection = useCallback((key: string) => {
     setActiveSections((prev) =>
       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
@@ -312,6 +319,45 @@ export default function DiscoverTab({ addToast }: DiscoverTabProps) {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Curated categories */}
+      {categories.length > 0 && (
+        <div className="glass rounded-2xl p-4 space-y-3">
+          <div>
+            <h2 className="text-lg font-semibold font-display">Vibe picks</h2>
+            <p className="text-cream-dim text-xs">Curated lists for whatever mood it is.</p>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1 snap-x">
+            {categories.map((cat) => (
+              <button
+                key={cat.slug}
+                onClick={() => router.push(`/discover?category=${cat.slug}`)}
+                className="flex-shrink-0 w-36 snap-start group text-left"
+                aria-label={`Start swiping ${cat.label}`}
+              >
+                <div
+                  className="relative w-36 h-44 rounded-xl overflow-hidden mb-2 shadow-lg group-hover:scale-[1.03] transition-all"
+                  style={{ backgroundColor: cat.accent }}
+                >
+                  {cat.posterUrl && (
+                    <div
+                      className="absolute inset-0 bg-cover bg-center opacity-70 group-hover:opacity-90 transition-opacity"
+                      style={{ backgroundImage: `url(${cat.posterUrl})` }}
+                    />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-charcoal via-charcoal/30 to-transparent" />
+                  <div className="absolute inset-0 p-3 flex flex-col justify-end">
+                    <p className="text-cream text-sm font-semibold leading-tight" style={{ fontFamily: 'var(--font-playfair)' }}>
+                      {cat.label}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-cream-dim text-[10px] line-clamp-2 leading-snug">{cat.blurb}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div className="glass rounded-2xl p-4 flex items-center justify-between">

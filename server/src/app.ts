@@ -19,6 +19,7 @@ import discoverRoutes from './routes/discover';
 import popularRoutes from './routes/popular';
 import friendsRoutes from './routes/friends';
 import devicesRoutes from './routes/devices';
+import categoriesRoutes from './routes/categories';
 
 export const prisma = process.env.NODE_ENV === 'test'
   ? ({} as unknown as PrismaClient)
@@ -56,6 +57,7 @@ app.use('/api/discover', discoverRoutes);
 app.use('/api/popular', popularRoutes);
 app.use('/api/friends', friendsRoutes);
 app.use('/api/devices', devicesRoutes);
+app.use('/api/categories', categoriesRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

@@ -153,6 +153,20 @@ export const browseApi = {
       : undefined),
 };
 
+export interface CategorySummary {
+  slug: string;
+  label: string;
+  blurb: string;
+  accent: string;
+  posterUrl: string | null;
+  movieCount: number;
+}
+
+export const categoriesApi = {
+  list: () => api.get<{ categories: CategorySummary[] }>('/categories'),
+  get: (slug: string) => api.get(`/categories/${slug}/movies`),
+};
+
 export const friendsApi = {
   list: () => api.get('/friends'),
   pending: () => api.get('/friends/pending'),

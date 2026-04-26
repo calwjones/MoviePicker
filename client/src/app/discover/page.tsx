@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useAuthGuard } from '@/hooks/useAuthGuard';
-import { discoverApi, movieApi } from '@/lib/api';
+import { categoriesApi, discoverApi, movieApi } from '@/lib/api';
 import { getErrorMessage } from '@/lib/errors';
 import { clearSwipeFilters } from '@/lib/filters';
 import SwipeView from '@/components/SwipeView';
@@ -59,7 +59,8 @@ function parseFiltersFromQuery(sp: URLSearchParams) {
     const ids = providersRaw.split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => !Number.isNaN(n) && n > 0);
     providers = ids.length > 0 ? ids : 'none';
   }
-  return { genres, decade, minRating, batchSize, providers };
+  const category = sp.get('category') ?? '';
+  return { genres, decade, minRating, batchSize, providers, category };
 }
 
 function DiscoverSwipePageInner() {
@@ -103,6 +104,15 @@ function DiscoverSwipePageInner() {
   const [enrichingTmdbId, setEnrichingTmdbId] = useState<number | null>(null);
 
   const fetchPage = useCallback(async (targetPage: number) => {
+    if (queryFilters.category) {
+      const res = await categoriesApi.get(queryFilters.category);
+      return {
+        movies: (res.data.movies ?? []) as SearchResult[],
+        totalPages: 1,
+        providerDropped: false,
+        minRatingDropped: false,
+      };
+    }
     const res = await discoverApi.movies({
       genres: queryFilters.genres,
       minRating: queryFilters.minRating > 0 ? queryFilters.minRating : undefined,
