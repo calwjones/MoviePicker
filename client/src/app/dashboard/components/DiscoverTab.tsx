@@ -220,6 +220,17 @@ export default function DiscoverTab({ addToast }: DiscoverTabProps) {
     }
   }, [addToast]);
 
+  const refreshRow = useCallback(async (rowId: string) => {
+    try {
+      const res = await browseApi.get([rowId]);
+      const fresh = (res.data.rows || []).find((r: BrowseRow) => r.id === rowId);
+      if (!fresh) return;
+      setRows((prev) => prev.map((r) => (r.id === rowId ? fresh : r)));
+    } catch {
+      addToast('Failed to refresh');
+    }
+  }, [addToast]);
+
   useEffect(() => {
     loadRows('initial', activeSections);
   }, [loadRows, activeSections]);
@@ -368,6 +379,7 @@ export default function DiscoverTab({ addToast }: DiscoverTabProps) {
               row={row}
               onSelect={(rec) => setRecDetail(rec)}
               onQuickAdd={handleAddRecommendation}
+              onRefresh={() => refreshRow(row.id)}
             />
           ))}
         </div>
@@ -408,20 +420,54 @@ function BrowseRowView({
   row,
   onSelect,
   onQuickAdd,
+  onRefresh,
 }: {
   row: BrowseRow;
   onSelect: (rec: SearchResult) => void;
   onQuickAdd: (rec: SearchResult) => void;
+  onRefresh: () => Promise<void>;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [adding, setAdding] = useState<Set<number>>(new Set());
+  const [refreshing, setRefreshing] = useState(false);
   useLayoutEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollLeft = 0;
   }, [row.movies]);
   if (row.movies.length === 0) return null;
+  const handleRefresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await onRefresh();
+    } finally {
+      setRefreshing(false);
+    }
+  };
   return (
     <div className="glass rounded-2xl p-4">
-      <h3 className="text-sm font-semibold text-danger uppercase tracking-wider mb-3">{row.title}</h3>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-danger uppercase tracking-wider">{row.title}</h3>
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="text-cream-dim text-xs hover:text-cream transition-colors disabled:opacity-50 flex items-center gap-1"
+          aria-label={`Refresh ${row.title}`}
+          title="Refresh this section"
+        >
+          <svg
+            className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <polyline points="23 4 23 10 17 10" />
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+          </svg>
+        </button>
+      </div>
       <div ref={scrollRef} className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x">
         {row.movies.map((rec) => (
           <div
