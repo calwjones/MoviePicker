@@ -15,6 +15,7 @@ import FriendsTab from './components/FriendsTab';
 import HistoryTab from './components/HistoryTab';
 import NotificationsTab from './components/NotificationsTab';
 import OnboardingModal from '@/components/OnboardingModal';
+import FeedbackButton from '@/components/FeedbackButton';
 import { FullPageSpinner } from '@/components/LoadingSpinner';
 
 type Tab = 'discover' | 'library' | 'swipe' | 'friends' | 'history';
@@ -215,6 +216,7 @@ function DashboardContent() {
         onClose={dismissOnboarding}
         onPickPath={handleOnboardingPath}
       />
+      {user && !user.isGuest && <FeedbackButton addToast={addToast} />}
     </div>
   );
 }

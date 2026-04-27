@@ -191,6 +191,11 @@ export const popularApi = {
   allTime: () => api.get('/popular/all-time'),
 };
 
+export const feedbackApi = {
+  submit: (body: string, page?: string) =>
+    api.post('/feedback', { body, page }),
+};
+
 export const discoverApi = {
   movies: (params: { genres?: string[]; minRating?: number; decade?: string; page?: number; providers?: number[] | 'none' }) =>
     api.get('/discover', {

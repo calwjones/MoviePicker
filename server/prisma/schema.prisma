@@ -215,3 +215,15 @@ model DeviceToken {
   @@map("device_tokens")
 }
 
+model Feedback {
+  id        String   @id @default(uuid())
+  userId    String?  @map("user_id")
+  body      String
+  page      String?
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("feedback")
+}
+
