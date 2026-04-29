@@ -4,6 +4,7 @@ import { emit } from '../services/emitter';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { CLIENT_URL } from '../config';
 import { applyMovieFilters, MovieFilters } from '../lib/filterMovies';
+import { buildGroupPool } from '../lib/groupCuration';
 import { resolveSessionRole } from '../lib/resolveSessionRole';
 import { getInCinemaIds, attachInCinema } from '../services/cinemaStatus';
 import { sendPush } from '../services/pushSender';
@@ -78,62 +79,6 @@ function parseBatchSize(value: unknown): number | null {
   if (value === null) return null;
   if (typeof value === 'number' && value > 0) return Math.floor(value);
   return 50;
-}
-
-async function buildGroupPool(
-  sessionId: string,
-  filters: MovieFilters,
-  batchSize: number | null,
-  excludeMovieIds: Set<string> = new Set(),
-): Promise<Movie[]> {
-  const MIN_SHARED = 15;
-
-  const participants = await prisma.sessionParticipant.findMany({
-    where: { sessionId, leftAt: null },
-    select: { userId: true, isHost: true },
-  });
-
-  const userIds = participants.map((p) => p.userId).filter((x): x is string => !!x);
-  const capped = (pool: Movie[]) => (batchSize != null ? pool.slice(0, batchSize) : pool);
-
-  if (userIds.length === 0) return [];
-
-  const perUserPools: Movie[][] = [];
-  for (const uid of userIds) {
-    const userMovies = await prisma.userMovie.findMany({
-      where: { userId: uid, onWatchlist: true },
-      include: { movie: true },
-    });
-    perUserPools.push(applyMovieFilters(
-      userMovies.map((um) => um.movie).filter((m) => !excludeMovieIds.has(m.id)),
-      filters,
-    ));
-  }
-
-  if (perUserPools.length === 1) {
-    return capped(shuffle([...perUserPools[0]]));
-  }
-
-  const movieIdSets = perUserPools.map((pool) => new Set(pool.map((m) => m.id)));
-  const basePool = perUserPools[0];
-  const intersection = basePool.filter((m) => movieIdSets.slice(1).every((s) => s.has(m.id)));
-
-  if (intersection.length >= MIN_SHARED) {
-    return capped(shuffle([...intersection]));
-  }
-
-  const intersectionIds = new Set(intersection.map((m) => m.id));
-  const unionMap = new Map<string, Movie>();
-  for (const pool of perUserPools) {
-    for (const m of pool) {
-      if (!intersectionIds.has(m.id)) unionMap.set(m.id, m);
-    }
-  }
-  const fillCap = batchSize != null
-    ? Math.max(0, batchSize - intersection.length)
-    : unionMap.size;
-  const fill = shuffle(Array.from(unionMap.values())).slice(0, fillCap);
-  return capped(shuffle([...intersection, ...fill]));
 }
 
 async function sampleSoloBatch(
