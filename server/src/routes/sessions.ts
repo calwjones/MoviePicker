@@ -299,7 +299,12 @@ router.post('/:id/start', authenticate, async (req: AuthRequest, res: Response) 
 
     await prisma.$transaction([
       prisma.sessionMovie.createMany({
-        data: moviePool.map((m) => ({ sessionId, movieId: m.id })),
+        data: moviePool.map((p) => ({
+          sessionId,
+          movieId: p.movie.id,
+          tier: p.tier,
+          sourceUserId: p.sourceUserId,
+        })),
       }),
       prisma.swipeSession.update({
         where: { id: sessionId },
@@ -341,19 +346,20 @@ router.post('/:id/another-batch', authenticate, async (req: AuthRequest, res: Re
     const filters = (session.filters ?? {}) as MovieFilters;
     const batchSize = session.batchSize;
 
-    let newMovies: Movie[];
+    let newRows: { movieId: string; tier: string | null; sourceUserId: string | null }[];
     if (session.type === 'solo') {
-      newMovies = await sampleSoloBatch(session.userId!, filters, batchSize, seenMovieIds);
+      const movies = await sampleSoloBatch(session.userId!, filters, batchSize, seenMovieIds);
+      newRows = movies.map((m) => ({ movieId: m.id, tier: null, sourceUserId: null }));
     } else {
-      newMovies = await buildGroupPool(
-        sessionId,
-        filters,
-        batchSize,
-        seenMovieIds,
-      );
+      const picks = await buildGroupPool(sessionId, filters, batchSize, seenMovieIds);
+      newRows = picks.map((p) => ({
+        movieId: p.movie.id,
+        tier: p.tier,
+        sourceUserId: p.sourceUserId,
+      }));
     }
 
-    if (newMovies.length === 0) {
+    if (newRows.length === 0) {
       const refreshed = await prisma.swipeSession.findUnique({
         where: { id: sessionId },
         include: { movies: { include: { movie: true } }, matches: { include: { movie: true } } },
@@ -363,7 +369,7 @@ router.post('/:id/another-batch', authenticate, async (req: AuthRequest, res: Re
     }
 
     await prisma.sessionMovie.createMany({
-      data: newMovies.map((m) => ({ sessionId, movieId: m.id })),
+      data: newRows.map((r) => ({ sessionId, ...r })),
       skipDuplicates: true,
     });
 
@@ -381,11 +387,11 @@ router.post('/:id/another-batch', authenticate, async (req: AuthRequest, res: Re
     const decoratedSession = await decorateSession(updatedSession);
 
     emit(`session:${sessionId}`, 'new-batch', {
-      added: newMovies.length,
+      added: newRows.length,
       session: decoratedSession,
     });
 
-    res.json({ added: newMovies.length, session: decoratedSession });
+    res.json({ added: newRows.length, session: decoratedSession });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal server error' });

@@ -176,6 +176,8 @@ model SessionMovie {
   movieId   String  @map("movie_id")
   user1Swipe String? @map("user_1_swipe")
   user2Swipe String? @map("user_2_swipe")
+  tier         String? @map("tier")
+  sourceUserId String? @map("source_user_id")
 
   session SwipeSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   movie   Movie        @relation(fields: [movieId], references: [id])

@@ -85,28 +85,43 @@ function scoreCandidate(
   return sum / usable.length;
 }
 
-function roundRobinPick(
-  perParticipantSorted: Movie[][],
+export interface CuratedPick {
+  movie: Movie;
+  tier: 'crossover' | 'exclusive';
+  sourceUserId: string | null;
+}
+
+function roundRobinPickByOwner(
+  perParticipant: { userId: string; movies: Movie[] }[],
   budget: number,
-): Movie[] {
+): CuratedPick[] {
   if (budget <= 0) return [];
-  const out: Movie[] = [];
-  const cursors = new Array(perParticipantSorted.length).fill(0);
+  const out: CuratedPick[] = [];
+  const cursors = new Array(perParticipant.length).fill(0);
   let exhausted = 0;
-  while (out.length < budget && exhausted < perParticipantSorted.length) {
+  while (out.length < budget && exhausted < perParticipant.length) {
     exhausted = 0;
-    for (let i = 0; i < perParticipantSorted.length && out.length < budget; i++) {
+    for (let i = 0; i < perParticipant.length && out.length < budget; i++) {
       const c = cursors[i];
-      const list = perParticipantSorted[i];
-      if (c >= list.length) {
+      const owner = perParticipant[i];
+      if (c >= owner.movies.length) {
         exhausted++;
         continue;
       }
-      out.push(list[c]);
+      out.push({ movie: owner.movies[c], tier: 'exclusive', sourceUserId: owner.userId });
       cursors[i] = c + 1;
     }
   }
   return out;
+}
+
+function shufflePicks(picks: CuratedPick[]): CuratedPick[] {
+  const arr = [...picks];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
 }
 
 export async function buildGroupPool(
@@ -114,7 +129,7 @@ export async function buildGroupPool(
   filters: MovieFilters,
   batchSize: number | null,
   excludeMovieIds: Set<string> = new Set(),
-): Promise<Movie[]> {
+): Promise<CuratedPick[]> {
   const participants = await prisma.sessionParticipant.findMany({
     where: { sessionId, leftAt: null },
     select: { userId: true },
@@ -123,10 +138,16 @@ export async function buildGroupPool(
   if (userIds.length === 0) return [];
 
   const pools = await loadParticipantPools(userIds, filters, excludeMovieIds);
-  const cap = (arr: Movie[]) => (batchSize != null ? arr.slice(0, batchSize) : arr);
 
   if (pools.length === 1) {
-    return cap(shuffle([...pools[0].watchlist]));
+    const ownerId = pools[0].userId;
+    const picks: CuratedPick[] = pools[0].watchlist.map((m) => ({
+      movie: m,
+      tier: 'exclusive',
+      sourceUserId: ownerId,
+    }));
+    const shuffled = shufflePicks(picks);
+    return batchSize != null ? shuffled.slice(0, batchSize) : shuffled;
   }
 
   const idSets = pools.map((p) => new Set(p.watchlist.map((m) => m.id)));
@@ -134,6 +155,11 @@ export async function buildGroupPool(
     idSets.slice(1).every((s) => s.has(m.id)),
   );
   const intersectionIds = new Set(intersection.map((m) => m.id));
+  const crossoverPicks: CuratedPick[] = intersection.map((m) => ({
+    movie: m,
+    tier: 'crossover',
+    sourceUserId: null,
+  }));
 
   const recCache = new Map<number, Promise<{ id: number; vote_average?: number; popularity?: number }[]>>();
   const affinityByUser = new Map<string, Map<number, number>>();
@@ -150,22 +176,23 @@ export async function buildGroupPool(
       .filter((p) => p.userId !== owner.userId)
       .map((p) => affinityByUser.get(p.userId)!)
       .filter((m): m is Map<number, number> => m != null);
-    return exclusive
+    const sorted = exclusive
       .map((m) => ({ m, score: scoreCandidate(m, otherMaps) }))
       .sort((a, b) => b.score - a.score)
       .map(({ m }) => m);
+    return { userId: owner.userId, movies: sorted };
   });
 
   if (batchSize == null) {
-    const tier2 = roundRobinPick(sortedExclusivesPerOwner, Number.MAX_SAFE_INTEGER);
-    return shuffle([...intersection, ...tier2]);
+    const exclusives = roundRobinPickByOwner(sortedExclusivesPerOwner, Number.MAX_SAFE_INTEGER);
+    return shufflePicks([...crossoverPicks, ...exclusives]);
   }
 
   const tier2Reserve = Math.max(1, Math.floor(batchSize * TIER_2_RATIO));
   const crossoverCap = Math.max(0, batchSize - tier2Reserve);
-  const tier1 = intersection.slice(0, crossoverCap);
+  const tier1 = crossoverPicks.slice(0, crossoverCap);
   const tier2Budget = batchSize - tier1.length;
-  const tier2 = roundRobinPick(sortedExclusivesPerOwner, tier2Budget);
+  const tier2 = roundRobinPickByOwner(sortedExclusivesPerOwner, tier2Budget);
 
-  return shuffle([...tier1, ...tier2]);
+  return shufflePicks([...tier1, ...tier2]);
 }

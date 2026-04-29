@@ -48,6 +48,8 @@ export interface SessionMovie {
   movie: Movie;
   user1Swipe: string | null;
   user2Swipe: string | null;
+  tier?: 'crossover' | 'exclusive' | null;
+  sourceUserId?: string | null;
 }
 
 export interface Match {

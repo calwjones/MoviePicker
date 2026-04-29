@@ -552,6 +552,8 @@ export default function SessionPage() {
         swipeError={swipeError}
         loading={loading}
         done={done}
+        participantNames={Object.fromEntries(participants.map((p) => [p.id, p.displayName]))}
+        selfUserId={user?.id ?? null}
         headerRight={
           participants.length > 1 ? (
             <div className="flex items-center gap-2">

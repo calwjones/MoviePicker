@@ -24,6 +24,8 @@ interface SwipeViewProps {
   doneContent: React.ReactNode;
   onExpand?: (movie: SessionMovie['movie']) => void;
   detailLoading?: boolean;
+  participantNames?: Record<string, string>;
+  selfUserId?: string | null;
 }
 
 export default function SwipeView({
@@ -40,6 +42,8 @@ export default function SwipeView({
   doneContent,
   onExpand,
   detailLoading,
+  participantNames,
+  selfUserId,
 }: SwipeViewProps) {
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
@@ -98,8 +102,24 @@ export default function SwipeView({
     );
   }
 
-  const currentMovie = movies[currentIndex]?.movie;
+  const currentSession = movies[currentIndex];
+  const currentMovie = currentSession?.movie;
   if (!currentMovie) return null;
+
+  const tierBadge = (() => {
+    if (!currentSession) return null;
+    if (currentSession.tier === 'crossover') {
+      return { label: 'shared pick', tone: 'crossover' as const };
+    }
+    if (currentSession.tier === 'exclusive' && currentSession.sourceUserId) {
+      if (currentSession.sourceUserId === selfUserId) {
+        return { label: 'your pick', tone: 'self' as const };
+      }
+      const name = participantNames?.[currentSession.sourceUserId];
+      if (name) return { label: `${name}'s pick`, tone: 'other' as const };
+    }
+    return null;
+  })();
 
   return (
     <div className="h-dvh overflow-hidden flex flex-col overscroll-none">
@@ -217,6 +237,22 @@ export default function SwipeView({
           {currentMovie.inCinema && (
             <div className="absolute top-4 left-4 z-10 pointer-events-none">
               <InCinemaBadge />
+            </div>
+          )}
+
+          {tierBadge && (
+            <div className="absolute top-4 right-4 z-10 pointer-events-none">
+              <span
+                className={`px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide backdrop-blur-md ${
+                  tierBadge.tone === 'crossover'
+                    ? 'bg-coral/90 text-charcoal'
+                    : tierBadge.tone === 'self'
+                      ? 'bg-cream/20 text-cream ring-1 ring-cream/30'
+                      : 'bg-charcoal/70 text-cream ring-1 ring-cream/20'
+                }`}
+              >
+                {tierBadge.label}
+              </span>
             </div>
           )}
 
