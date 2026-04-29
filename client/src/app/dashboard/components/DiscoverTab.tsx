@@ -352,7 +352,6 @@ export default function DiscoverTab({ addToast }: DiscoverTabProps) {
                     </p>
                   </div>
                 </div>
-                <p className="text-cream-dim text-[10px] line-clamp-2 leading-snug">{cat.blurb}</p>
               </button>
             ))}
           </div>

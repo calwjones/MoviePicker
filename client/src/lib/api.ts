@@ -156,7 +156,6 @@ export const browseApi = {
 export interface CategorySummary {
   slug: string;
   label: string;
-  blurb: string;
   accent: string;
   posterUrl: string | null;
   movieCount: number;

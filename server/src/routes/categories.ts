@@ -30,7 +30,6 @@ router.get('/', authenticate, async (_req: AuthRequest, res: Response) => {
         return {
           slug: def.slug,
           label: def.label,
-          blurb: def.blurb,
           accent: def.accent,
           posterUrl: cover?.poster_path ? `${TMDB_IMAGE_BASE}${cover.poster_path}` : null,
           movieCount: results.length,
@@ -60,7 +59,6 @@ router.get('/:slug/movies', authenticate, async (req: AuthRequest, res: Response
     res.json({
       slug: def.slug,
       label: def.label,
-      blurb: def.blurb,
       accent: def.accent,
       movies,
     });

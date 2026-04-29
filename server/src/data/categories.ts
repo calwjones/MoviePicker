@@ -6,7 +6,6 @@ export interface CategoryMovie {
 export interface CategoryDef {
   slug: string;
   label: string;
-  blurb: string;
   accent: string;
   movies: CategoryMovie[];
 }
@@ -14,8 +13,7 @@ export interface CategoryDef {
 export const CATEGORIES: CategoryDef[] = [
   {
     slug: 'girls-night',
-    label: 'Girls Night',
-    blurb: 'Pajama-pile, popcorn, peak girlhood.',
+    label: 'girls night',
     accent: '#f48fb1',
     movies: [
       { title: 'Mean Girls', year: 2004 },
@@ -42,8 +40,7 @@ export const CATEGORIES: CategoryDef[] = [
   },
   {
     slug: 'stoner-night',
-    label: 'Stoner Night',
-    blurb: 'Lights low, snacks high, plot optional.',
+    label: 'stoner night',
     accent: '#a5d6a7',
     movies: [
       { title: 'Pineapple Express', year: 2008 },
@@ -70,8 +67,7 @@ export const CATEGORIES: CategoryDef[] = [
   },
   {
     slug: 'date-night',
-    label: 'Date Night',
-    blurb: 'Romance with the lights dimmed.',
+    label: 'date night',
     accent: '#ef9a9a',
     movies: [
       { title: 'The Notebook', year: 2004 },
@@ -98,8 +94,7 @@ export const CATEGORIES: CategoryDef[] = [
   },
   {
     slug: 'cozy-fall',
-    label: 'Cozy Fall',
-    blurb: 'Sweater weather, hot drink, warm story.',
+    label: 'cozy fall',
     accent: '#ffb74d',
     movies: [
       { title: "You've Got Mail", year: 1998 },
@@ -126,8 +121,7 @@ export const CATEGORIES: CategoryDef[] = [
   },
   {
     slug: 'christmas-comfort',
-    label: 'Christmas Comfort',
-    blurb: 'Tree lit, fairy lights, fuzzy socks.',
+    label: 'christmas comfort',
     accent: '#e57373',
     movies: [
       { title: 'Home Alone', year: 1990 },
@@ -154,8 +148,7 @@ export const CATEGORIES: CategoryDef[] = [
   },
   {
     slug: 'spooky-not-scary',
-    label: 'Spooky But Not Scary',
-    blurb: 'Halloween mood, no nightmares.',
+    label: 'spooky not scary',
     accent: '#ffb74d',
     movies: [
       { title: 'Beetlejuice', year: 1988 },
@@ -183,7 +176,6 @@ export const CATEGORIES: CategoryDef[] = [
   {
     slug: 'omg-im-so-single',
     label: 'omg im so single',
-    blurb: 'Heartbreak hits, ice cream optional.',
     accent: '#ce93d8',
     movies: [
       { title: '500 Days of Summer', year: 2009 },
@@ -211,7 +203,6 @@ export const CATEGORIES: CategoryDef[] = [
   {
     slug: 'wtf-did-i-just-watch',
     label: 'wtf did i just watch',
-    blurb: 'Brain melting in the best way.',
     accent: '#80deea',
     movies: [
       { title: 'Mulholland Drive', year: 2001 },
@@ -239,35 +230,33 @@ export const CATEGORIES: CategoryDef[] = [
   {
     slug: 'did-i-even-watch-that',
     label: 'did i even watch that',
-    blurb: 'Hazy, dreamy, half-remembered.',
     accent: '#b39ddb',
     movies: [
-      { title: 'Mulholland Drive', year: 2001 },
-      { title: 'Lost Highway', year: 1997 },
-      { title: 'Inland Empire', year: 2006 },
-      { title: 'The Tree of Life', year: 2011 },
       { title: 'Stalker', year: 1979 },
       { title: 'Solaris', year: 1972 },
+      { title: 'The Tree of Life', year: 2011 },
+      { title: 'Days of Heaven', year: 1978 },
       { title: 'Picnic at Hanging Rock', year: 1975 },
-      { title: 'Beyond the Black Rainbow', year: 2010 },
-      { title: 'Suspiria', year: 2018 },
-      { title: 'Under the Skin', year: 2013 },
-      { title: 'The Holy Mountain', year: 1973 },
-      { title: 'Enter the Void', year: 2009 },
-      { title: 'Spring Breakers', year: 2012 },
-      { title: 'Climax', year: 2018 },
-      { title: 'Uncle Boonmee Who Can Recall His Past Lives', year: 2010 },
-      { title: 'Daughters of the Dust', year: 1991 },
-      { title: 'Beau Travail', year: 1999 },
       { title: 'In the Mood for Love', year: 2000 },
+      { title: 'Chungking Express', year: 1994 },
+      { title: 'Happy Together', year: 1997 },
       { title: 'Drive My Car', year: 2021 },
       { title: 'Memoria', year: 2021 },
+      { title: 'Uncle Boonmee Who Can Recall His Past Lives', year: 2010 },
+      { title: 'Beau Travail', year: 1999 },
+      { title: 'Daughters of the Dust', year: 1991 },
+      { title: 'Paterson', year: 2016 },
+      { title: 'Columbus', year: 2017 },
+      { title: 'After Yang', year: 2021 },
+      { title: 'Portrait of a Lady on Fire', year: 2019 },
+      { title: 'Petite Maman', year: 2021 },
+      { title: 'Aftersun', year: 2022 },
+      { title: 'Past Lives', year: 2023 },
     ],
   },
   {
     slug: 'gonna-ugly-cry-tonight',
     label: 'gonna ugly cry tonight',
-    blurb: 'Tissues nearby. You have been warned.',
     accent: '#90caf9',
     movies: [
       { title: 'Manchester by the Sea', year: 2016 },
@@ -295,7 +284,6 @@ export const CATEGORIES: CategoryDef[] = [
   {
     slug: 'high-school-is-hell',
     label: 'high school is hell',
-    blurb: 'Cafeteria politics, locker dread, peak teen.',
     accent: '#ffcc80',
     movies: [
       { title: 'The Breakfast Club', year: 1985 },
@@ -323,7 +311,6 @@ export const CATEGORIES: CategoryDef[] = [
   {
     slug: 'cool-asf',
     label: 'cool asf',
-    blurb: 'Frame this. Posters in dorm rooms incoming.',
     accent: '#9fa8da',
     movies: [
       { title: 'Drive', year: 2011 },
