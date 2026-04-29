@@ -16,6 +16,17 @@ const feedbackLimiter = rateLimit({
 const MAX_BODY = 2000;
 const MAX_PAGE = 200;
 
+const ADMIN_USER_IDS = new Set(
+  (process.env.ADMIN_USER_IDS ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0),
+);
+
+function isAdmin(req: AuthRequest): boolean {
+  return !req.isGuest && req.userId != null && ADMIN_USER_IDS.has(req.userId);
+}
+
 router.post('/', feedbackLimiter, authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.isGuest ? null : req.userId ?? null;
@@ -46,6 +57,36 @@ router.post('/', feedbackLimiter, authenticate, async (req: AuthRequest, res: Re
     res.json({ success: true });
   } catch (err) {
     console.error('[feedback] submit failed', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
+  if (!isAdmin(req)) {
+    res.status(403).json({ error: 'Forbidden' });
+    return;
+  }
+  try {
+    const limit = Math.min(parseInt(String(req.query.limit ?? '100'), 10) || 100, 500);
+    const rows = await prisma.feedback.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+    const userIds = Array.from(new Set(rows.map((r) => r.userId).filter((x): x is string => !!x)));
+    const users = userIds.length > 0
+      ? await prisma.user.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, username: true },
+        })
+      : [];
+    const userById = new Map(users.map((u) => [u.id, u.username]));
+    const feedback = rows.map((r) => ({
+      ...r,
+      username: r.userId ? userById.get(r.userId) ?? null : null,
+    }));
+    res.json({ feedback });
+  } catch (err) {
+    console.error('[feedback] list failed', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
