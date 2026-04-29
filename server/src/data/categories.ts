@@ -93,8 +93,8 @@ export const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    slug: 'cozy-fall',
-    label: 'cozy fall',
+    slug: 'autumn-nights',
+    label: 'autumn nights',
     accent: '#ffb74d',
     movies: [
       { title: "You've Got Mail", year: 1998 },
@@ -174,8 +174,8 @@ export const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    slug: 'omg-im-so-single',
-    label: 'omg im so single',
+    slug: 'single',
+    label: 'single',
     accent: '#ce93d8',
     movies: [
       { title: '500 Days of Summer', year: 2009 },
@@ -201,8 +201,8 @@ export const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    slug: 'wtf-did-i-just-watch',
-    label: 'wtf did i just watch',
+    slug: 'fever-dreams',
+    label: 'fever dreams',
     accent: '#80deea',
     movies: [
       { title: 'Mulholland Drive', year: 2001 },
@@ -228,8 +228,8 @@ export const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    slug: 'did-i-even-watch-that',
-    label: 'did i even watch that',
+    slug: 'slow-cinema',
+    label: 'slow cinema',
     accent: '#b39ddb',
     movies: [
       { title: 'Stalker', year: 1979 },
@@ -255,8 +255,8 @@ export const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    slug: 'gonna-ugly-cry-tonight',
-    label: 'gonna ugly cry tonight',
+    slug: 'tearjerkers',
+    label: 'tearjerkers',
     accent: '#90caf9',
     movies: [
       { title: 'Manchester by the Sea', year: 2016 },
@@ -282,8 +282,8 @@ export const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    slug: 'high-school-is-hell',
-    label: 'high school is hell',
+    slug: 'teenage',
+    label: 'teenage',
     accent: '#ffcc80',
     movies: [
       { title: 'The Breakfast Club', year: 1985 },
@@ -309,8 +309,8 @@ export const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    slug: 'cool-asf',
-    label: 'cool asf',
+    slug: 'all-style',
+    label: 'all style',
     accent: '#9fa8da',
     movies: [
       { title: 'Drive', year: 2011 },
