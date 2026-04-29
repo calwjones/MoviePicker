@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { browseApi, categoriesApi, movieApi, providerApi, type CategorySummary } from '@/lib/api';
+import { browseApi, categoriesApi, friendsApi, movieApi, providerApi, type CategorySummary, type LovedMovie } from '@/lib/api';
 import MoviePoster from '@/components/MoviePoster';
 import InCinemaBadge from '@/components/InCinemaBadge';
 import RecDetailSheet from '@/components/RecDetailSheet';
@@ -84,6 +84,7 @@ export default function DiscoverTab({ addToast }: DiscoverTabProps) {
   const [showFilters, setShowFilters] = useState(false);
   const [providersExpanded, setProvidersExpanded] = useState(false);
   const [categories, setCategories] = useState<CategorySummary[]>([]);
+  const [lovedMovies, setLovedMovies] = useState<LovedMovie[]>([]);
 
   useEffect(() => {
     try {
@@ -242,6 +243,13 @@ export default function DiscoverTab({ addToast }: DiscoverTabProps) {
       .catch(() => { /* ignore */ });
   }, []);
 
+  useEffect(() => {
+    if (user?.isGuest) return;
+    friendsApi.loved()
+      .then((res) => setLovedMovies(res.data.movies ?? []))
+      .catch(() => { /* ignore */ });
+  }, [user]);
+
   const toggleSection = useCallback((key: string) => {
     setActiveSections((prev) =>
       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
@@ -354,6 +362,54 @@ export default function DiscoverTab({ addToast }: DiscoverTabProps) {
                 </div>
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Friends loved */}
+      {!user?.isGuest && lovedMovies.length > 0 && (
+        <div className="glass rounded-2xl p-4 space-y-3">
+          <div>
+            <h2 className="text-lg font-semibold font-display">Friends loved</h2>
+            <p className="text-cream-dim text-xs">Highly rated by friends, not yet in your library.</p>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1 snap-x">
+            {lovedMovies.map((entry) => {
+              const m = entry.movie;
+              const top = entry.raters[0];
+              const extra = entry.raters.length - 1;
+              const attribution = extra > 0
+                ? `${top.username} ${top.rating}★ +${extra}`
+                : `${top.username} ${top.rating}★`;
+              const rec: SearchResult = {
+                tmdbId: m.tmdbId ?? 0,
+                title: m.title,
+                year: m.year,
+                posterUrl: m.posterUrl,
+                overview: m.overview,
+                rating: m.tmdbRating,
+                inCinema: m.inCinema,
+              };
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => setRecDetail(rec)}
+                  className="flex-shrink-0 w-28 snap-start group text-left"
+                  aria-label={`${m.title}, loved by ${attribution}`}
+                >
+                  <div className="relative w-28 aspect-[2/3] rounded-xl overflow-hidden bg-card mb-2 shadow-lg group-hover:shadow-coral/20 group-hover:scale-[1.03] transition-all">
+                    <MoviePoster posterUrl={m.posterUrl} title={m.title} />
+                    {m.inCinema && (
+                      <div className="absolute top-1.5 left-1.5">
+                        <InCinemaBadge size="sm" />
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs font-medium truncate">{m.title}</p>
+                  <p className="text-cream-dim text-[10px] truncate">{attribution}</p>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

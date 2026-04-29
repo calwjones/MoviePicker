@@ -184,7 +184,14 @@ export const friendsApi = {
   declineInvite: (inviteId: string) => api.post(`/friends/invites/${inviteId}/decline`),
   inviteToSession: (sessionId: string, friendIds: string[]) =>
     api.post(`/sessions/${sessionId}/invite`, { friendIds }),
+  loved: () => api.get<{ movies: LovedMovie[] }>('/friends/loved'),
 };
+
+export interface LovedMovie {
+  movie: import('@matchsticked/shared').Movie;
+  raters: { id: string; username: string; rating: number }[];
+  avgRating: number;
+}
 
 export const popularApi = {
   allTime: () => api.get('/popular/all-time'),

@@ -285,6 +285,81 @@ router.get('/:id/library', authenticate, async (req: AuthRequest, res: Response)
   }
 });
 
+router.get('/loved', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const minRating = 4;
+    const limit = Math.min(parseInt(String(req.query.limit ?? '20'), 10) || 20, 50);
+
+    const friendIds = await prisma.$queryRaw<{ other_id: string }[]>`
+      SELECT CASE WHEN requester_id = ${userId} THEN addressee_id ELSE requester_id END as other_id
+      FROM friendships
+      WHERE status = 'accepted' AND (requester_id = ${userId} OR addressee_id = ${userId})
+    `;
+    const ids = friendIds.map((r) => r.other_id);
+    if (ids.length === 0) {
+      res.json({ movies: [] });
+      return;
+    }
+
+    const myMovies = await prisma.userMovie.findMany({
+      where: { userId, OR: [{ onWatchlist: true }, { watched: true }] },
+      select: { movieId: true },
+    });
+    const ownedMovieIds = new Set(myMovies.map((m) => m.movieId));
+
+    const lovedRows = await prisma.userMovie.findMany({
+      where: {
+        userId: { in: ids },
+        userRating: { gte: minRating },
+      },
+      include: {
+        movie: true,
+        user: { select: { id: true, username: true } },
+      },
+    });
+
+    const byMovie = new Map<string, {
+      movie: typeof lovedRows[number]['movie'];
+      raters: { id: string; username: string; rating: number }[];
+    }>();
+    for (const row of lovedRows) {
+      if (ownedMovieIds.has(row.movieId)) continue;
+      if (!row.user) continue;
+      let entry = byMovie.get(row.movieId);
+      if (!entry) {
+        entry = { movie: row.movie, raters: [] };
+        byMovie.set(row.movieId, entry);
+      }
+      entry.raters.push({
+        id: row.user.id,
+        username: row.user.username,
+        rating: row.userRating ?? 0,
+      });
+    }
+
+    const inCinemaSet = await getInCinemaIds();
+    const movies = Array.from(byMovie.values())
+      .map((entry) => {
+        const avg = entry.raters.reduce((s, r) => s + r.rating, 0) / entry.raters.length;
+        return {
+          movie: attachInCinema(entry.movie, inCinemaSet),
+          raters: entry.raters.sort((a, b) => b.rating - a.rating),
+          avgRating: avg,
+          score: avg * Math.log2(entry.raters.length + 1),
+        };
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map(({ movie, raters, avgRating }) => ({ movie, raters, avgRating }));
+
+    res.json({ movies });
+  } catch (err) {
+    console.error('[friends] loved failed', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
