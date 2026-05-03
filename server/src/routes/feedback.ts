@@ -16,15 +16,21 @@ const feedbackLimiter = rateLimit({
 const MAX_BODY = 2000;
 const MAX_PAGE = 200;
 
-const ADMIN_USER_IDS = new Set(
-  (process.env.ADMIN_USER_IDS ?? '')
+const ADMIN_USERNAMES = new Set(
+  (process.env.ADMIN_USERNAMES ?? '')
     .split(',')
-    .map((s) => s.trim())
+    .map((s) => s.trim().toLowerCase())
     .filter((s) => s.length > 0),
 );
 
-function isAdmin(req: AuthRequest): boolean {
-  return !req.isGuest && req.userId != null && ADMIN_USER_IDS.has(req.userId);
+async function isAdmin(req: AuthRequest): Promise<boolean> {
+  if (req.isGuest || req.userId == null) return false;
+  if (ADMIN_USERNAMES.size === 0) return false;
+  const u = await prisma.user.findUnique({
+    where: { id: req.userId },
+    select: { username: true },
+  });
+  return u != null && ADMIN_USERNAMES.has(u.username.toLowerCase());
 }
 
 router.post('/', feedbackLimiter, authenticate, async (req: AuthRequest, res: Response) => {
@@ -62,7 +68,7 @@ router.post('/', feedbackLimiter, authenticate, async (req: AuthRequest, res: Re
 });
 
 router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
-  if (!isAdmin(req)) {
+  if (!(await isAdmin(req))) {
     res.status(403).json({ error: 'Forbidden' });
     return;
   }

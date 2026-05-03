@@ -200,7 +200,18 @@ export const popularApi = {
 export const feedbackApi = {
   submit: (body: string, page?: string) =>
     api.post('/feedback', { body, page }),
+  list: () => api.get<{ feedback: FeedbackEntry[] }>('/feedback'),
 };
+
+export interface FeedbackEntry {
+  id: string;
+  userId: string | null;
+  username: string | null;
+  body: string;
+  page: string | null;
+  userAgent: string | null;
+  createdAt: string;
+}
 
 export const discoverApi = {
   movies: (params: { genres?: string[]; minRating?: number; decade?: string; page?: number; providers?: number[] | 'none' }) =>
