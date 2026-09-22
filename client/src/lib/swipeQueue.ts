@@ -1,4 +1,5 @@
 import { swipeApi } from './api';
+import { isPermanentFailure } from './serialQueue';
 
 const STORAGE_KEY = 'moviepicker_swipe_queue';
 
@@ -58,7 +59,15 @@ export async function flushQueue(): Promise<{ flushed: number; failed: number }>
         flushed++;
         queue = queue.slice(1);
         write(queue);
-      } catch {
+      } catch (err) {
+        if (isPermanentFailure(err)) {
+          // The server will never accept this one (session ended, movie gone):
+          // drop it so it can't block every swipe queued behind it.
+          failed++;
+          queue = queue.slice(1);
+          write(queue);
+          continue;
+        }
         failed++;
         break;
       }
@@ -67,6 +76,16 @@ export async function flushQueue(): Promise<{ flushed: number; failed: number }>
     flushing = false;
   }
   return { flushed, failed };
+}
+
+/** Remove a not-yet-synced swipe. Returns true if one was queued (so the server never saw it). */
+export function dequeueSwipe(sessionId: string, movieId: string): boolean {
+  const queue = read();
+  const idx = queue.map((e) => e.sessionId === sessionId && e.movieId === movieId).lastIndexOf(true);
+  if (idx === -1) return false;
+  queue.splice(idx, 1);
+  write(queue);
+  return true;
 }
 
 export function clearQueueForSession(sessionId: string): void {

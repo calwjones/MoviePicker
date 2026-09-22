@@ -63,4 +63,21 @@ describe('Socket Client', () => {
     disconnectSocket();
     expect(socket.disconnect).toHaveBeenCalled();
   });
+
+  it('connectSocket re-authenticates when the stored token changes', () => {
+    localStorageMock.setItem('token', 'user-a');
+    connectSocket();
+    const socket = getSocket();
+    expect(socket.auth).toEqual({ token: 'user-a' });
+
+    (socket.connect as jest.Mock).mockClear();
+    connectSocket();
+    expect(socket.connect).not.toHaveBeenCalled();
+
+    localStorageMock.setItem('token', 'user-b');
+    connectSocket();
+    expect(socket.disconnect).toHaveBeenCalled();
+    expect(socket.connect).toHaveBeenCalledTimes(1);
+    expect(socket.auth).toEqual({ token: 'user-b' });
+  });
 });

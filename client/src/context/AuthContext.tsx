@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { authApi } from '@/lib/api';
+import { connectSocket, disconnectSocket } from '@/lib/socket';
 
 interface User {
   id: string;
@@ -73,6 +74,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     const res = await authApi.login(email, password);
     localStorage.setItem('token', res.data.token);
+    // Re-authenticate any socket still holding a previous session's token.
+    connectSocket();
     setUser(res.data.user);
   };
 
@@ -86,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('token');
     localStorage.removeItem('guest_session_id');
     localStorage.removeItem('user_token_backup');
+    disconnectSocket();
     setUser(null);
   }, []);
 
