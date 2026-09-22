@@ -104,13 +104,16 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
     }
 
     let isMatch = false;
+    // True only when this swipe created the match, so repeat likes don't re-notify.
+    let isNewMatch = false;
     const clearMatch = () => prisma.match.deleteMany({ where: { sessionId, movieId } });
-    const recordMatch = () =>
-      prisma.match.upsert({
-        where: { sessionId_movieId: { sessionId, movieId } },
-        update: {},
-        create: { sessionId, movieId },
+    const recordMatch = async () => {
+      const { count } = await prisma.match.createMany({
+        data: [{ sessionId, movieId }],
+        skipDuplicates: true,
       });
+      isNewMatch = count > 0;
+    };
 
     if (isSolo) {
       await Promise.all([
@@ -163,7 +166,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       participantId,
     });
 
-    if (isMatch && !isSolo) {
+    if (isNewMatch && !isSolo) {
       void (async () => {
         try {
           const [participants, movie] = await Promise.all([
@@ -531,7 +534,7 @@ router.post('/matches/:matchId/rate', authenticate, async (req: AuthRequest, res
       return;
     }
 
-    const { isSolo, isUser1, isUser2 } = await resolveSessionRole(req, match.session);
+    const { isSolo, isUser1, isUser2, isGuest } = await resolveSessionRole(req, match.session);
 
     if (isSolo) {
       if (!isUser1) {
@@ -543,17 +546,28 @@ router.post('/matches/:matchId/rate', authenticate, async (req: AuthRequest, res
       return;
     }
 
-    const updateField = isUser1 ? 'user1Rating' as const : 'user2Rating' as const;
+    // The two legacy columns predate n-person groups: every non-host shares
+    // user2Rating. Keep writing them for older clients, but a registered user's
+    // rating now lives on their own library row, where recommendations and
+    // friends' "loved" picks already read it.
+    const legacyField = isUser1 ? 'user1Rating' as const : 'user2Rating' as const;
     const [updated, inCinemaSet] = await Promise.all([
       prisma.match.update({
         where: { id: matchId },
-        data: { [updateField]: rating },
+        data: { [legacyField]: rating },
         include: { movie: true },
       }),
       getInCinemaIds(),
+      isGuest
+        ? Promise.resolve(null)
+        : prisma.userMovie.upsert({
+          where: { userId_movieId: { userId: req.userId!, movieId: match.movieId } },
+          update: { userRating: rating, watched: true, onWatchlist: false },
+          create: { userId: req.userId!, movieId: match.movieId, userRating: rating, watched: true, source: 'match' },
+        }),
     ]);
 
-    res.json({ match: { ...updated, movie: attachInCinema(updated.movie, inCinemaSet) } });
+    res.json({ match: { ...updated, userRating: rating, movie: attachInCinema(updated.movie, inCinemaSet) } });
   } catch {
     res.status(500).json({ error: 'Internal server error' });
   }

@@ -509,26 +509,46 @@ router.get('/history/all', authenticate, async (req: AuthRequest, res: Response)
       },
       include: {
         matches: { include: { movie: true } },
-        _count: { select: { movies: true } },
+        _count: { select: { movies: true, participants: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    const inCinemaSet = await getInCinemaIds();
-    const history = sessions.map((s) => ({
-      id: s.id,
-      type: s.type,
-      status: s.status,
-      createdAt: s.createdAt,
-      movieCount: s._count.movies,
-      matchCount: s.matches.length,
-      matches: s.matches.map((m) => ({
-        id: m.id,
-        movie: attachInCinema(m.movie, inCinemaSet),
-        watched: m.watched,
-        watchedAt: m.watchedAt,
-      })),
-    }));
+    const matchedMovieIds = Array.from(new Set(sessions.flatMap((s) => s.matches.map((m) => m.movieId))));
+    const [inCinemaSet, myRatings] = await Promise.all([
+      getInCinemaIds(),
+      matchedMovieIds.length > 0
+        ? prisma.userMovie.findMany({
+          where: { userId: req.userId!, movieId: { in: matchedMovieIds }, userRating: { not: null } },
+          select: { movieId: true, userRating: true },
+        })
+        : Promise.resolve([]),
+    ]);
+    const ratingByMovie = new Map(myRatings.map((r) => [r.movieId, r.userRating]));
+
+    const history = sessions.map((s) => {
+      const isHost = s.userId === req.userId;
+      // In 3+ person groups the shared user2Rating column may hold someone else's score.
+      const legacyTrusted = isHost || s._count.participants <= 2;
+      return {
+        id: s.id,
+        type: s.type,
+        status: s.status,
+        createdAt: s.createdAt,
+        movieCount: s._count.movies,
+        matchCount: s.matches.length,
+        matches: s.matches.map((m) => ({
+          id: m.id,
+          movie: attachInCinema(m.movie, inCinemaSet),
+          watched: m.watched,
+          watchedAt: m.watchedAt,
+          // Library rating first; legacy per-match columns cover ratings saved before it.
+          userRating: ratingByMovie.get(m.movieId)
+            ?? (legacyTrusted ? (isHost ? m.user1Rating : m.user2Rating) : null)
+            ?? null,
+        })),
+      };
+    });
 
     res.json({ sessions: history });
   } catch {

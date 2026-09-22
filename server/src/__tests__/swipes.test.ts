@@ -2,6 +2,7 @@ import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import app from '../app';
 import mockPrisma from '../__mocks__/prisma';
+import { sendPush } from '../services/pushSender';
 
 jest.mock('../app', () => {
   const actual = jest.requireActual('../app');
@@ -12,14 +13,15 @@ jest.mock('../app', () => {
   };
 });
 
-jest.mock('../services/pushSender', () => ({ sendPush: jest.fn() }));
+jest.mock('../services/pushSender', () => ({ sendPush: jest.fn().mockResolvedValue(undefined) }));
 
 const prisma = mockPrisma as unknown as {
   swipeSession: { findUnique: jest.Mock };
   sessionMovie: { findUnique: jest.Mock; update: jest.Mock; count: jest.Mock };
   sessionSwipe: { upsert: jest.Mock; count: jest.Mock };
-  match: { upsert: jest.Mock; deleteMany: jest.Mock };
+  match: { upsert: jest.Mock; deleteMany: jest.Mock; createMany: jest.Mock };
 };
+(mockPrisma.match as unknown as { createMany: jest.Mock }).createMany = jest.fn();
 prisma.sessionSwipe = { upsert: jest.fn(), count: jest.fn() };
 
 const token = jwt.sign({ userId: 'u1' }, process.env.JWT_SECRET as string);
@@ -49,6 +51,11 @@ describe('POST /api/swipes', () => {
     prisma.sessionMovie.findUnique.mockResolvedValue({ id: 'sm1' });
     prisma.sessionMovie.count.mockResolvedValue(10);
     prisma.sessionSwipe.count.mockResolvedValue(0);
+    prisma.match.createMany.mockResolvedValue({ count: 1 });
+    (mockPrisma as unknown as { sessionParticipant: unknown }).sessionParticipant = {
+      findMany: jest.fn().mockResolvedValue([{ userId: 'u1' }, { userId: 'u2' }]),
+    };
+    (mockPrisma.movie as unknown as { findUnique: jest.Mock }).findUnique.mockResolvedValue({ title: 'Heat' });
   });
 
   it('rejects non-string ids', async () => {
@@ -83,7 +90,19 @@ describe('POST /api/swipes', () => {
       direction: 'right',
       participant: { leftAt: null },
     });
-    expect(prisma.match.upsert).toHaveBeenCalledTimes(1);
+    expect(prisma.match.createMany).toHaveBeenCalledTimes(1);
+    await new Promise((r) => setImmediate(r));
+    expect(sendPush).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not notify again when a like re-confirms an existing match', async () => {
+    prisma.swipeSession.findUnique.mockResolvedValue(groupSession());
+    prisma.sessionSwipe.count.mockResolvedValueOnce(2).mockResolvedValueOnce(4);
+    prisma.match.createMany.mockResolvedValue({ count: 0 });
+    const res = await swipe({ sessionId: 's1', movieId: 'm1', direction: 'right' });
+    expect(res.body.isMatch).toBe(true);
+    await new Promise((r) => setImmediate(r));
+    expect(sendPush).not.toHaveBeenCalled();
   });
 
   it('does not match while an active participant has not liked it', async () => {
@@ -91,7 +110,7 @@ describe('POST /api/swipes', () => {
     prisma.sessionSwipe.count.mockResolvedValueOnce(1).mockResolvedValueOnce(1);
     const res = await swipe({ sessionId: 's1', movieId: 'm1', direction: 'right' });
     expect(res.body.isMatch).toBe(false);
-    expect(prisma.match.upsert).not.toHaveBeenCalled();
+    expect(prisma.match.createMany).not.toHaveBeenCalled();
   });
 
   it('clears a stale match when someone passes', async () => {
