@@ -45,7 +45,7 @@ function VerifyContent() {
             <p className="text-cream-dim text-sm">You&apos;re all set. You can sign in now.</p>
             <Link
               href="/auth?mode=login"
-              className="inline-block w-full py-3 bg-coral text-charcoal font-semibold rounded-xl hover:bg-coral-dark transition-colors"
+              className="inline-block w-full py-3 bg-coral text-cream font-semibold rounded-xl hover:bg-coral-dark transition-colors"
             >
               Sign in
             </Link>

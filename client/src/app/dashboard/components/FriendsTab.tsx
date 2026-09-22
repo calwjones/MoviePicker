@@ -140,7 +140,7 @@ export default function FriendsTab({ addToast }: FriendsTabProps) {
             key={t.key}
             onClick={() => setSubTab(t.key)}
             className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors capitalize ${
-              subTab === t.key ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
+              subTab === t.key ? 'bg-coral text-cream' : 'glass text-cream-dim'
             }`}
           >
             {t.label}
@@ -206,7 +206,7 @@ export default function FriendsTab({ addToast }: FriendsTabProps) {
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleAccept(p.friendshipId)}
-                        className="px-3 py-1.5 bg-coral text-charcoal text-xs font-semibold rounded-lg"
+                        className="px-3 py-1.5 bg-coral text-cream text-xs font-semibold rounded-lg"
                       >
                         Accept
                       </button>
@@ -269,7 +269,7 @@ export default function FriendsTab({ addToast }: FriendsTabProps) {
           <button
             onClick={handleRequest}
             disabled={!query.trim() || requesting}
-            className="w-full py-2.5 bg-coral text-charcoal rounded-xl font-medium hover:bg-coral-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-full py-2.5 bg-coral text-cream rounded-xl font-medium hover:bg-coral-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {requesting ? 'Sending…' : 'Send request'}
           </button>

@@ -44,7 +44,7 @@ export default function FeedbackButton({ addToast }: FeedbackButtonProps) {
       <button
         onClick={() => setOpen(true)}
         aria-label="Send feedback"
-        className="fixed bottom-4 right-4 z-30 px-3 py-2 rounded-full bg-coral text-charcoal text-xs font-bold shadow-lg hover:bg-coral-dark transition-colors flex items-center gap-1.5"
+        className="fixed bottom-4 right-4 z-30 px-3 py-2 rounded-full bg-coral text-cream text-xs font-bold shadow-lg hover:bg-coral-dark transition-colors flex items-center gap-1.5"
       >
         <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
@@ -94,7 +94,7 @@ export default function FeedbackButton({ addToast }: FeedbackButtonProps) {
                 <button
                   onClick={submit}
                   disabled={submitting || !body.trim()}
-                  className="flex-1 py-2 bg-coral text-charcoal font-semibold rounded-xl hover:bg-coral-dark transition-colors disabled:opacity-50"
+                  className="flex-1 py-2 bg-coral text-cream font-semibold rounded-xl hover:bg-coral-dark transition-colors disabled:opacity-50"
                 >
                   {submitting ? 'Sending…' : 'Send'}
                 </button>

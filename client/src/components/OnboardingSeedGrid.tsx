@@ -126,7 +126,7 @@ export default function OnboardingSeedGrid({
                   }`}
                 />
                 {active && (
-                  <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-coral text-charcoal flex items-center justify-center text-xs font-bold">
+                  <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-coral text-cream flex items-center justify-center text-xs font-bold">
                     ✓
                   </div>
                 )}
@@ -148,7 +148,7 @@ export default function OnboardingSeedGrid({
       <button
         onClick={handleSave}
         disabled={saving}
-        className="w-full py-3 bg-coral text-charcoal rounded-xl font-semibold hover:bg-coral-dark transition-colors disabled:opacity-60"
+        className="w-full py-3 bg-coral text-cream rounded-xl font-semibold hover:bg-coral-dark transition-colors disabled:opacity-60"
       >
         {saving
           ? 'Adding…'

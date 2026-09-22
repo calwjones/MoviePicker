@@ -341,7 +341,7 @@ export default function RoulettePage() {
               whileTap={{ scale: 0.95 }}
               onClick={spin}
               disabled={spinning || spinsLeft <= 0}
-              className="py-4 px-16 bg-coral text-charcoal font-bold rounded-xl text-lg hover:bg-coral-dark transition-all disabled:opacity-40"
+              className="py-4 px-16 bg-coral text-cream font-bold rounded-xl text-lg hover:bg-coral-dark transition-all disabled:opacity-40"
               style={{
                 boxShadow: spinning ? 'none' : '0 0 20px rgba(161, 47, 10, 0.2)',
               }}
@@ -374,7 +374,7 @@ export default function RoulettePage() {
                   )}
                   <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-card/70 to-transparent" />
                   <div className="absolute top-4 left-4 px-3 py-1 bg-coral rounded-full">
-                    <span className="text-charcoal text-xs font-bold">YOUR PICK</span>
+                    <span className="text-cream text-xs font-bold">YOUR PICK</span>
                   </div>
                   {winner.inCinema && (
                     <div className="absolute top-4 right-4">
@@ -422,7 +422,7 @@ export default function RoulettePage() {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => router.replace('/dashboard')}
-                  className="flex-1 py-3 bg-coral text-charcoal font-semibold rounded-xl hover:bg-coral-dark transition-colors"
+                  className="flex-1 py-3 bg-coral text-cream font-semibold rounded-xl hover:bg-coral-dark transition-colors"
                 >
                   Done
                 </motion.button>

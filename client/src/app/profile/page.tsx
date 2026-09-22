@@ -289,7 +289,7 @@ export default function ProfilePage() {
             <button
               onClick={handleSaveName}
               disabled={!canSaveName}
-              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-coral text-charcoal hover:bg-coral-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-coral text-cream hover:bg-coral-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {savingName ? 'Saving…' : 'Save'}
             </button>
@@ -318,7 +318,7 @@ export default function ProfilePage() {
                   onClick={() => toggleProvider(p.id)}
                   disabled={savingProviders}
                   className={`flex items-center gap-1.5 pl-1 pr-3 py-1 rounded-full text-xs transition-all hover:-translate-y-0.5 disabled:opacity-60 ${
-                    selected ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
+                    selected ? 'bg-coral text-cream' : 'glass text-cream-dim'
                   }`}
                 >
                   <img src={tmdbImage(p.logoUrl, 'w92')} alt="" loading="lazy" className="w-5 h-5 rounded" />
@@ -411,7 +411,7 @@ export default function ProfilePage() {
         <button
           onClick={handleChangePassword}
           disabled={!passwordReady || savingPassword}
-          className="w-full py-2.5 bg-coral text-charcoal rounded-xl font-medium hover:bg-coral-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="w-full py-2.5 bg-coral text-cream rounded-xl font-medium hover:bg-coral-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {savingPassword ? 'Saving…' : 'Update password'}
         </button>

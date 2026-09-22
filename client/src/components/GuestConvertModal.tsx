@@ -111,7 +111,7 @@ export default function GuestConvertModal({ open, onClose, defaultName = '', onC
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-3 bg-coral text-charcoal font-semibold rounded-xl hover:bg-coral-dark transition-colors disabled:opacity-50"
+                  className="w-full py-3 bg-coral text-cream font-semibold rounded-xl hover:bg-coral-dark transition-colors disabled:opacity-50"
                 >
                   {loading ? 'Creating account…' : 'Create account'}
                 </button>

@@ -144,7 +144,7 @@ export default function LetterboxdImport({ mode, onSuccess, onSkip }: Letterboxd
           type="button"
           onClick={submit}
           disabled={loading}
-          className="w-full py-3 bg-coral text-charcoal font-semibold rounded-xl text-sm hover:bg-coral-dark transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+          className="w-full py-3 bg-coral text-cream font-semibold rounded-xl text-sm hover:bg-coral-dark transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
         >
           {loading ? (
             <>

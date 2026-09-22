@@ -89,7 +89,7 @@ export default function FilterEditor({
               onClick={() => toggleGenre(genre)}
               className={`px-3 py-1.5 rounded-full text-xs transition-all hover:-translate-y-0.5 ${
                 (filters.genres || []).includes(genre)
-                  ? 'bg-coral text-charcoal'
+                  ? 'bg-coral text-cream'
                   : 'glass text-cream-dim'
               }`}
             >
@@ -107,7 +107,7 @@ export default function FilterEditor({
               key={decade}
               onClick={() => onChange({ ...filters, decade: filters.decade === decade ? '' : decade })}
               className={`px-3 py-1.5 rounded-full text-xs transition-all hover:-translate-y-0.5 ${
-                filters.decade === decade ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
+                filters.decade === decade ? 'bg-coral text-cream' : 'glass text-cream-dim'
               }`}
             >
               {decade}s
@@ -142,7 +142,7 @@ export default function FilterEditor({
                     })
                   }
                   className={`relative flex items-center gap-1.5 pl-1 pr-3 py-1 rounded-full text-xs transition-all hover:-translate-y-0.5 ${
-                    selected ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
+                    selected ? 'bg-coral text-cream' : 'glass text-cream-dim'
                   }`}
                 >
                   <img src={tmdbImage(provider.logoUrl, 'w92')} alt="" loading="lazy" className="w-5 h-5 rounded" />
@@ -151,7 +151,7 @@ export default function FilterEditor({
                     <span
                       aria-label="From your profile"
                       className={`absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] leading-none ${
-                        selected ? 'bg-charcoal text-coral' : 'bg-coral text-charcoal'
+                        selected ? 'bg-charcoal text-coral' : 'bg-coral text-cream'
                       }`}
                     >
                       ★
@@ -213,7 +213,7 @@ export default function FilterEditor({
                 key={size}
                 onClick={() => onBatchSizeChange(size)}
                 className={`px-3 py-1.5 rounded-full text-xs transition-all ${
-                  batchSize === size ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
+                  batchSize === size ? 'bg-coral text-cream' : 'glass text-cream-dim'
                 }`}
               >
                 {size}
@@ -222,7 +222,7 @@ export default function FilterEditor({
             <button
               onClick={() => onBatchSizeChange(null)}
               className={`px-3 py-1.5 rounded-full text-xs transition-all ${
-                batchSize === null ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
+                batchSize === null ? 'bg-coral text-cream' : 'glass text-cream-dim'
               }`}
             >
               All

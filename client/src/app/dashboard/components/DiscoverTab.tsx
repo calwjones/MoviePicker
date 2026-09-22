@@ -299,7 +299,7 @@ export default function DiscoverTab({ addToast }: DiscoverTabProps) {
           />
           <button
             onClick={handleStartDiscover}
-            className="w-full py-3 bg-coral text-charcoal font-semibold rounded-xl text-sm hover:bg-coral-dark transition-colors"
+            className="w-full py-3 bg-coral text-cream font-semibold rounded-xl text-sm hover:bg-coral-dark transition-colors"
           >
             Start discovering
           </button>
@@ -509,7 +509,7 @@ function ChipButton({
     <button
       onClick={() => onToggle(chip.key)}
       className={`px-3 py-1.5 rounded-full text-xs transition-all hover:-translate-y-0.5 ${
-        active ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
+        active ? 'bg-coral text-cream' : 'glass text-cream-dim'
       }`}
     >
       {chip.label}
@@ -592,7 +592,7 @@ function BrowseRowView({
                   setAdding((prev) => new Set(prev).add(rec.tmdbId));
                   onQuickAdd(rec);
                 }}
-                className="absolute bottom-1.5 right-1.5 w-7 h-7 rounded-full bg-coral text-charcoal flex items-center justify-center shadow-lg hover:bg-coral-dark active:scale-90 transition-all disabled:opacity-50"
+                className="absolute bottom-1.5 right-1.5 w-7 h-7 rounded-full bg-coral text-cream flex items-center justify-center shadow-lg hover:bg-coral-dark active:scale-90 transition-all disabled:opacity-50"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
                   <line x1="12" y1="5" x2="12" y2="19" />

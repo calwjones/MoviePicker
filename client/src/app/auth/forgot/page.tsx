@@ -34,7 +34,7 @@ export default function ForgotPasswordPage() {
           </p>
           <Link
             href="/auth?mode=login"
-            className="inline-block w-full py-3 bg-coral text-charcoal font-semibold rounded-xl hover:bg-coral-dark transition-colors"
+            className="inline-block w-full py-3 bg-coral text-cream font-semibold rounded-xl hover:bg-coral-dark transition-colors"
           >
             Back to sign in
           </Link>
@@ -69,7 +69,7 @@ export default function ForgotPasswordPage() {
             whileTap={{ scale: 0.98 }}
             type="submit"
             disabled={loading}
-            className="w-full py-4 bg-coral text-charcoal font-semibold rounded-xl text-lg hover:bg-coral-dark transition-colors disabled:opacity-50"
+            className="w-full py-4 bg-coral text-cream font-semibold rounded-xl text-lg hover:bg-coral-dark transition-colors disabled:opacity-50"
           >
             {loading ? 'Sending…' : 'Send reset link'}
           </motion.button>

@@ -150,7 +150,7 @@ export default function JoinPage() {
               {user && !user.isGuest ? (
                 <div className="space-y-4">
                   <div className="flex items-center gap-3 p-3 bg-charcoal rounded-xl">
-                    <div className="w-8 h-8 rounded-full bg-coral flex items-center justify-center text-charcoal font-bold text-sm">
+                    <div className="w-8 h-8 rounded-full bg-coral flex items-center justify-center text-cream font-bold text-sm">
                       {user.username[0].toUpperCase()}
                     </div>
                     <div>
@@ -166,7 +166,7 @@ export default function JoinPage() {
                     whileTap={{ scale: 0.98 }}
                     onClick={handleJoinWithAccount}
                     disabled={submitting}
-                    className="w-full py-4 bg-coral text-charcoal font-bold rounded-xl text-lg hover:bg-coral-dark transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                    className="w-full py-4 bg-coral text-cream font-bold rounded-xl text-lg hover:bg-coral-dark transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {submitting && (
                       <span className="w-4 h-4 border-2 border-charcoal border-t-transparent rounded-full animate-spin" />
@@ -196,7 +196,7 @@ export default function JoinPage() {
                     whileTap={displayName.trim() ? { scale: 0.98 } : {}}
                     type="submit"
                     disabled={submitting || !displayName.trim()}
-                    className="w-full py-4 bg-coral text-charcoal font-bold rounded-xl text-lg hover:bg-coral-dark transition-colors disabled:opacity-50"
+                    className="w-full py-4 bg-coral text-cream font-bold rounded-xl text-lg hover:bg-coral-dark transition-colors disabled:opacity-50"
                   >
                     {submitting ? 'Joining...' : 'Join as Guest'}
                   </motion.button>

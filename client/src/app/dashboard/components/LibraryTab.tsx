@@ -636,7 +636,7 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
                   className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex-shrink-0 ${
                     movie._added
                       ? 'bg-green-500/20 text-green-400'
-                      : 'bg-coral text-charcoal hover:bg-coral-dark'
+                      : 'bg-coral text-cream hover:bg-coral-dark'
                   }`}
                 >
                   {addingTmdbId === movie.tmdbId ? '...' : movie._added ? 'Added' : '+ Add'}
@@ -785,7 +785,7 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
                         onClick={() => toggleSortField(field)}
                         className={`px-3 py-1.5 rounded-full text-xs transition-all hover:-translate-y-0.5 hover:shadow-md flex items-center gap-1 ${
                           sortBy === field
-                            ? 'bg-coral text-charcoal shadow-coral/20'
+                            ? 'bg-coral text-cream shadow-coral/20'
                             : 'glass text-cream-dim shadow-sm'
                         }`}
                       >
@@ -810,7 +810,7 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
                         )}
                         className={`px-3 py-1.5 rounded-full text-xs transition-all hover:-translate-y-0.5 hover:shadow-md ${
                           filterGenres.includes(genre)
-                            ? 'bg-coral text-charcoal shadow-coral/20'
+                            ? 'bg-coral text-cream shadow-coral/20'
                             : 'glass text-cream-dim shadow-sm'
                         }`}
                       >
@@ -830,7 +830,7 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
                         onClick={() => setFilterDecade(prev => prev === decade ? '' : decade)}
                         className={`px-3 py-1.5 rounded-full text-xs transition-all hover:-translate-y-0.5 hover:shadow-md ${
                           filterDecade === decade
-                            ? 'bg-coral text-charcoal shadow-coral/20'
+                            ? 'bg-coral text-cream shadow-coral/20'
                             : 'glass text-cream-dim shadow-sm'
                         }`}
                       >
@@ -929,7 +929,7 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
                 loadWatchlist(f);
               }}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors capitalize ${
-                libraryFilter === f ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
+                libraryFilter === f ? 'bg-coral text-cream' : 'glass text-cream-dim'
               }`}
             >
               {f}
@@ -968,7 +968,7 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
               <div className="flex flex-col gap-2 max-w-xs mx-auto pt-2">
                 <button
                   onClick={() => setSeedGridOpen(true)}
-                  className="w-full py-2.5 bg-coral text-charcoal rounded-xl font-semibold hover:bg-coral-dark transition-colors"
+                  className="w-full py-2.5 bg-coral text-cream rounded-xl font-semibold hover:bg-coral-dark transition-colors"
                 >
                   Tap a few picks
                 </button>

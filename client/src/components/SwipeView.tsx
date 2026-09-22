@@ -96,7 +96,7 @@ export default function SwipeView({
         <p className="text-cream-dim mb-6">Add some movies to your watchlists first, then start a new session.</p>
         <button
           onClick={() => router.push('/dashboard')}
-          className="py-3 px-8 bg-coral text-charcoal font-semibold rounded-xl hover:bg-coral-dark transition-colors"
+          className="py-3 px-8 bg-coral text-cream font-semibold rounded-xl hover:bg-coral-dark transition-colors"
         >
           Back to Dashboard
         </button>
@@ -252,7 +252,7 @@ export default function SwipeView({
               <span
                 className={`px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide backdrop-blur-md ${
                   tierBadge.tone === 'crossover'
-                    ? 'bg-coral/90 text-charcoal'
+                    ? 'bg-coral/90 text-cream'
                     : tierBadge.tone === 'self'
                       ? 'bg-cream/20 text-cream ring-1 ring-cream/30'
                       : 'bg-charcoal/70 text-cream ring-1 ring-cream/20'
@@ -337,7 +337,7 @@ export default function SwipeView({
           whileTap={{ scale: 0.95 }}
           onClick={() => cardRef.current?.swipe('right')}
           disabled={swiping}
-          className="flex-1 py-4 bg-coral text-charcoal rounded-xl text-lg font-semibold hover:bg-coral-dark transition-colors disabled:opacity-50"
+          className="flex-1 py-4 bg-coral text-cream rounded-xl text-lg font-semibold hover:bg-coral-dark transition-colors disabled:opacity-50"
         >
           &#10003;
         </motion.button>

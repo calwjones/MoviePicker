@@ -79,7 +79,7 @@ function AuthForm() {
               setMode('login');
               setPassword('');
             }}
-            className="w-full py-3 bg-coral text-charcoal font-semibold rounded-xl hover:bg-coral-dark transition-colors"
+            className="w-full py-3 bg-coral text-cream font-semibold rounded-xl hover:bg-coral-dark transition-colors"
           >
             Go to sign in
           </button>
@@ -170,7 +170,7 @@ function AuthForm() {
             whileTap={{ scale: 0.98 }}
             type="submit"
             disabled={loading}
-            className="w-full py-4 bg-coral text-charcoal font-semibold rounded-xl text-lg transition-colors hover:bg-coral-dark disabled:opacity-50"
+            className="w-full py-4 bg-coral text-cream font-semibold rounded-xl text-lg transition-colors hover:bg-coral-dark disabled:opacity-50"
           >
             {loading ? 'Loading...' : mode === 'login' ? 'Sign In' : 'Create Account'}
           </motion.button>

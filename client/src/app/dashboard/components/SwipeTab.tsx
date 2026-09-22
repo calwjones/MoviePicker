@@ -437,7 +437,7 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
                 <motion.button
                   whileTap={{ scale: 0.95 }}
                   onClick={() => { navigator.clipboard.writeText(shareLink); addToast('Link copied!'); }}
-                  className="px-3 py-2 bg-coral text-charcoal text-xs font-semibold rounded-lg shrink-0"
+                  className="px-3 py-2 bg-coral text-cream text-xs font-semibold rounded-lg shrink-0"
                 >
                   Copy
                 </motion.button>
@@ -457,7 +457,7 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
                   <motion.button
                     whileTap={{ scale: 0.95 }}
                     onClick={() => { navigator.clipboard.writeText(shortCode); addToast('Code copied!'); }}
-                    className="px-3 py-2 bg-coral text-charcoal text-xs font-semibold rounded-lg shrink-0"
+                    className="px-3 py-2 bg-coral text-cream text-xs font-semibold rounded-lg shrink-0"
                   >
                     Copy
                   </motion.button>
@@ -492,7 +492,7 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
                           invited
                             ? 'bg-coral/20 text-cream-dim cursor-default'
                             : selected
-                              ? 'bg-coral text-charcoal'
+                              ? 'bg-coral text-cream'
                               : 'glass text-cream-dim hover:text-cream'
                         }`}
                       >
@@ -507,7 +507,7 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
                     whileTap={{ scale: 0.95 }}
                     onClick={handleInviteFriends}
                     disabled={inviting}
-                    className="w-full py-2 bg-coral/80 text-charcoal text-xs font-semibold rounded-lg disabled:opacity-50"
+                    className="w-full py-2 bg-coral/80 text-cream text-xs font-semibold rounded-lg disabled:opacity-50"
                   >
                     {inviting ? 'Sending…' : `Invite ${selectedFriendIds.size} friend${selectedFriendIds.size === 1 ? '' : 's'}`}
                   </motion.button>
@@ -544,7 +544,7 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
               whileTap={{ scale: 0.98 }}
               onClick={handleStartGroup}
               disabled={startLoading}
-              className="w-full py-3 bg-coral text-charcoal font-semibold rounded-xl hover:bg-coral-dark transition-colors disabled:opacity-50"
+              className="w-full py-3 bg-coral text-cream font-semibold rounded-xl hover:bg-coral-dark transition-colors disabled:opacity-50"
             >
               {startLoading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -572,7 +572,7 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
               whileTap={{ scale: 0.98 }}
               onClick={handleStartSolo}
               disabled={anyLoading || poolSize === 0 || poolSizeLoading}
-              className="flex-1 py-4 bg-coral text-charcoal font-semibold rounded-xl text-base hover:bg-coral-dark transition-all shadow-md hover:shadow-coral/40 disabled:opacity-50"
+              className="flex-1 py-4 bg-coral text-cream font-semibold rounded-xl text-base hover:bg-coral-dark transition-all shadow-md hover:shadow-coral/40 disabled:opacity-50"
             >
               {soloLoading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -617,7 +617,7 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
                 whileTap={{ scale: 0.95 }}
                 onClick={handleJoinByCode}
                 disabled={joinCodeLoading || joinCodeInput.length !== 6}
-                className="px-4 bg-coral text-charcoal text-sm font-semibold rounded-xl shrink-0 hover:bg-coral-dark transition-colors disabled:opacity-50"
+                className="px-4 bg-coral text-cream text-sm font-semibold rounded-xl shrink-0 hover:bg-coral-dark transition-colors disabled:opacity-50"
               >
                 {joinCodeLoading ? '…' : 'Join'}
               </motion.button>

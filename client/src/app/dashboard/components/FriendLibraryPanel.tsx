@@ -250,7 +250,7 @@ export default function FriendLibraryPanel({ friend, onClose, addToast }: Props)
                             onClick={() => toggleSortField(field)}
                             className={`px-3 py-1.5 rounded-full text-xs transition-all hover:-translate-y-0.5 hover:shadow-md flex items-center gap-1 ${
                               sortBy === field
-                                ? 'bg-coral text-charcoal shadow-coral/20'
+                                ? 'bg-coral text-cream shadow-coral/20'
                                 : 'glass text-cream-dim shadow-sm'
                             }`}
                           >
@@ -274,7 +274,7 @@ export default function FriendLibraryPanel({ friend, onClose, addToast }: Props)
                             )}
                             className={`px-3 py-1.5 rounded-full text-xs transition-all hover:-translate-y-0.5 hover:shadow-md ${
                               filterGenres.includes(genre)
-                                ? 'bg-coral text-charcoal shadow-coral/20'
+                                ? 'bg-coral text-cream shadow-coral/20'
                                 : 'glass text-cream-dim shadow-sm'
                             }`}
                           >
@@ -293,7 +293,7 @@ export default function FriendLibraryPanel({ friend, onClose, addToast }: Props)
                             onClick={() => setFilterDecade((prev) => (prev === decade ? '' : decade))}
                             className={`px-3 py-1.5 rounded-full text-xs transition-all hover:-translate-y-0.5 hover:shadow-md ${
                               filterDecade === decade
-                                ? 'bg-coral text-charcoal shadow-coral/20'
+                                ? 'bg-coral text-cream shadow-coral/20'
                                 : 'glass text-cream-dim shadow-sm'
                             }`}
                           >
@@ -377,7 +377,7 @@ export default function FriendLibraryPanel({ friend, onClose, addToast }: Props)
                   key={f}
                   onClick={() => setFilter(f)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors capitalize ${
-                    filter === f ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
+                    filter === f ? 'bg-coral text-cream' : 'glass text-cream-dim'
                   }`}
                 >
                   {f}

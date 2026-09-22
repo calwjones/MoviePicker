@@ -124,7 +124,7 @@ function DashboardContent() {
                 <path d="M13.73 21a2 2 0 0 1-3.46 0" />
               </svg>
               {inviteCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-coral text-charcoal text-[10px] font-bold flex items-center justify-center">
+                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-coral text-cream text-[10px] font-bold flex items-center justify-center">
                   {inviteCount}
                 </span>
               )}
@@ -156,7 +156,7 @@ function DashboardContent() {
             key={t}
             onClick={() => setTab(t)}
             className={`shrink-0 py-2 px-4 sm:flex-1 sm:px-2 rounded-xl text-sm font-medium transition-colors ${
-              tab === t ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
+              tab === t ? 'bg-coral text-cream' : 'glass text-cream-dim'
             }`}
           >
             {TAB_LABELS[t]}

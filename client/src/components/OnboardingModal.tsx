@@ -148,7 +148,7 @@ export default function OnboardingModal({ open, onClose, onPickPath }: Onboardin
                   </div>
                   <button
                     onClick={goNext}
-                    className="w-full py-3 bg-coral text-charcoal rounded-xl font-semibold hover:bg-coral-dark transition-colors"
+                    className="w-full py-3 bg-coral text-cream rounded-xl font-semibold hover:bg-coral-dark transition-colors"
                   >
                     Get started
                   </button>
@@ -221,7 +221,7 @@ export default function OnboardingModal({ open, onClose, onPickPath }: Onboardin
                             onClick={() => toggleProvider(p.id)}
                             disabled={savingProviders}
                             className={`flex items-center gap-1.5 pl-1 pr-3 py-1 rounded-full text-xs transition-all hover:-translate-y-0.5 disabled:opacity-60 ${
-                              selected ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
+                              selected ? 'bg-coral text-cream' : 'glass text-cream-dim'
                             }`}
                           >
                             <img src={tmdbImage(p.logoUrl, 'w92')} alt="" loading="lazy" className="w-5 h-5 rounded" />
@@ -233,7 +233,7 @@ export default function OnboardingModal({ open, onClose, onPickPath }: Onboardin
                   )}
                   <button
                     onClick={goNext}
-                    className="w-full py-3 bg-coral text-charcoal rounded-xl font-semibold hover:bg-coral-dark transition-colors"
+                    className="w-full py-3 bg-coral text-cream rounded-xl font-semibold hover:bg-coral-dark transition-colors"
                   >
                     Continue
                   </button>

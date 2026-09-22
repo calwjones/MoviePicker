@@ -260,7 +260,7 @@ export default function MovieDetailModal({
               {isRecContext && onAdd && (
                 <button
                   onClick={() => onAdd(shown)}
-                  className="flex-1 py-3 bg-coral text-charcoal rounded-xl font-medium text-sm hover:bg-coral/90 transition-colors"
+                  className="flex-1 py-3 bg-coral text-cream rounded-xl font-medium text-sm hover:bg-coral/90 transition-colors"
                 >
                   Add to Watchlist
                 </button>

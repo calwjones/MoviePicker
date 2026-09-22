@@ -53,7 +53,7 @@ export default function FilterSummary({ filters, onEdit, onClear, open }: Filter
           <div className="flex items-center gap-2 mb-1">
             <span className="text-cream font-semibold text-sm">Filters</span>
             {count > 0 && (
-              <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-coral text-charcoal text-[10px] font-bold">
+              <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-coral text-cream text-[10px] font-bold">
                 {count}
               </span>
             )}

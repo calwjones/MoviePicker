@@ -502,7 +502,7 @@ export default function SessionPage() {
         <>
           <button
             onClick={handlePickForToday}
-            className="w-full py-4 bg-coral text-charcoal font-bold rounded-xl text-lg hover:bg-coral-dark transition-colors"
+            className="w-full py-4 bg-coral text-cream font-bold rounded-xl text-lg hover:bg-coral-dark transition-colors"
           >
             {matches.length >= 2 ? 'Spin the Roulette' : 'Pick one for today'}
           </button>
@@ -684,7 +684,7 @@ function NoMatches({
           <button
             onClick={onAnotherBatch}
             disabled={batchLoading}
-            className="w-full py-4 bg-coral text-charcoal font-bold rounded-xl text-lg hover:bg-coral-dark transition-colors disabled:opacity-50"
+            className="w-full py-4 bg-coral text-cream font-bold rounded-xl text-lg hover:bg-coral-dark transition-colors disabled:opacity-50"
           >
             {batchLoading ? 'Loading…' : 'Another batch'}
           </button>
@@ -734,7 +734,7 @@ function WinnerCard({
           )}
           <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-card/70 to-transparent" />
           <div className="absolute top-4 left-4 px-3 py-1 bg-coral rounded-full">
-            <span className="text-charcoal text-xs font-bold">TODAY&apos;S PICK</span>
+            <span className="text-cream text-xs font-bold">TODAY&apos;S PICK</span>
           </div>
           {movie.inCinema && (
             <div className="absolute top-4 right-4">
@@ -769,7 +769,7 @@ function WinnerCard({
         {canPickAgain && (
           <button
             onClick={onPickAgain}
-            className="w-full py-3 bg-coral text-charcoal font-semibold rounded-xl hover:bg-coral-dark transition-colors"
+            className="w-full py-3 bg-coral text-cream font-semibold rounded-xl hover:bg-coral-dark transition-colors"
           >
             Pick again
           </button>

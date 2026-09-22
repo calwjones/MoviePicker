@@ -54,7 +54,7 @@ export default function ConfirmModal({
                 className={`flex-1 py-2 rounded-xl transition-all btn-glow shadow-sm ${
                   danger
                     ? 'bg-danger/80 text-cream hover:bg-danger'
-                    : 'bg-coral text-charcoal hover:bg-coral-dark'
+                    : 'bg-coral text-cream hover:bg-coral-dark'
                 }`}
               >
                 {confirmLabel}

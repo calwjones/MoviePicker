@@ -96,7 +96,7 @@ export default function MatchesRevealView({
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={onStartReveal}
-          className="py-4 px-12 bg-coral text-charcoal font-bold rounded-xl text-lg hover:bg-coral-dark transition-colors"
+          className="py-4 px-12 bg-coral text-cream font-bold rounded-xl text-lg hover:bg-coral-dark transition-colors"
         >
           {revealCTA}
         </motion.button>

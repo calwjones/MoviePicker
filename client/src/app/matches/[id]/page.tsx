@@ -152,7 +152,7 @@ export default function MatchesPage() {
 
           <button
             onClick={() => router.replace('/dashboard')}
-            className="py-3 px-8 bg-coral text-charcoal font-semibold rounded-xl hover:bg-coral-dark transition-colors"
+            className="py-3 px-8 bg-coral text-cream font-semibold rounded-xl hover:bg-coral-dark transition-colors"
           >
             Back to Dashboard
           </button>
@@ -187,7 +187,7 @@ export default function MatchesPage() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setRevealed(true)}
-              className="py-4 px-12 bg-coral text-charcoal font-bold rounded-xl text-lg hover:bg-coral-dark transition-colors"
+              className="py-4 px-12 bg-coral text-cream font-bold rounded-xl text-lg hover:bg-coral-dark transition-colors"
             >
               Reveal Your Pick
             </motion.button>
@@ -221,7 +221,7 @@ export default function MatchesPage() {
               )}
               <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-card/70 to-transparent" />
               <div className="absolute top-4 left-4 px-3 py-1 bg-coral rounded-full">
-                <span className="text-charcoal text-xs font-bold">YOUR PICK</span>
+                <span className="text-cream text-xs font-bold">YOUR PICK</span>
               </div>
               {movie.inCinema && (
                 <div className="absolute top-4 right-4">
@@ -292,7 +292,7 @@ export default function MatchesPage() {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={startReveal}
-            className="py-4 px-12 bg-coral text-charcoal font-bold rounded-xl text-lg hover:bg-coral-dark transition-colors"
+            className="py-4 px-12 bg-coral text-cream font-bold rounded-xl text-lg hover:bg-coral-dark transition-colors"
           >
             Reveal Matches
           </motion.button>
@@ -385,7 +385,7 @@ export default function MatchesPage() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => router.replace(`/roulette/${sessionId}`)}
-              className="w-full py-4 bg-coral text-charcoal font-bold rounded-xl text-lg hover:bg-coral-dark transition-colors"
+              className="w-full py-4 bg-coral text-cream font-bold rounded-xl text-lg hover:bg-coral-dark transition-colors"
             >
               Spin the Roulette
             </motion.button>

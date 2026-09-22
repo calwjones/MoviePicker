@@ -43,7 +43,7 @@ export default function Home() {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => router.push('/auth?mode=register')}
-            className="w-full py-4 bg-coral text-charcoal font-semibold rounded-xl text-lg transition-colors hover:bg-coral-dark"
+            className="w-full py-4 bg-coral text-cream font-semibold rounded-xl text-lg transition-colors hover:bg-coral-dark"
           >
             Get Started
           </motion.button>

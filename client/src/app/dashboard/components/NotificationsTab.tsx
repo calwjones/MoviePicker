@@ -162,7 +162,7 @@ export default function NotificationsTab({ addToast }: NotificationsTabProps) {
                   <button
                     onClick={() => accept(inv)}
                     disabled={busy}
-                    className="px-3 py-1.5 bg-coral text-charcoal text-xs font-semibold rounded-lg hover:bg-coral-dark transition-colors disabled:opacity-50"
+                    className="px-3 py-1.5 bg-coral text-cream text-xs font-semibold rounded-lg hover:bg-coral-dark transition-colors disabled:opacity-50"
                   >
                     Accept
                   </button>

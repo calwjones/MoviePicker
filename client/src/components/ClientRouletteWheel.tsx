@@ -207,7 +207,7 @@ export default function ClientRouletteWheel({
           whileTap={{ scale: 0.95 }}
           onClick={spin}
           disabled={spinning || spinsLeft <= 0}
-          className="py-4 px-16 bg-coral text-charcoal font-bold rounded-xl text-lg hover:bg-coral-dark transition-all disabled:opacity-40"
+          className="py-4 px-16 bg-coral text-cream font-bold rounded-xl text-lg hover:bg-coral-dark transition-all disabled:opacity-40"
           style={{ boxShadow: spinning ? 'none' : '0 0 20px rgba(161, 47, 10, 0.2)' }}
         >
           {spinning ? 'Spinning…' : spinsLeft <= 0 ? 'No spins left' : 'SPIN'}

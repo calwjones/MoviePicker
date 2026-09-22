@@ -47,7 +47,7 @@ function ResetContent() {
           <p className="text-cream-dim text-sm">This reset link is missing a token. Request a new one.</p>
           <Link
             href="/auth/forgot"
-            className="inline-block w-full py-3 bg-coral text-charcoal font-semibold rounded-xl hover:bg-coral-dark transition-colors"
+            className="inline-block w-full py-3 bg-coral text-cream font-semibold rounded-xl hover:bg-coral-dark transition-colors"
           >
             Request reset link
           </Link>
@@ -108,7 +108,7 @@ function ResetContent() {
             whileTap={{ scale: 0.98 }}
             type="submit"
             disabled={loading}
-            className="w-full py-4 bg-coral text-charcoal font-semibold rounded-xl text-lg hover:bg-coral-dark transition-colors disabled:opacity-50"
+            className="w-full py-4 bg-coral text-cream font-semibold rounded-xl text-lg hover:bg-coral-dark transition-colors disabled:opacity-50"
           >
             {loading ? 'Updating…' : 'Update password'}
           </motion.button>

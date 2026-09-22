@@ -81,7 +81,7 @@ export default function GlobalInviteListener() {
             <div className="flex gap-2">
               <button
                 onClick={accept}
-                className="flex-1 py-2 bg-coral text-charcoal font-semibold rounded-lg text-sm"
+                className="flex-1 py-2 bg-coral text-cream font-semibold rounded-lg text-sm"
               >
                 Accept
               </button>

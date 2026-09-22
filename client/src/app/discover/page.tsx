@@ -436,7 +436,7 @@ function DiscoverSwipePageInner() {
             disabled={added || adding}
             aria-label={added ? 'Added to watchlist' : 'Add to watchlist'}
             className={`w-7 h-7 flex items-center justify-center rounded-full text-sm font-bold transition-colors disabled:opacity-80 ${
-              added ? 'bg-success/90 text-charcoal' : 'bg-coral text-charcoal hover:bg-coral-dark'
+              added ? 'bg-success/90 text-cream' : 'bg-coral text-cream hover:bg-coral-dark'
             }`}
           >
             {adding ? '…' : added ? '✓' : '+'}
@@ -450,7 +450,7 @@ function DiscoverSwipePageInner() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={handlePickForToday}
-              className="w-full py-4 bg-coral text-charcoal font-bold rounded-xl text-lg hover:bg-coral-dark transition-colors"
+              className="w-full py-4 bg-coral text-cream font-bold rounded-xl text-lg hover:bg-coral-dark transition-colors"
             >
               Spin the Roulette
             </motion.button>
@@ -460,7 +460,7 @@ function DiscoverSwipePageInner() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={handlePickForToday}
-              className="w-full py-4 bg-coral text-charcoal font-bold rounded-xl text-lg hover:bg-coral-dark transition-colors"
+              className="w-full py-4 bg-coral text-cream font-bold rounded-xl text-lg hover:bg-coral-dark transition-colors"
             >
               Pick one for today
             </motion.button>
@@ -586,7 +586,7 @@ function DiscoverEmptyShortlist({
           <button
             onClick={onAnotherBatch}
             disabled={batchLoading}
-            className="w-full py-3 bg-coral text-charcoal font-semibold rounded-xl text-sm hover:bg-coral-dark transition-colors disabled:opacity-50"
+            className="w-full py-3 bg-coral text-cream font-semibold rounded-xl text-sm hover:bg-coral-dark transition-colors disabled:opacity-50"
           >
             {batchLoading ? 'Loading…' : 'Another batch'}
           </button>
@@ -656,7 +656,7 @@ function DiscoverWinnerCard({
           )}
           <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-card/70 to-transparent" />
           <div className="absolute top-4 left-4 px-3 py-1 bg-coral rounded-full">
-            <span className="text-charcoal text-xs font-bold">TODAY&apos;S PICK</span>
+            <span className="text-cream text-xs font-bold">TODAY&apos;S PICK</span>
           </div>
           {movie.inCinema && (
             <div className="absolute top-4 right-4">
@@ -693,7 +693,7 @@ function DiscoverWinnerCard({
           onClick={onAdd}
           disabled={added || adding}
           className={`w-full py-3 rounded-xl font-semibold text-sm transition-colors disabled:opacity-60 ${
-            added ? 'bg-success/20 text-success' : 'bg-coral text-charcoal hover:bg-coral-dark'
+            added ? 'bg-success/20 text-success' : 'bg-coral text-cream hover:bg-coral-dark'
           }`}
         >
           {adding ? 'Adding…' : added ? 'Added to watchlist' : 'Add to watchlist'}
