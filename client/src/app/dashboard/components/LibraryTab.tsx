@@ -467,7 +467,7 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
                 onClick={() => setRecDetail(rec)}
               >
                 <div className="w-28 aspect-[2/3] rounded-xl overflow-hidden bg-card mb-2 shadow-lg group-hover:shadow-coral/20 group-hover:scale-[1.03] transition-all">
-                  <MoviePoster posterUrl={rec.posterUrl} title={rec.title} />
+                  <MoviePoster posterUrl={rec.posterUrl} title={rec.title} sizes="112px" />
                 </div>
                 <button
                   onClick={(e) => { e.stopPropagation(); handleDismissRec(rec); }}
@@ -512,7 +512,7 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
                   <div key={um.id} className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 min-w-0">
                       <div className="w-8 h-12 rounded overflow-hidden flex-shrink-0 bg-card">
-                        <MoviePoster posterUrl={um.movie.posterUrl} title={um.movie.title} />
+                        <MoviePoster posterUrl={um.movie.posterUrl} title={um.movie.title} sizes="32px" />
                       </div>
                       <div className="min-w-0">
                         <p className="text-xs font-medium truncate">{um.movie.title}</p>
@@ -566,7 +566,7 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
                     onClick={() => setRecDetail(rec)}
                   >
                     <div className="w-28 aspect-[2/3] rounded-xl overflow-hidden bg-card mb-2 shadow-lg group-hover:shadow-coral/20 group-hover:scale-[1.03] transition-all">
-                      <MoviePoster posterUrl={rec.posterUrl} title={rec.title} />
+                      <MoviePoster posterUrl={rec.posterUrl} title={rec.title} sizes="112px" />
                     </div>
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDismissRec(rec); }}
@@ -619,7 +619,7 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
                 className="flex items-center gap-3 p-3 glass rounded-xl hover:bg-card-hover transition-all btn-glow cursor-pointer"
               >
                 <div className="w-12 aspect-[2/3] rounded-lg overflow-hidden bg-card flex-shrink-0 shadow-md">
-                  <MoviePoster posterUrl={movie.posterUrl} title={movie.title} />
+                  <MoviePoster posterUrl={movie.posterUrl} title={movie.title} sizes="48px" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate">{movie.title}</p>

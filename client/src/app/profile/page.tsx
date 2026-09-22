@@ -7,6 +7,7 @@ import { authApi, providerApi } from '@/lib/api';
 import { getBaseName } from '@/components/StreamingProviders';
 import LetterboxdImport from '@/components/LetterboxdImport';
 import { FullPageSpinner } from '@/components/LoadingSpinner';
+import { tmdbImage } from '@/lib/tmdbImage';
 
 const USERNAME_RE = /^[a-z0-9_-]{3,30}$/;
 const USERNAME_COOLDOWN_DAYS = 30;
@@ -320,7 +321,7 @@ export default function ProfilePage() {
                     selected ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
                   }`}
                 >
-                  <img src={p.logoUrl} alt="" className="w-5 h-5 rounded" />
+                  <img src={tmdbImage(p.logoUrl, 'w92')} alt="" loading="lazy" className="w-5 h-5 rounded" />
                   <span>{p.baseName}</span>
                 </button>
               );

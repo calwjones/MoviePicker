@@ -145,7 +145,7 @@ export default function MovieDetailModal({
 
             <div className="flex gap-4 mb-4">
               <div className="relative w-24 h-36 rounded-xl overflow-hidden flex-shrink-0">
-                <MoviePoster posterUrl={shown.posterUrl} title={shown.title} />
+                <MoviePoster posterUrl={shown.posterUrl} title={shown.title} sizes="96px" eager />
                 {shown.inCinema && (
                   <div className="absolute top-1.5 left-1.5">
                     <InCinemaBadge size="sm" />

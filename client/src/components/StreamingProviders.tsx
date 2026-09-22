@@ -1,6 +1,7 @@
 'use client';
 
 import { getProviderUrl } from '@/lib/providerLinks';
+import { tmdbImage } from '@/lib/tmdbImage';
 
 interface Provider {
   name: string;
@@ -72,7 +73,7 @@ function ProviderChip({ provider, dim }: { provider: Provider; dim?: boolean }) 
       className={className}
       onClick={(e) => e.stopPropagation()}
     >
-      <img src={provider.logoUrl} alt={provider.name} className="w-5 h-5 rounded" />
+      <img src={tmdbImage(provider.logoUrl, 'w92')} alt="" loading="lazy" className="w-5 h-5 rounded" />
       <span className="text-xs text-cream-dim">{provider.name}</span>
     </a>
   );

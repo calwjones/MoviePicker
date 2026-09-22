@@ -9,6 +9,7 @@ import MoviePoster from '@/components/MoviePoster';
 import MovieDetailModal from '@/components/MovieDetailModal';
 import SwipeCard, { type SwipeCardHandle } from '@/components/SwipeCard';
 import InCinemaBadge from '@/components/InCinemaBadge';
+import { CARD_POSTER_SIZES, posterSrcSet } from '@/lib/tmdbImage';
 
 interface SwipeViewProps {
   movies: SessionMovie[];
@@ -57,14 +58,15 @@ export default function SwipeView({
     return { movie, direction: last.direction as 'left' | 'right' };
   }, [undoStack, movies]);
 
+  // The fanned "next" card already loads the upcoming poster; warm the one after it
+  // with the same srcset so the browser picks an identical, cache-hitting candidate.
   useEffect(() => {
-    if (currentIndex + 1 < movies.length) {
-      const nextPoster = movies[currentIndex + 1]?.movie?.posterUrl;
-      if (nextPoster) {
-        const img = new Image();
-        img.src = nextPoster;
-      }
-    }
+    const url = movies[currentIndex + 2]?.movie?.posterUrl;
+    if (!url) return;
+    const img = new Image();
+    img.sizes = CARD_POSTER_SIZES;
+    img.srcset = posterSrcSet(url) ?? '';
+    img.src = url;
   }, [currentIndex, movies]);
 
   if (loading) {
@@ -155,7 +157,7 @@ export default function SwipeView({
               style={{ transformOrigin: 'bottom center', zIndex: 1 }}
             >
               <div className="absolute inset-0 bg-card">
-                <MoviePoster posterUrl={previousSwipe.movie.movie.posterUrl} title="" />
+                <MoviePoster posterUrl={previousSwipe.movie.movie.posterUrl} title="" sizes={CARD_POSTER_SIZES} eager />
               </div>
               <div className="absolute inset-0 bg-charcoal/60" />
               {/* Verdict badge */}
@@ -200,7 +202,7 @@ export default function SwipeView({
             }}
           >
             <div className="absolute inset-0 bg-card">
-              <MoviePoster posterUrl={movies[currentIndex + 1].movie.posterUrl} title="" />
+              <MoviePoster posterUrl={movies[currentIndex + 1].movie.posterUrl} title="" sizes={CARD_POSTER_SIZES} eager />
             </div>
             <div className="absolute inset-0 bg-charcoal/70" />
           </div>
@@ -216,9 +218,14 @@ export default function SwipeView({
           className="relative w-full max-w-md lg:max-w-lg max-h-full shrink-0 rounded-3xl overflow-hidden shadow-2xl cursor-grab active:cursor-grabbing aspect-[2/3]"
         >
           {currentMovie.posterUrl ? (
-            <div
-              className="absolute inset-0 bg-cover bg-center"
-              style={{ backgroundImage: `url(${currentMovie.posterUrl})` }}
+            <img
+              src={currentMovie.posterUrl}
+              srcSet={posterSrcSet(currentMovie.posterUrl)}
+              sizes={CARD_POSTER_SIZES}
+              alt=""
+              draggable={false}
+              decoding="async"
+              className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
             />
           ) : (
             <div className="absolute inset-0 bg-card flex items-center justify-center p-6">

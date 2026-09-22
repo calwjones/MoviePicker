@@ -398,7 +398,7 @@ export default function DiscoverTab({ addToast }: DiscoverTabProps) {
                   aria-label={`${m.title}, loved by ${attribution}`}
                 >
                   <div className="relative w-28 aspect-[2/3] rounded-xl overflow-hidden bg-card mb-2 shadow-lg group-hover:shadow-coral/20 group-hover:scale-[1.03] transition-all">
-                    <MoviePoster posterUrl={m.posterUrl} title={m.title} />
+                    <MoviePoster posterUrl={m.posterUrl} title={m.title} sizes="112px" />
                     {m.inCinema && (
                       <div className="absolute top-1.5 left-1.5">
                         <InCinemaBadge size="sm" />
@@ -577,7 +577,7 @@ function BrowseRowView({
             onClick={() => onSelect(rec)}
           >
             <div className="relative w-28 aspect-[2/3] rounded-xl overflow-hidden bg-card mb-2 shadow-lg group-hover:shadow-coral/20 group-hover:scale-[1.03] transition-all">
-              <MoviePoster posterUrl={rec.posterUrl} title={rec.title} />
+              <MoviePoster posterUrl={rec.posterUrl} title={rec.title} sizes="112px" />
               {rec.inCinema && (
                 <div className="absolute top-1.5 left-1.5">
                   <InCinemaBadge size="sm" />

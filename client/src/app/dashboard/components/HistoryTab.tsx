@@ -150,7 +150,7 @@ export default function HistoryTab({ addToast }: HistoryTabProps) {
                     className="flex items-center gap-3 p-2 glass rounded-xl hover:bg-card-hover transition-all"
                   >
                     <div className="w-10 aspect-[2/3] rounded-lg overflow-hidden bg-card flex-shrink-0 shadow-sm">
-                      <MoviePoster posterUrl={match.movie.posterUrl} title={match.movie.title} />
+                      <MoviePoster posterUrl={match.movie.posterUrl} title={match.movie.title} sizes="40px" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{match.movie.title}</p>

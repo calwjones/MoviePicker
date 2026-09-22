@@ -2,6 +2,7 @@
 
 import type { Filters } from '@matchsticked/shared';
 import { DECADE_OPTIONS } from '@/lib/decades';
+import { tmdbImage } from '@/lib/tmdbImage';
 
 const GENRE_OPTIONS = [
   'Action', 'Adventure', 'Animation', 'Comedy', 'Crime', 'Documentary',
@@ -144,7 +145,7 @@ export default function FilterEditor({
                     selected ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
                   }`}
                 >
-                  <img src={provider.logoUrl} alt="" className="w-5 h-5 rounded" />
+                  <img src={tmdbImage(provider.logoUrl, 'w92')} alt="" loading="lazy" className="w-5 h-5 rounded" />
                   <span>{provider.name}</span>
                   {confirmed && (
                     <span

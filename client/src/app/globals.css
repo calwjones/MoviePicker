@@ -11,8 +11,10 @@
   --color-glass: #1C1C1C;
   --color-success: #4ADE80;
   --color-danger: #EF4444;
-  --font-sans: "Inter", "DM Sans", system-ui, sans-serif;
-  --font-serif: "Playfair Display", Georgia, serif;
+  /* --font-inter / --font-playfair are injected on <html> by next/font in layout.tsx. */
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-serif: var(--font-playfair), Georgia, serif;
+  --font-display: var(--font-playfair), Georgia, serif;
 }
 
 body {
@@ -22,7 +24,7 @@ body {
     radial-gradient(at 100% 0%, rgba(161, 47, 10, 0.04) 0px, transparent 50%);
   background-attachment: fixed;
   color: var(--color-cream);
-  font-family: var(--font-sans);
+  font-family: var(--font-inter), system-ui, sans-serif;
   min-height: 100dvh;
   overflow-x: hidden;
 }

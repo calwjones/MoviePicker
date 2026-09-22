@@ -1,19 +1,19 @@
 'use client';
 
 import { useState } from 'react';
+import { GRID_POSTER_SIZES, posterSrcSet, tmdbImage } from '@/lib/tmdbImage';
 
 interface MoviePosterProps {
   posterUrl: string | null;
   title: string;
   className?: string;
+  /** Rendered width hint for srcset selection. Defaults to a grid thumbnail. */
+  sizes?: string;
+  /** Load immediately instead of when scrolled near (use for above-the-fold art). */
+  eager?: boolean;
 }
 
-function getBlurUrl(posterUrl: string): string | null {
-  if (!posterUrl.includes('image.tmdb.org')) return null;
-  return posterUrl.replace(/\/t\/p\/w\d+\//, '/t/p/w92/');
-}
-
-export default function MoviePoster({ posterUrl, title, className = '' }: MoviePosterProps) {
+export default function MoviePoster({ posterUrl, title, className = '', sizes = GRID_POSTER_SIZES, eager = false }: MoviePosterProps) {
   const [loaded, setLoaded] = useState(false);
 
   if (!posterUrl) {
@@ -24,7 +24,8 @@ export default function MoviePoster({ posterUrl, title, className = '' }: MovieP
     );
   }
 
-  const blurUrl = getBlurUrl(posterUrl);
+  const blurUrl = posterUrl.includes('image.tmdb.org') ? tmdbImage(posterUrl, 'w92') : null;
+  const loading = eager ? 'eager' : 'lazy';
 
   return (
     <div className={`relative w-full h-full overflow-hidden ${className}`}>
@@ -34,13 +35,18 @@ export default function MoviePoster({ posterUrl, title, className = '' }: MovieP
           alt=""
           aria-hidden="true"
           draggable={false}
+          loading={loading}
+          decoding="async"
           className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl pointer-events-none select-none"
         />
       )}
       <img
         src={posterUrl}
+        srcSet={posterSrcSet(posterUrl)}
+        sizes={sizes}
         alt={title}
-        loading="lazy"
+        loading={loading}
+        decoding="async"
         draggable={false}
         onLoad={() => setLoaded(true)}
         className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 pointer-events-none select-none ${loaded ? 'opacity-100' : 'opacity-0'}`}

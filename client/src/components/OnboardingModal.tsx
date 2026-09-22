@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { getBaseName } from './StreamingProviders';
 import LetterboxdImport from './LetterboxdImport';
 import OnboardingSeedGrid from './OnboardingSeedGrid';
+import { tmdbImage } from '@/lib/tmdbImage';
 
 type Path = 'together' | 'solo' | 'discover';
 type Step = 0 | 1 | 2 | 3 | 4;
@@ -223,7 +224,7 @@ export default function OnboardingModal({ open, onClose, onPickPath }: Onboardin
                               selected ? 'bg-coral text-charcoal' : 'glass text-cream-dim'
                             }`}
                           >
-                            <img src={p.logoUrl} alt="" className="w-5 h-5 rounded" />
+                            <img src={tmdbImage(p.logoUrl, 'w92')} alt="" loading="lazy" className="w-5 h-5 rounded" />
                             <span>{p.baseName}</span>
                           </button>
                         );

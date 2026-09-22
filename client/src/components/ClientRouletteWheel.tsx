@@ -178,7 +178,7 @@ export default function ClientRouletteWheel({
                   }`}
                   style={{ width: TILE_WIDTH }}
                 >
-                  <MoviePoster posterUrl={t.sm.movie.posterUrl} title={t.sm.movie.title} />
+                  <MoviePoster posterUrl={t.sm.movie.posterUrl} title={t.sm.movie.title} sizes={`${TILE_WIDTH}px`} eager />
                   {!isWinner && <div className="absolute inset-0 bg-charcoal/30" />}
                 </div>
               );

@@ -8,6 +8,10 @@ const eslintConfig = defineConfig([
   {
     rules: {
       "react-hooks/set-state-in-effect": "warn",
+      // Posters and logos come from TMDB's CDN, which already serves pre-sized
+      // variants picked via srcset (see lib/tmdbImage.ts). next/image would only
+      // add a paid re-optimisation hop on top.
+      "@next/next/no-img-element": "off",
     },
   },
   // Override default ignores of eslint-config-next.
