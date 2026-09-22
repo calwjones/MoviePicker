@@ -248,8 +248,21 @@ export async function refreshMovie(movie: Movie): Promise<Movie> {
   return promise;
 }
 
-export async function refreshIfStale(movie: Movie): Promise<Movie> {
-  return isMovieStale(movie) ? refreshMovie(movie) : movie;
+/**
+ * Refresh a stale movie, but never hold the caller longer than `waitMs`: if TMDB
+ * is slow the stored row is returned and the refresh keeps going in the background.
+ */
+export async function refreshIfStale(movie: Movie, waitMs = 2500): Promise<Movie> {
+  if (!isMovieStale(movie)) return movie;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const fallback = new Promise<Movie>((resolve) => {
+    timer = setTimeout(() => resolve(movie), waitMs);
+  });
+  try {
+    return await Promise.race([refreshMovie(movie), fallback]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** Fire-and-forget refresh of the stalest movies in a set, bounded so it never floods TMDB. */

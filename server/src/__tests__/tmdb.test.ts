@@ -6,6 +6,7 @@ import {
   pickTrailerKey,
   findOrCreateMovie,
   isMovieStale,
+  refreshIfStale,
 } from '../services/tmdb';
 import { resetTmdbClientState } from '../services/tmdbClient';
 import { prisma } from '../app';
@@ -304,6 +305,25 @@ describe('TMDb Service', () => {
       expect(isMovieStale({ tmdbSyncedAt: null })).toBe(true);
       expect(isMovieStale({ tmdbSyncedAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000) })).toBe(true);
       expect(isMovieStale({ tmdbSyncedAt: new Date() })).toBe(false);
+    });
+  });
+
+  describe('refreshIfStale', () => {
+    const stale = { id: 'm1', tmdbId: 1, title: 'Old', tmdbSyncedAt: null } as unknown as Parameters<typeof refreshIfStale>[0];
+
+    it('returns fresh data when TMDB answers quickly', async () => {
+      mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ id: 1, title: 'Old', videos: { results: [{ key: 'k', site: 'YouTube', type: 'Trailer', official: true }] } }) });
+      (prisma.movie.update as jest.Mock).mockImplementation(({ data }) => Promise.resolve({ ...stale, ...data }));
+      const movie = await refreshIfStale(stale);
+      expect(movie.trailerKey).toBe('k');
+    });
+
+    it('falls back to the stored row when TMDB is slow', async () => {
+      mockFetch.mockReturnValue(new Promise(() => {}));
+      const t0 = Date.now();
+      const movie = await refreshIfStale(stale, 50);
+      expect(movie).toBe(stale);
+      expect(Date.now() - t0).toBeLessThan(1000);
     });
   });
 });
