@@ -1,31 +1,38 @@
-FROM node:20-alpine AS builder
+# Build context is the repo root (see docker-compose.yml): the client installs
+# from the root workspace lockfile alongside @matchsticked/shared.
+# Debian-based rather than Alpine because the lockfile pins the glibc (-gnu)
+# Tailwind/LightningCSS native bindings.
+FROM node:20-slim AS builder
 
-WORKDIR /app/client
+WORKDIR /app
 
-# Copy shared types to ../shared (same relative path as local dev)
-COPY shared/ /app/shared/
+COPY package.json package-lock.json ./
+COPY shared/ ./shared/
+COPY client/package.json ./client/
+RUN npm ci --workspace client --no-audit --no-fund
 
-# Copy client files
-COPY client/package.json client/package-lock.json* ./
-RUN npm ci --legacy-peer-deps
-COPY client/ ./
+COPY client/ ./client/
 
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_SOCKET_URL
+ARG NEXT_PUBLIC_SITE_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_SOCKET_URL=$NEXT_PUBLIC_SOCKET_URL
+ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
+ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN npm run build
+RUN npm run build --workspace client
 
-FROM node:20-alpine AS runner
+FROM node:20-slim AS runner
 
 WORKDIR /app
 ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 
-COPY --from=builder /app/client/package.json ./
+# In a workspace, standalone output mirrors the repo layout: server.js lives under client/.
 COPY --from=builder /app/client/.next/standalone ./
-COPY --from=builder /app/client/.next/static ./.next/static
-COPY --from=builder /app/client/public ./public
+COPY --from=builder /app/client/.next/static ./client/.next/static
+COPY --from=builder /app/client/public ./client/public
 
 EXPOSE 3000
-CMD ["node", "server.js"]
+CMD ["node", "client/server.js"]
