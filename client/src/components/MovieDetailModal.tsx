@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { animate, motion, AnimatePresence, useMotionValue } from 'framer-motion';
 import type { Movie, UserMovie } from '@matchsticked/shared';
 import { movieApi } from '@/lib/api';
 import MoviePoster from './MoviePoster';
@@ -52,6 +52,10 @@ export default function MovieDetailModal({
 }: MovieDetailModalProps) {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
+  // Sheet pull-to-dismiss, tracked by hand from the grab handle so it can't
+  // collide with scrolling inside the sheet.
+  const sheetY = useMotionValue(0);
+  const pull = useRef<{ pointerId: number; originY: number; samples: { y: number; t: number }[] } | null>(null);
   const [fresh, setFresh] = useState<Movie | null>(null);
   const [trailerFor, setTrailerFor] = useState<string | null>(null);
 
@@ -95,6 +99,32 @@ export default function MovieDetailModal({
     };
   }, [open]);
 
+  const onHandleDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    pull.current = { pointerId: e.pointerId, originY: e.clientY, samples: [{ y: e.clientY, t: e.timeStamp }] };
+  };
+  const onHandleMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const p = pull.current;
+    if (!p || e.pointerId !== p.pointerId) return;
+    const dy = e.clientY - p.originY;
+    // Follows the finger down; resists being pulled up.
+    sheetY.set(dy > 0 ? dy : dy * 0.15);
+    p.samples.push({ y: e.clientY, t: e.timeStamp });
+    while (p.samples.length > 2 && e.timeStamp - p.samples[0].t > 100) p.samples.shift();
+  };
+  const onHandleUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const p = pull.current;
+    if (!p || e.pointerId !== p.pointerId) return;
+    pull.current = null;
+    const first = p.samples[0];
+    const last = p.samples[p.samples.length - 1];
+    const dt = (last.t - first.t) / 1000;
+    const velocity = dt > 0 ? (last.y - first.y) / dt : 0;
+    // Past ~120px, or a downward flick, dismisses like a native sheet.
+    if (sheetY.get() > 120 || velocity > 600) close();
+    else animate(sheetY, 0, { type: 'spring', stiffness: 500, damping: 38 });
+  };
+
   const isRecContext = !!onAdd;
   const isLibraryContext = !!userMovie;
 
@@ -109,9 +139,11 @@ export default function MovieDetailModal({
           onClick={close}
         >
           <motion.div
-            initial={{ y: 100, opacity: 0 }}
+            initial={{ y: '100%', opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 100, opacity: 0 }}
+            exit={{ y: '100%', opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 36 }}
+            style={{ y: sheetY }}
             ref={dialogRef}
             role="dialog"
             aria-modal="true"
@@ -120,6 +152,16 @@ export default function MovieDetailModal({
             className="glass rounded-t-2xl sm:rounded-2xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto focus:outline-none"
             onClick={(e) => e.stopPropagation()}
           >
+            <div
+              onPointerDown={onHandleDown}
+              onPointerMove={onHandleMove}
+              onPointerUp={onHandleUp}
+              onPointerCancel={onHandleUp}
+              className="sm:hidden -mt-4 -mx-6 mb-1 pt-2 pb-4 flex justify-center cursor-grab touch-none"
+              aria-hidden="true"
+            >
+              <span className="h-1 w-10 rounded-full bg-cream/25" />
+            </div>
             {playing && shown.trailerKey && (
               <div className="relative aspect-video -mx-2 -mt-2 mb-4 rounded-xl overflow-hidden bg-black">
                 <iframe

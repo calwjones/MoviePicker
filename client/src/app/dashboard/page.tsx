@@ -190,18 +190,20 @@ function DashboardContent() {
             key={t}
             onClick={() => selectTab(t)}
             aria-current={tab === t ? 'page' : undefined}
-            className={`relative shrink-0 py-2 px-4 sm:flex-1 sm:px-2 rounded-xl text-sm font-medium transition-colors duration-200 glass ${
+            // No backdrop blur here: it would give each tab its own stacking
+            // context and the sliding pill would paint over the labels it passes.
+            className={`relative shrink-0 py-2 px-4 sm:flex-1 sm:px-2 rounded-xl text-sm font-medium transition-colors duration-200 bg-[rgba(40,40,40,0.4)] border border-white/[0.08] ${
               tab === t ? 'text-cream' : 'text-cream-dim hover:text-cream'
             }`}
           >
             {tab === t && (
               <motion.span
                 layoutId="dashboard-tab-pill"
-                className="absolute inset-0 rounded-xl bg-coral"
+                className="absolute -inset-px z-0 rounded-xl bg-coral"
                 transition={{ type: 'spring', stiffness: 520, damping: 40 }}
               />
             )}
-            <span className="relative">{TAB_LABELS[t]}</span>
+            <span className="relative z-10">{TAB_LABELS[t]}</span>
           </button>
         ))}
       </div>

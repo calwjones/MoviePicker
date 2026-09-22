@@ -5,6 +5,7 @@ import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import ConditionalFooter from "@/components/ConditionalFooter";
 import GlobalInviteListener from "@/components/GlobalInviteListener";
+import MotionProvider from "@/components/MotionProvider";
 
 // Self-hosted at build time: no render-blocking request to Google, no CSP
 // exception, and the --font-* variables the components reference actually exist.
@@ -46,13 +47,15 @@ export default function RootLayout({
   return (
     <html lang="en" className={`dark ${inter.variable} ${playfair.variable}`}>
       <body className="antialiased bg-charcoal text-cream flex flex-col min-h-dvh font-sans">
-        <AuthProvider>
-          <main className="flex-1 flex flex-col">
-            {children}
-          </main>
-          <ConditionalFooter />
-          <GlobalInviteListener />
-        </AuthProvider>
+        <MotionProvider>
+          <AuthProvider>
+            <main className="flex-1 flex flex-col">
+              {children}
+            </main>
+            <ConditionalFooter />
+            <GlobalInviteListener />
+          </AuthProvider>
+        </MotionProvider>
         <Analytics />
       </body>
     </html>

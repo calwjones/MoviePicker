@@ -17,16 +17,41 @@
   --font-display: var(--font-playfair), Georgia, serif;
 }
 
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
   background: var(--color-charcoal);
-  background-image:
-    radial-gradient(at 0% 0%, rgba(161, 47, 10, 0.06) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(161, 47, 10, 0.04) 0px, transparent 50%);
-  background-attachment: fixed;
   color: var(--color-cream);
   font-family: var(--font-inter), system-ui, sans-serif;
   min-height: 100dvh;
   overflow-x: hidden;
+}
+
+/* The warm corner glow lives on its own fixed layer: background-attachment:
+   fixed forces a full repaint on every scroll frame (and is ignored on iOS). */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(at 0% 0%, rgba(161, 47, 10, 0.06) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(161, 47, 10, 0.04) 0px, transparent 50%);
+}
+
+/* No double-tap-to-zoom delay on controls. */
+button,
+a,
+[role='button'] {
+  touch-action: manipulation;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* Scrollbar */
@@ -236,6 +261,13 @@ body {
 .ms-sparks {
   animation: ms-spark-burst 3.0s linear infinite;
   transform-box: view-box;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab-panel:not([hidden]),
+  .match-pulse {
+    animation: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
