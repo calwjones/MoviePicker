@@ -5,6 +5,7 @@ import { setupSocketHandlers } from './services/socket';
 import { setIO } from './services/emitter';
 import { CLIENT_URL, PORT } from './config';
 import { warmBrowseCache } from './routes/browse';
+import { warmCategoryCache } from './routes/categories';
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
@@ -19,7 +20,10 @@ setIO(io);
 
 httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  warmBrowseCache().catch((err) => console.error('[browse] warmup failed', err));
+  warmBrowseCache()
+    .catch((err) => console.error('[browse] warmup failed', err))
+    .then(() => warmCategoryCache())
+    .catch((err) => console.error('[categories] warmup failed', err));
 });
 
 function shutdown(signal: string) {

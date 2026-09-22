@@ -1,6 +1,7 @@
 import { TMDB_API_KEY } from '../config';
 
-const TMDB_BASE = 'https://api.themoviedb.org/3';
+// Overridable so integration environments can point at a stub.
+const TMDB_BASE = process.env.TMDB_API_BASE || 'https://api.themoviedb.org/3';
 
 // TMDB's documented ceiling is ~50 req/s and ~20 open connections per IP.
 // Stay comfortably under both; 429s are still handled below if we overshoot.
