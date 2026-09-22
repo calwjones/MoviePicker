@@ -39,6 +39,12 @@ function shutdown(signal: string) {
   }, 10000);
 }
 
+// Background work (push sends, metadata refreshes) is fire-and-forget; a stray
+// rejection there should be logged, not take every connected user down with it.
+process.on('unhandledRejection', (reason) => {
+  console.error('[process] unhandled rejection', reason);
+});
+
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 

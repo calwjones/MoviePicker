@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import rateLimit from 'express-rate-limit';
 import { prisma } from '../app';
 import { emit } from '../services/emitter';
 import { authenticate, AuthRequest } from '../middleware/auth';
@@ -12,6 +13,16 @@ import { refreshStaleInBackground } from '../services/tmdb';
 import type { Movie } from '@prisma/client';
 
 const router = Router();
+
+// Codes are 6 chars from a 32-letter alphabet; without a cap the unauthenticated
+// lookup below could be walked to find live sessions.
+const codeLookupLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  message: { error: 'Too many attempts, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 type SessionWithMovies = {
   movies?: { movie: Movie }[];
@@ -428,7 +439,7 @@ router.get('/active', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.get('/by-code/:code', async (req, res: Response) => {
+router.get('/by-code/:code', codeLookupLimiter, async (req, res: Response) => {
   try {
     const code = String(req.params.code ?? '').toUpperCase();
     if (!/^[A-Z0-9]{4,10}$/.test(code)) {

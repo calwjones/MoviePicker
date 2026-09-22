@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import rateLimit from 'express-rate-limit';
 import { prisma } from '../app';
 import { emit } from '../services/emitter';
 import { authenticate, AuthRequest } from '../middleware/auth';
@@ -6,6 +7,15 @@ import { getInCinemaIds, attachInCinema } from '../services/cinemaStatus';
 import { sendPush } from '../services/pushSender';
 
 const router = Router();
+
+// Each request pushes a notification to the recipient; cap it so it can't be used to spam.
+const friendRequestLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 30,
+  message: { error: 'Too many friend requests, try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 interface FriendRow {
   id: string;
@@ -97,7 +107,7 @@ router.get('/pending', authenticate, async (req: AuthRequest, res: Response) => 
   }
 });
 
-router.post('/request', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/request', friendRequestLimiter, authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
     const { username } = req.body as { username?: string };

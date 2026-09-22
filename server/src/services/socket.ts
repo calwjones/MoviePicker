@@ -16,6 +16,7 @@ interface RouletteState {
 const rouletteSpins = new Map<string, RouletteState>();
 const announcedJoins = new Set<string>();
 const MAX_SPINS = 3;
+const MAX_ROULETTE_ITEMS = 500;
 
 export function clearSessionState(sessionId: string): void {
   rouletteSpins.delete(sessionId);
@@ -52,7 +53,8 @@ export function setupSocketHandlers(io: Server): void {
       socket.join(`user:${socket.userId}`);
     }
 
-    socket.on('join-session', async (sessionId: string) => {
+    socket.on('join-session', async (sessionId: unknown) => {
+      if (typeof sessionId !== 'string' || sessionId.length > 64) return;
       try {
         const session = await prisma.swipeSession.findUnique({
           where: { id: sessionId },
@@ -115,39 +117,54 @@ export function setupSocketHandlers(io: Server): void {
       }
     });
 
-    socket.on('done-swiping', (data: { sessionId: string }) => {
-      socket.to(`session:${data.sessionId}`).emit('partner-done');
+    // Every handler below takes client-supplied data: validate its shape and
+    // never let a throw escape into socket.io (an uncaught throw here takes the
+    // whole process down).
+    const guard = <T>(event: string, handler: (data: T) => void) => {
+      socket.on(event, (data: unknown) => {
+        try {
+          handler((data && typeof data === 'object' ? data : {}) as T);
+        } catch (err) {
+          console.error(`[socket] ${event} handler failed`, err);
+        }
+      });
+    };
+    const inSession = (sessionId: unknown): sessionId is string =>
+      typeof sessionId === 'string' && socket.rooms.has(`session:${sessionId}`);
+
+    guard<{ sessionId?: unknown }>('done-swiping', ({ sessionId }) => {
+      if (!inSession(sessionId)) return;
+      socket.to(`session:${sessionId}`).emit('partner-done');
     });
 
-    socket.on('reveal-matches', (data: { sessionId: string }) => {
-      const { sessionId } = data;
-      if (!sessionId || !socket.rooms.has(`session:${sessionId}`)) return;
+    guard<{ sessionId?: unknown }>('reveal-matches', ({ sessionId }) => {
+      if (!inSession(sessionId)) return;
       io.to(`session:${sessionId}`).emit('matches-revealed');
     });
 
-    socket.on('reveal-all', (data: { sessionId: string }) => {
-      const { sessionId } = data;
-      if (!sessionId || !socket.rooms.has(`session:${sessionId}`)) return;
+    guard<{ sessionId?: unknown }>('reveal-all', ({ sessionId }) => {
+      if (!inSession(sessionId)) return;
       io.to(`session:${sessionId}`).emit('matches-reveal-all');
     });
 
-    socket.on('roulette-open', (data: { sessionId: string; excludedIds?: string[] }) => {
-      const { sessionId, excludedIds } = data;
-      if (!sessionId || !socket.rooms.has(`session:${sessionId}`)) return;
-      io.to(`session:${sessionId}`).emit('roulette-opened', { excludedIds: excludedIds ?? [] });
+    guard<{ sessionId?: unknown; excludedIds?: unknown }>('roulette-open', ({ sessionId, excludedIds }) => {
+      if (!inSession(sessionId)) return;
+      const ids = Array.isArray(excludedIds)
+        ? excludedIds.filter((id): id is string => typeof id === 'string' && id.length <= 64).slice(0, MAX_ROULETTE_ITEMS)
+        : [];
+      io.to(`session:${sessionId}`).emit('roulette-opened', { excludedIds: ids });
     });
 
-    socket.on('roulette-close', (data: { sessionId: string }) => {
-      const { sessionId } = data;
-      if (!sessionId || !socket.rooms.has(`session:${sessionId}`)) return;
+    guard<{ sessionId?: unknown }>('roulette-close', ({ sessionId }) => {
+      if (!inSession(sessionId)) return;
       io.to(`session:${sessionId}`).emit('roulette-closed');
     });
 
-    socket.on('roulette-spin', (data: { sessionId: string; matchCount: number }) => {
-      const { sessionId, matchCount } = data;
-      if (!sessionId || !matchCount || matchCount <= 0) return;
-
-      if (!socket.rooms.has(`session:${sessionId}`)) {
+    guard<{ sessionId?: unknown; matchCount?: unknown }>('roulette-spin', ({ sessionId, matchCount }) => {
+      // matchCount comes from the client: an unbounded value used to size an
+      // array here, so one message could exhaust the heap and kill the server.
+      if (typeof matchCount !== 'number' || !Number.isInteger(matchCount) || matchCount <= 0 || matchCount > MAX_ROULETTE_ITEMS) return;
+      if (!inSession(sessionId)) {
         socket.emit('roulette-error', { message: 'Not in session' });
         return;
       }
@@ -158,10 +175,10 @@ export function setupSocketHandlers(io: Server): void {
         return;
       }
 
-      const eligible = state.lastWinner !== null && matchCount > 1
-        ? Array.from({ length: matchCount }, (_, i) => i).filter((i) => i !== state.lastWinner)
-        : Array.from({ length: matchCount }, (_, i) => i);
-      const winnerIndex = eligible[Math.floor(Math.random() * eligible.length)];
+      // Uniform pick that never repeats the previous winner (when there's a choice).
+      const avoid = state.lastWinner !== null && state.lastWinner < matchCount && matchCount > 1 ? state.lastWinner : null;
+      let winnerIndex = Math.floor(Math.random() * (avoid === null ? matchCount : matchCount - 1));
+      if (avoid !== null && winnerIndex >= avoid) winnerIndex++;
 
       rouletteSpins.set(sessionId, { count: state.count + 1, lastWinner: winnerIndex });
       const spinsLeft = MAX_SPINS - (state.count + 1);
