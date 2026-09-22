@@ -57,9 +57,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Reads localStorage, which only exists after hydration, so this has to run in
+  // an effect; the synchronous setState is the intended one-time sync.
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoading(false);
       return;
     }

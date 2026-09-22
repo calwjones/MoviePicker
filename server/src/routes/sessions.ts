@@ -507,19 +507,30 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
 
 router.get('/history/all', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const sessions = await prisma.swipeSession.findMany({
+    // Optional paging: ?limit=N&before=<createdAt ISO>. Without limit the full
+    // history is returned, as older clients expect.
+    const limitParam = parseInt(String(req.query.limit ?? ''), 10);
+    const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 50) : null;
+    const before = typeof req.query.before === 'string' ? new Date(req.query.before) : null;
+    const beforeValid = before && !isNaN(before.getTime()) ? before : null;
+
+    const found = await prisma.swipeSession.findMany({
       where: {
         OR: [
           { userId: req.userId!, type: { in: ['solo', 'group', 'guest'] } },
           { participants: { some: { userId: req.userId! } } },
         ],
+        ...(beforeValid ? { createdAt: { lt: beforeValid } } : {}),
       },
       include: {
         matches: { include: { movie: true } },
         _count: { select: { movies: true, participants: true } },
       },
       orderBy: { createdAt: 'desc' },
+      ...(limit ? { take: limit + 1 } : {}),
     });
+    const hasMore = limit != null && found.length > limit;
+    const sessions = hasMore ? found.slice(0, limit!) : found;
 
     const matchedMovieIds = Array.from(new Set(sessions.flatMap((s) => s.matches.map((m) => m.movieId))));
     const [inCinemaSet, myRatings] = await Promise.all([
@@ -557,7 +568,10 @@ router.get('/history/all', authenticate, async (req: AuthRequest, res: Response)
       };
     });
 
-    res.json({ sessions: history });
+    res.json({
+      sessions: history,
+      nextCursor: hasMore ? sessions[sessions.length - 1].createdAt.toISOString() : null,
+    });
   } catch {
     res.status(500).json({ error: 'Internal server error' });
   }

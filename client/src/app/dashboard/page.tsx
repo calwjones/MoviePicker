@@ -35,7 +35,7 @@ function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toasts, addToast } = useToast();
-  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
   const [inviteCount, setInviteCount] = useState(0);
   const [bellOpen, setBellOpen] = useState(false);
 
@@ -89,17 +89,17 @@ function DashboardContent() {
     else if (window.scrollY > 0) window.scrollTo(0, 0);
   }, [tab]);
 
-  useEffect(() => {
-    if (rawTab === 'notifications' && user && !user.isGuest) setBellOpen(true);
-  }, [rawTab, user]);
+  // ?tab=notifications opens the bell once (adjusting state during render).
+  const [notificationsParamHandled, setNotificationsParamHandled] = useState(false);
+  if (rawTab === 'notifications' && user && !user.isGuest && !notificationsParamHandled) {
+    setNotificationsParamHandled(true);
+    setBellOpen(true);
+  }
 
-  const refreshInvites = useCallback(async () => {
-    try {
-      const res = await friendsApi.invites();
-      setInviteCount((res.data.invites ?? []).length);
-    } catch {
-      /* ignore */
-    }
+  const refreshInvites = useCallback(() => {
+    friendsApi.invites()
+      .then((res) => setInviteCount((res.data.invites ?? []).length))
+      .catch(() => { /* badge just stays as it was */ });
   }, []);
 
   useEffect(() => {
@@ -117,13 +117,10 @@ function DashboardContent() {
     if (bellOpen) refreshInvites();
   }, [bellOpen, refreshInvites]);
 
-  useEffect(() => {
-    if (authLoading || !user || user.isGuest) return;
-    if (!user.onboardedAt) setOnboardingOpen(true);
-  }, [user, authLoading]);
+  const onboardingOpen = !authLoading && !!user && !user.isGuest && !user.onboardedAt && !onboardingDismissed;
 
   const dismissOnboarding = () => {
-    setOnboardingOpen(false);
+    setOnboardingDismissed(true);
     completeOnboarding().catch((err) => console.warn('[onboarding] mark complete failed', err));
   };
 

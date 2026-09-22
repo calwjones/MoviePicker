@@ -31,21 +31,22 @@ function recToMovie(rec: SearchResult): Movie {
 }
 
 export default function RecDetailSheet({ rec, onClose, onAdd, onDismiss }: RecDetailSheetProps) {
-  const [full, setFull] = useState<Movie | null>(null);
-  const [loading, setLoading] = useState(false);
+  // Keyed to the rec it was fetched for, so a slow response for the previous
+  // pick can never show under the current one.
+  const [fetched, setFetched] = useState<{ tmdbId: number; movie: Movie | null } | null>(null);
 
   useEffect(() => {
-    if (!rec) {
-      setFull(null);
-      return;
-    }
-    setFull(null);
-    setLoading(true);
+    if (!rec) return;
+    let cancelled = false;
     movieApi.getByTmdbId(rec.tmdbId)
-      .then((res) => setFull(res.data.movie))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      .then((res) => { if (!cancelled) setFetched({ tmdbId: rec.tmdbId, movie: res.data.movie }); })
+      .catch(() => { if (!cancelled) setFetched({ tmdbId: rec.tmdbId, movie: null }); });
+    return () => { cancelled = true; };
   }, [rec]);
+
+  const current = rec && fetched?.tmdbId === rec.tmdbId ? fetched : null;
+  const full = current?.movie ?? null;
+  const loading = !!rec && !current;
 
   const displayMovie = full ?? (rec ? recToMovie(rec) : null);
 

@@ -15,19 +15,27 @@ interface HistoryTabProps {
 }
 
 const SESSIONS_PER_PAGE = 10;
+const PAGE_SIZE = 20;
 
 export default function HistoryTab({ addToast, active }: HistoryTabProps) {
   const router = useRouter();
   const [history, setHistory] = useState<HistorySession[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [visibleCount, setVisibleCount] = useState(SESSIONS_PER_PAGE);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [rewatched, setRewatched] = useState<Set<string>>(new Set());
 
   const loadHistory = async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setHistoryLoading(true);
     try {
-      const res = await sessionApi.history();
-      setHistory(res.data.sessions);
+      const res = await sessionApi.history({ limit: PAGE_SIZE });
+      const page: HistorySession[] = res.data.sessions;
+      // A background refresh replaces the newest page but keeps older pages already loaded.
+      setHistory((prev) => (opts?.silent
+        ? [...page, ...prev.filter((s) => !page.some((p) => p.id === s.id) && s.createdAt < (page[page.length - 1]?.createdAt ?? ''))]
+        : page));
+      if (!opts?.silent) setNextCursor(res.data.nextCursor ?? null);
     } catch {
       // ignore
     } finally {
@@ -40,6 +48,25 @@ export default function HistoryTab({ addToast, active }: HistoryTabProps) {
   }, []);
 
   useOnReactivate(active, () => { void loadHistory({ silent: true }); });
+
+  const loadMore = async () => {
+    if (visibleCount < history.length) {
+      setVisibleCount((prev) => prev + SESSIONS_PER_PAGE);
+      return;
+    }
+    if (!nextCursor) return;
+    setLoadingMore(true);
+    try {
+      const res = await sessionApi.history({ limit: PAGE_SIZE, before: nextCursor });
+      setHistory((prev) => [...prev, ...res.data.sessions]);
+      setNextCursor(res.data.nextCursor ?? null);
+      setVisibleCount((prev) => prev + SESSIONS_PER_PAGE);
+    } catch {
+      addToast('Couldn’t load older sessions');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const handleMarkWatched = async (matchId: string) => {
     try {
@@ -217,12 +244,13 @@ export default function HistoryTab({ addToast, active }: HistoryTabProps) {
           </div>
         ))
       )}
-      {!historyLoading && history.length > visibleCount && (
+      {!historyLoading && (history.length > visibleCount || nextCursor) && (
         <button
-          onClick={() => setVisibleCount((prev) => prev + SESSIONS_PER_PAGE)}
+          disabled={loadingMore}
+          onClick={loadMore}
           className="w-full py-2 glass rounded-xl text-cream-dim text-sm hover:bg-card-hover transition-colors"
         >
-          Show more ({history.length - visibleCount} remaining)
+          {loadingMore ? 'Loading…' : 'Show older sessions'}
         </button>
       )}
     </motion.div>

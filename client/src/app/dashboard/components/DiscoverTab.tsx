@@ -12,6 +12,7 @@ import FilterEditor, { PREFERRED_PROVIDERS, type ProviderChip } from '@/componen
 import { getBaseName } from '@/components/StreamingProviders';
 import { useAuth } from '@/context/AuthContext';
 import type { SearchResult, Filters } from '@matchsticked/shared';
+import { clickableProps } from '@/lib/a11y';
 
 interface BrowseRow {
   id: string;
@@ -570,8 +571,8 @@ function BrowseRowView({
         {row.movies.map((rec) => (
           <div
             key={rec.tmdbId}
-            className="flex-shrink-0 w-28 snap-start group cursor-pointer"
-            onClick={() => onSelect(rec)}
+            className="flex-shrink-0 w-28 snap-start group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember focus-visible:ring-offset-2 focus-visible:ring-offset-charcoal rounded-xl"
+            {...clickableProps(() => onSelect(rec), rec.title)}
           >
             <div className="relative w-28 aspect-[2/3] rounded-xl overflow-hidden bg-card mb-2 shadow-lg group-hover:shadow-coral/20 group-hover:scale-[1.03] transition-all">
               <MoviePoster posterUrl={rec.posterUrl} title={rec.title} sizes="112px" />

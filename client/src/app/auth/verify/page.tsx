@@ -8,16 +8,15 @@ import { FullPageSpinner } from '@/components/LoadingSpinner';
 
 function VerifyContent() {
   const searchParams = useSearchParams();
-  const [status, setStatus] = useState<'pending' | 'success' | 'error'>('pending');
-  const [errorMessage, setErrorMessage] = useState('');
+  const token = searchParams.get('token');
+  const [result, setResult] = useState<{ status: 'pending' | 'success' | 'error'; errorMessage: string }>({ status: 'pending', errorMessage: '' });
+  const status = token ? result.status : 'error';
+  const errorMessage = token ? result.errorMessage : 'Missing verification token.';
+  const setStatus = (s: 'success' | 'error') => setResult((r) => ({ ...r, status: s }));
+  const setErrorMessage = (m: string) => setResult((r) => ({ ...r, errorMessage: m }));
 
   useEffect(() => {
-    const token = searchParams.get('token');
-    if (!token) {
-      setStatus('error');
-      setErrorMessage('Missing verification token.');
-      return;
-    }
+    if (!token) return;
     authApi
       .verifyEmail(token)
       .then(() => setStatus('success'))
@@ -25,7 +24,7 @@ function VerifyContent() {
         setStatus('error');
         setErrorMessage(err?.response?.data?.error || 'Link is invalid or expired.');
       });
-  }, [searchParams]);
+  }, [token]);
 
   return (
     <div className="flex items-center justify-center min-h-dvh px-6">

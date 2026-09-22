@@ -9,6 +9,7 @@ import MovieDetailModal from '@/components/MovieDetailModal';
 import SkeletonList from '@/components/SkeletonList';
 import { DECADE_OPTIONS } from '@/lib/decades';
 import type { Movie } from '@matchsticked/shared';
+import { clickableProps } from '@/lib/a11y';
 
 type LibFilter = 'watchlist' | 'watched' | 'all';
 type SortField = 'dateAdded' | 'year' | 'runtime' | 'tmdbRating' | 'userRating';
@@ -417,8 +418,8 @@ export default function FriendLibraryPanel({ friend, onClose, addToast }: Props)
                 {filtered.map((um) => (
                   <div
                     key={um.id}
-                    className="relative group cursor-pointer"
-                    onClick={() => setSelected(um.movie)}
+                    className="relative group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember focus-visible:ring-offset-2 focus-visible:ring-offset-charcoal rounded-xl"
+                    {...clickableProps(() => setSelected(um.movie), um.movie.title)}
                   >
                     <div className="relative aspect-[2/3] rounded-xl overflow-hidden bg-card transition-all duration-200 group-hover:ring-2 group-hover:ring-coral/50 group-hover:scale-[1.03]">
                       <MoviePoster posterUrl={um.movie.posterUrl} title={um.movie.title} />

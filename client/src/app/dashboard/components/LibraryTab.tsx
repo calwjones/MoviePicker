@@ -18,6 +18,8 @@ import { useRouter } from 'next/navigation';
 import { DECADE_OPTIONS } from '@/lib/decades';
 import type { Movie, UserMovie, SearchResult } from '@matchsticked/shared';
 import { useOnReactivate } from '@/hooks/useOnReactivate';
+import { getErrorMessage } from '@/lib/errors';
+import { clickableProps } from '@/lib/a11y';
 
 const GENRE_OPTIONS = [
   'Action', 'Adventure', 'Animation', 'Comedy', 'Crime', 'Documentary',
@@ -197,9 +199,9 @@ export default function LibraryTab({ addToast, active }: LibraryTabProps) {
       setSearchResults((prev) =>
         prev.map((m) => (m.tmdbId === tmdbId ? { ...m, _added: true } : m))
       );
-      loadWatchlist();
-    } catch {
-      // ignore
+      loadWatchlist(undefined, { silent: true });
+    } catch (err) {
+      addToast(getErrorMessage(err, 'Couldn’t add that movie. Try again?'));
     } finally {
       setAddingTmdbId(null);
     }
@@ -279,7 +281,8 @@ export default function LibraryTab({ addToast, active }: LibraryTabProps) {
     try {
       await recommendationApi.undismiss(um.movie.tmdbId!);
     } catch {
-      // best-effort
+      setDismissedMovies((prev) => (prev.some((m) => m.id === um.id) ? prev : [um, ...prev]));
+      addToast('Couldn’t restore that one. Try again?');
     }
   };
 
@@ -306,8 +309,8 @@ export default function LibraryTab({ addToast, active }: LibraryTabProps) {
       setRecDetail(null);
       loadWatchlist();
       addToast(`Added "${rec.title}" to your watchlist`);
-    } catch {
-      // ignore
+    } catch (err) {
+      addToast(getErrorMessage(err, 'Couldn’t add that movie. Try again?'));
     }
   };
 
@@ -470,8 +473,8 @@ export default function LibraryTab({ addToast, active }: LibraryTabProps) {
             {recommendations.map((rec) => (
               <div
                 key={rec.tmdbId}
-                className="flex-shrink-0 w-28 snap-start group cursor-pointer relative"
-                onClick={() => setRecDetail(rec)}
+                className="flex-shrink-0 w-28 snap-start group cursor-pointer relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember focus-visible:ring-offset-2 focus-visible:ring-offset-charcoal rounded-xl"
+                {...clickableProps(() => setRecDetail(rec), rec.title)}
               >
                 <div className="w-28 aspect-[2/3] rounded-xl overflow-hidden bg-card mb-2 shadow-lg group-hover:shadow-coral/20 group-hover:scale-[1.03] transition-all">
                   <MoviePoster posterUrl={rec.posterUrl} title={rec.title} sizes="112px" />
@@ -569,8 +572,8 @@ export default function LibraryTab({ addToast, active }: LibraryTabProps) {
                 {moviesLike.map((rec) => (
                   <div
                     key={rec.tmdbId}
-                    className="flex-shrink-0 w-28 snap-start group cursor-pointer relative"
-                    onClick={() => setRecDetail(rec)}
+                    className="flex-shrink-0 w-28 snap-start group cursor-pointer relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember focus-visible:ring-offset-2 focus-visible:ring-offset-charcoal rounded-xl"
+                    {...clickableProps(() => setRecDetail(rec), rec.title)}
                   >
                     <div className="w-28 aspect-[2/3] rounded-xl overflow-hidden bg-card mb-2 shadow-lg group-hover:shadow-coral/20 group-hover:scale-[1.03] transition-all">
                       <MoviePoster posterUrl={rec.posterUrl} title={rec.title} sizes="112px" />
@@ -993,8 +996,8 @@ export default function LibraryTab({ addToast, active }: LibraryTabProps) {
             {visibleWatchlist.map((um) => (
               <div
                 key={um.id}
-                className="relative group cursor-pointer"
-                onClick={() => { setSelectedMovie(um.movie); setSelectedUserMovie(um); }}
+                className="relative group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember focus-visible:ring-offset-2 focus-visible:ring-offset-charcoal rounded-xl"
+                {...clickableProps(() => { setSelectedMovie(um.movie); setSelectedUserMovie(um); }, um.movie.title)}
               >
                 <div className="relative aspect-[2/3] rounded-xl overflow-hidden bg-card transition-all duration-200 group-hover:ring-2 group-hover:ring-coral/50 group-hover:scale-[1.03] group-hover:shadow-lg group-hover:shadow-coral/10">
                   <MoviePoster posterUrl={um.movie.posterUrl} title={um.movie.title} />

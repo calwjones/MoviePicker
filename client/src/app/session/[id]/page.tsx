@@ -374,7 +374,9 @@ export default function SessionPage() {
     try {
       await runInOrder(() => swipeApi.undo(sessionId, last.movieId));
       revert();
-    } catch { /* swallow */ }
+    } catch {
+      setSwipeError('Couldn’t undo that one. Check your connection and try again.');
+    }
   }, [undoStack, done, sessionId, runInOrder]);
 
   const handleAnotherBatch = async () => {

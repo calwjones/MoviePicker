@@ -104,7 +104,8 @@ export const sessionApi = {
     api.post(`/sessions/${sessionId}/start`),
   active: () => api.get('/sessions/active'),
   get: (id: string) => api.get(`/sessions/${id}`),
-  history: () => api.get('/sessions/history/all'),
+  history: (params?: { limit?: number; before?: string }) =>
+    api.get('/sessions/history/all', { params }),
   cancel: (id: string) => api.delete(`/sessions/${id}`),
   anotherBatch: (sessionId: string) =>
     api.post(`/sessions/${sessionId}/another-batch`),

@@ -24,6 +24,12 @@ export default function GlobalInviteListener() {
   const [invite, setInvite] = useState<SessionInvite | null>(null);
   const [toasts, setToasts] = useState<FriendToast[]>([]);
 
+  const pushToast = (message: string) => {
+    const id = Date.now() + Math.random();
+    setToasts((prev) => [...prev, { id, message }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 5000);
+  };
+
   useEffect(() => {
     if (loading || !user || user.isGuest) return;
     connectSocket();
@@ -55,7 +61,9 @@ export default function GlobalInviteListener() {
     try {
       const res = await friendsApi.acceptInvite(invite.inviteId);
       router.push(`/join/${res.data.sessionId}`);
-    } catch { /* ignore */ }
+    } catch {
+      pushToast('That invite has expired or the session already started');
+    }
     setInvite(null);
   };
 
