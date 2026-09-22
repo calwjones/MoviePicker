@@ -279,9 +279,6 @@ export default function DiscoverTab({ addToast }: DiscoverTabProps) {
   return (
     <motion.div
       key="browse"
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 20 }}
       className="space-y-4"
     >
       {/* Discover hero */}

@@ -7,22 +7,24 @@ import { movieApi, sessionApi, swipeApi } from '@/lib/api';
 import MoviePoster from '@/components/MoviePoster';
 import StarRating from '@/components/StarRating';
 import type { HistorySession } from '@matchsticked/shared';
+import { useOnReactivate } from '@/hooks/useOnReactivate';
 
 interface HistoryTabProps {
+  active?: boolean;
   addToast: (message: string) => void;
 }
 
 const SESSIONS_PER_PAGE = 10;
 
-export default function HistoryTab({ addToast }: HistoryTabProps) {
+export default function HistoryTab({ addToast, active }: HistoryTabProps) {
   const router = useRouter();
   const [history, setHistory] = useState<HistorySession[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [visibleCount, setVisibleCount] = useState(SESSIONS_PER_PAGE);
   const [rewatched, setRewatched] = useState<Set<string>>(new Set());
 
-  const loadHistory = async () => {
-    setHistoryLoading(true);
+  const loadHistory = async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setHistoryLoading(true);
     try {
       const res = await sessionApi.history();
       setHistory(res.data.sessions);
@@ -36,6 +38,8 @@ export default function HistoryTab({ addToast }: HistoryTabProps) {
   useEffect(() => {
     loadHistory();
   }, []);
+
+  useOnReactivate(active, () => { void loadHistory({ silent: true }); });
 
   const handleMarkWatched = async (matchId: string) => {
     try {
@@ -87,9 +91,6 @@ export default function HistoryTab({ addToast }: HistoryTabProps) {
   return (
     <motion.div
       key="history"
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 20 }}
       className="space-y-4"
     >
       <h2 className="text-xl font-semibold font-display">

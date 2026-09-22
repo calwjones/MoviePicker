@@ -17,6 +17,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { DECADE_OPTIONS } from '@/lib/decades';
 import type { Movie, UserMovie, SearchResult } from '@matchsticked/shared';
+import { useOnReactivate } from '@/hooks/useOnReactivate';
 
 const GENRE_OPTIONS = [
   'Action', 'Adventure', 'Animation', 'Comedy', 'Crime', 'Documentary',
@@ -28,10 +29,12 @@ type SortField = 'dateAdded' | 'year' | 'runtime' | 'tmdbRating' | 'userRating';
 type SortDir = 'asc' | 'desc';
 
 interface LibraryTabProps {
+  /** False while another dashboard tab is showing (this one stays mounted). */
+  active?: boolean;
   addToast: (message: string) => void;
 }
 
-export default function LibraryTab({ addToast }: LibraryTabProps) {
+export default function LibraryTab({ addToast, active }: LibraryTabProps) {
   const { user } = useAuth();
   const router = useRouter();
   const hasLetterboxd = !!user?.letterboxdUsername;
@@ -84,8 +87,8 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
   const [importing, setImporting] = useState(false);
   const [importStatus, setImportStatus] = useState('');
 
-  const loadWatchlist = useCallback(async (filter?: 'watchlist' | 'watched' | 'all') => {
-    setLibraryLoading(true);
+  const loadWatchlist = useCallback(async (filter?: 'watchlist' | 'watched' | 'all', opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLibraryLoading(true);
     try {
       const f = filter || libraryFilter;
       const res = await movieApi.mine(f === 'all' ? undefined : f);
@@ -100,6 +103,9 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
   useEffect(() => {
     loadWatchlist();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Pick up changes made from other tabs without flashing the skeleton.
+  useOnReactivate(active, () => { void loadWatchlist(undefined, { silent: true }); });
 
   useEffect(() => {
     return () => {
@@ -445,9 +451,6 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
   return (
     <motion.div
       key="library"
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 20 }}
       className="space-y-4"
     >
       {/* For You Recommendations */}

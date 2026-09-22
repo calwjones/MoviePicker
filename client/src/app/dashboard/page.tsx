@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, useEffect, Suspense } from 'react';
+import { useCallback, useState, useEffect, useLayoutEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
@@ -53,9 +53,40 @@ function DashboardContent() {
       ? (requestedTab as Tab)
       : 'discover';
 
+  // Tabs stay mounted once visited, so switching back is instant and keeps
+  // their state. (Setting state during render is React's pattern for this.)
+  const [visited, setVisited] = useState<Tab[]>([tab]);
+  if (!visited.includes(tab)) setVisited([...visited, tab]);
+
+  // Once the first tab has settled, mount the rest in the background so their
+  // first visit is already loaded too.
+  useEffect(() => {
+    if (authLoading || !user) return;
+    const warm = () => setVisited(user.isGuest ? ALL_TABS.filter((t) => t !== 'friends') : [...ALL_TABS]);
+    let idleId: number | undefined;
+    // Head start so the visible tab's own requests go first.
+    const timer = setTimeout(() => {
+      if ('requestIdleCallback' in window) idleId = window.requestIdleCallback(warm, { timeout: 2000 });
+      else warm();
+    }, 1200);
+    return () => {
+      clearTimeout(timer);
+      if (idleId !== undefined) window.cancelIdleCallback(idleId);
+    };
+  }, [authLoading, user]);
+
+  const scrollByTab = useRef<Partial<Record<Tab, number>>>({});
   const selectTab = useCallback((t: Tab) => {
+    scrollByTab.current[tab] = window.scrollY;
     router.replace(t === 'discover' ? '/dashboard' : `/dashboard?tab=${t}`, { scroll: false });
-  }, [router]);
+  }, [router, tab]);
+
+  // Each tab comes back where you left it (top of page on first visit).
+  useLayoutEffect(() => {
+    const y = scrollByTab.current[tab];
+    if (y !== undefined) window.scrollTo(0, y);
+    else if (window.scrollY > 0) window.scrollTo(0, 0);
+  }, [tab]);
 
   useEffect(() => {
     if (rawTab === 'notifications' && user && !user.isGuest) setBellOpen(true);
@@ -159,22 +190,31 @@ function DashboardContent() {
             key={t}
             onClick={() => selectTab(t)}
             aria-current={tab === t ? 'page' : undefined}
-            className={`shrink-0 py-2 px-4 sm:flex-1 sm:px-2 rounded-xl text-sm font-medium transition-colors ${
-              tab === t ? 'bg-coral text-cream' : 'glass text-cream-dim'
+            className={`relative shrink-0 py-2 px-4 sm:flex-1 sm:px-2 rounded-xl text-sm font-medium transition-colors duration-200 glass ${
+              tab === t ? 'text-cream' : 'text-cream-dim hover:text-cream'
             }`}
           >
-            {TAB_LABELS[t]}
+            {tab === t && (
+              <motion.span
+                layoutId="dashboard-tab-pill"
+                className="absolute inset-0 rounded-xl bg-coral"
+                transition={{ type: 'spring', stiffness: 520, damping: 40 }}
+              />
+            )}
+            <span className="relative">{TAB_LABELS[t]}</span>
           </button>
         ))}
       </div>
 
-      <AnimatePresence mode="wait">
-        {tab === 'discover' && <DiscoverTab key="discover" addToast={addToast} />}
-        {tab === 'library' && <LibraryTab key="library" addToast={addToast} />}
-        {tab === 'swipe' && <SwipeTab key="swipe" addToast={addToast} />}
-        {tab === 'friends' && <FriendsTab key="friends" addToast={addToast} />}
-        {tab === 'history' && <HistoryTab key="history" addToast={addToast} />}
-      </AnimatePresence>
+      {tabs.filter((t) => visited.includes(t)).map((t) => (
+        <section key={t} hidden={t !== tab} aria-label={TAB_LABELS[t]} className="tab-panel">
+          {t === 'discover' && <DiscoverTab addToast={addToast} />}
+          {t === 'library' && <LibraryTab addToast={addToast} active={tab === 'library'} />}
+          {t === 'swipe' && <SwipeTab addToast={addToast} active={tab === 'swipe'} />}
+          {t === 'friends' && <FriendsTab addToast={addToast} active={tab === 'friends'} />}
+          {t === 'history' && <HistoryTab addToast={addToast} active={tab === 'history'} />}
+        </section>
+      ))}
 
       <AnimatePresence>
         {bellOpen && (

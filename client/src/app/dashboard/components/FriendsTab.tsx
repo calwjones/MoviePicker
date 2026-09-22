@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { friendsApi } from '@/lib/api';
 import { connectSocket, getSocket } from '@/lib/socket';
 import FriendLibraryPanel from './FriendLibraryPanel';
+import { useOnReactivate } from '@/hooks/useOnReactivate';
 
 type Friend = {
   id: string;
@@ -24,10 +25,11 @@ type Pending = {
 type SubTab = 'friends' | 'pending' | 'add';
 
 interface FriendsTabProps {
+  active?: boolean;
   addToast: (message: string) => void;
 }
 
-export default function FriendsTab({ addToast }: FriendsTabProps) {
+export default function FriendsTab({ addToast, active }: FriendsTabProps) {
   const { user } = useAuth();
 
   const [subTab, setSubTab] = useState<SubTab>('friends');
@@ -59,6 +61,8 @@ export default function FriendsTab({ addToast }: FriendsTabProps) {
     if (!user || user.isGuest) return;
     refresh();
   }, [user, refresh]);
+
+  useOnReactivate(active, () => { if (user && !user.isGuest) void refresh(); });
 
   useEffect(() => {
     if (!user || user.isGuest) return;
@@ -130,9 +134,6 @@ export default function FriendsTab({ addToast }: FriendsTabProps) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
     >
       <div className="flex gap-2 mb-6">
         {subTabs.map((t) => (

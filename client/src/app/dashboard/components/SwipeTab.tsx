@@ -14,6 +14,7 @@ import FilterEditor from '@/components/FilterEditor';
 import { useAuth } from '@/context/AuthContext';
 import type { Filters } from '@matchsticked/shared';
 import { canNativeShare, copyText, shareOrCopy } from '@/lib/share';
+import { useOnReactivate } from '@/hooks/useOnReactivate';
 
 interface ProviderChip {
   name: string;
@@ -66,10 +67,11 @@ interface Participant {
 }
 
 interface SwipeTabProps {
+  active?: boolean;
   addToast: (message: string) => void;
 }
 
-export default function SwipeTab({ addToast }: SwipeTabProps) {
+export default function SwipeTab({ addToast, active }: SwipeTabProps) {
   const router = useRouter();
   const { user } = useAuth();
 
@@ -139,6 +141,11 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
       batchSize === null ? 'all' : String(batchSize),
     );
   }, [batchSize]);
+
+  // The watchlist may have changed in Library or Discover while this tab was hidden.
+  useOnReactivate(active, () => {
+    movieApi.getPoolSize().then((res) => setPoolSize(res.data.size)).catch(() => { /* keep last value */ });
+  });
 
   useEffect(() => {
     const run = async () => {
@@ -352,9 +359,6 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
   return (
     <motion.div
       key="swipe"
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 20 }}
       className="space-y-4"
     >
       {/* Pool size */}
