@@ -87,11 +87,14 @@ model Movie {
   runtime            Int?
   tmdbRating         Float?  @map("tmdb_rating")
   streamingProviders Json    @default("[]") @map("streaming_providers")
+  trailerKey         String?   @map("trailer_key")
+  tmdbSyncedAt       DateTime? @map("tmdb_synced_at")
 
   userMovies    UserMovie[]
   sessionMovies SessionMovie[]
   matches       Match[]
 
+  @@index([title, year])
   @@map("movies")
 }
 
