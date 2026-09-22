@@ -135,6 +135,7 @@ model SwipeSession {
   invites SessionInvite[]
   participants SessionParticipant[]
 
+  @@index([userId, type, status])
   @@map("swipe_sessions")
 }
 
@@ -155,6 +156,7 @@ model SessionParticipant {
   @@unique([sessionId, userId])
   @@unique([sessionId, guestToken])
   @@index([sessionId])
+  @@index([userId])
   @@map("session_participants")
 }
 
@@ -170,6 +172,7 @@ model SessionSwipe {
 
   @@unique([sessionId, movieId, participantId])
   @@index([sessionId, movieId])
+  @@index([sessionId, participantId])
   @@map("session_swipes")
 }
 

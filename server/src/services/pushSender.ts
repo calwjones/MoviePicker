@@ -90,7 +90,7 @@ export async function sendPush({
   if (userIds.length === 0) return;
   const dedupedUserIds = Array.from(new Set(userIds));
 
-  let users: { id: string; notificationPreferences: unknown }[] = [];
+  let users: { id: string; notificationPreferences: unknown }[];
   try {
     users = await prisma.user.findMany({
       where: { id: { in: dedupedUserIds } },
@@ -110,7 +110,7 @@ export async function sendPush({
 
   if (allowedUserIds.length === 0) return;
 
-  let tokens: { expoPushToken: string }[] = [];
+  let tokens: { expoPushToken: string }[];
   try {
     tokens = await prisma.deviceToken.findMany({
       where: { userId: { in: allowedUserIds } },

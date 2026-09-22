@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { PrismaClient } from '@prisma/client';
@@ -33,6 +34,8 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 app.use(helmet());
+// Discover and library payloads run to hundreds of movies; gzip cuts them ~5x.
+app.use(compression());
 app.use(cors({ origin: CLIENT_URL, maxAge: 86400 }));
 app.use(express.json());
 

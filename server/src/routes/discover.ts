@@ -44,14 +44,6 @@ function weightedScore(voteAverage: number, voteCount: number): number {
   return (v / (v + BAYESIAN_PRIOR_VOTES)) * r + (BAYESIAN_PRIOR_VOTES / (v + BAYESIAN_PRIOR_VOTES)) * BAYESIAN_PRIOR_MEAN;
 }
 
-function shuffleInPlace<T>(arr: T[]): T[] {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
 type BaseOpts = {
   genreIds?: number[];
   minRating?: number;

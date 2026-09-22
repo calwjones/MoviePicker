@@ -52,23 +52,29 @@ async function getCompromises(sessionId: string) {
     .filter((x): x is NonNullable<typeof x> => x !== null);
 }
 
-async function countActiveParticipants(sessionId: string): Promise<number> {
-  return prisma.sessionParticipant.count({ where: { sessionId, leftAt: null } });
+function isNonEmptyString(v: unknown): v is string {
+  return typeof v === 'string' && v.length > 0;
 }
 
 router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { sessionId, movieId, direction } = req.body;
 
-    if (!sessionId || !movieId || !['left', 'right'].includes(direction)) {
+    if (!isNonEmptyString(sessionId) || !isNonEmptyString(movieId) || !['left', 'right'].includes(direction)) {
       res.status(400).json({ error: 'sessionId, movieId, and direction (left/right) are required' });
       return;
     }
 
-    const session = await prisma.swipeSession.findUnique({
-      where: { id: sessionId },
-      include: { participants: true },
-    });
+    const [session, sessionMovie] = await Promise.all([
+      prisma.swipeSession.findUnique({
+        where: { id: sessionId },
+        include: { participants: true },
+      }),
+      prisma.sessionMovie.findUnique({
+        where: { sessionId_movieId: { sessionId, movieId } },
+        select: { id: true },
+      }),
+    ]);
 
     if (!session) {
       res.status(404).json({ error: 'Session not found' });
@@ -87,17 +93,34 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       return;
     }
 
+    if (session.status === 'completed') {
+      res.status(409).json({ error: 'This session has ended' });
+      return;
+    }
+
+    if (!sessionMovie) {
+      res.status(404).json({ error: 'Movie is not part of this session' });
+      return;
+    }
+
     let isMatch = false;
+    const clearMatch = () => prisma.match.deleteMany({ where: { sessionId, movieId } });
+    const recordMatch = () =>
+      prisma.match.upsert({
+        where: { sessionId_movieId: { sessionId, movieId } },
+        update: {},
+        create: { sessionId, movieId },
+      });
 
     if (isSolo) {
-      if (direction === 'right') {
-        await prisma.match.upsert({
+      await Promise.all([
+        prisma.sessionMovie.update({
           where: { sessionId_movieId: { sessionId, movieId } },
-          update: {},
-          create: { sessionId, movieId },
-        });
-        isMatch = true;
-      }
+          data: { user1Swipe: direction },
+        }),
+        direction === 'right' ? recordMatch() : clearMatch(),
+      ]);
+      isMatch = direction === 'right';
     } else {
       await prisma.sessionSwipe.upsert({
         where: {
@@ -108,38 +131,27 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       });
 
       if (direction === 'right') {
-        const [rightCount, activeCount] = await Promise.all([
-          prisma.sessionSwipe.count({
-            where: { sessionId, movieId, direction: 'right' },
-          }),
-          countActiveParticipants(sessionId),
-        ]);
-        if (rightCount >= activeCount && activeCount > 0) {
-          await prisma.match.upsert({
-            where: { sessionId_movieId: { sessionId, movieId } },
-            update: {},
-            create: { sessionId, movieId },
-          });
+        // Only people still in the session count toward "everyone liked it".
+        const activeCount = session.participants.filter((p) => p.leftAt === null).length;
+        const rightCount = await prisma.sessionSwipe.count({
+          where: { sessionId, movieId, direction: 'right', participant: { leftAt: null } },
+        });
+        if (activeCount > 0 && rightCount >= activeCount) {
+          await recordMatch();
           isMatch = true;
         }
+      } else {
+        // A pass (including a re-swipe after a like) rules out unanimity.
+        await clearMatch();
       }
     }
 
-    let swiped = 0;
-    const total = await prisma.sessionMovie.count({ where: { sessionId } });
-    if (isSolo) {
-      await prisma.sessionMovie.update({
-        where: { sessionId_movieId: { sessionId, movieId } },
-        data: { user1Swipe: direction },
-      });
-      swiped = await prisma.sessionMovie.count({
-        where: { sessionId, user1Swipe: { not: null } },
-      });
-    } else {
-      swiped = await prisma.sessionSwipe.count({
-        where: { sessionId, participantId: participantId! },
-      });
-    }
+    const [total, swiped] = await Promise.all([
+      prisma.sessionMovie.count({ where: { sessionId } }),
+      isSolo
+        ? prisma.sessionMovie.count({ where: { sessionId, user1Swipe: { not: null } } })
+        : prisma.sessionSwipe.count({ where: { sessionId, participantId: participantId! } }),
+    ]);
     const progress = total > 0 ? Math.round((swiped / total) * 100) : 0;
 
     emit(`session:${sessionId}`, 'swipe-update', {
@@ -259,7 +271,7 @@ router.post('/undo', authenticate, async (req: AuthRequest, res: Response) => {
     }
 
     let swiped = 0;
-    let total = await prisma.sessionMovie.count({ where: { sessionId } });
+    const total = await prisma.sessionMovie.count({ where: { sessionId } });
     if (isSolo) {
       swiped = await prisma.sessionMovie.count({
         where: { sessionId, user1Swipe: { not: null } },
