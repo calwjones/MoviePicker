@@ -13,6 +13,7 @@ import FilterSummary from '@/components/FilterSummary';
 import FilterEditor from '@/components/FilterEditor';
 import { useAuth } from '@/context/AuthContext';
 import type { Filters } from '@matchsticked/shared';
+import { canNativeShare, copyText, shareOrCopy } from '@/lib/share';
 
 interface ProviderChip {
   name: string;
@@ -436,11 +437,32 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
                 </p>
                 <motion.button
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => { navigator.clipboard.writeText(shareLink); addToast('Link copied!'); }}
+                  onClick={async () => {
+                    addToast((await copyText(shareLink)) ? 'Link copied!' : 'Couldn’t copy. Long-press the link instead');
+                  }}
                   className="px-3 py-2 bg-coral text-cream text-xs font-semibold rounded-lg shrink-0"
                 >
                   Copy
                 </motion.button>
+                {canNativeShare() && (
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={async () => {
+                      const result = await shareOrCopy({
+                        title: 'MatchSticked',
+                        text: shortCode
+                          ? `Help me pick a movie on MatchSticked. Join with code ${shortCode}:`
+                          : 'Help me pick a movie on MatchSticked:',
+                        url: shareLink,
+                      });
+                      if (result === 'copied') addToast('Link copied!');
+                    }}
+                    aria-label="Share invite link"
+                    className="px-3 py-2 glass text-cream text-xs font-semibold rounded-lg shrink-0"
+                  >
+                    Share
+                  </motion.button>
+                )}
               </div>
             </div>
 
@@ -456,7 +478,9 @@ export default function SwipeTab({ addToast }: SwipeTabProps) {
                   </p>
                   <motion.button
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => { navigator.clipboard.writeText(shortCode); addToast('Code copied!'); }}
+                    onClick={async () => {
+                      addToast((await copyText(shortCode)) ? 'Code copied!' : 'Couldn’t copy the code');
+                    }}
                     className="px-3 py-2 bg-coral text-cream text-xs font-semibold rounded-lg shrink-0"
                   >
                     Copy

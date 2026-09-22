@@ -17,7 +17,7 @@ interface SwipeViewProps {
   onSwipe: (direction: 'left' | 'right') => Promise<void>;
   onUndo: () => Promise<void>;
   undoStack: { index: number; movieId: string; direction: string }[];
-  swiping: boolean;
+  swiping?: boolean;
   swipeError: string;
   loading: boolean;
   done: boolean;
@@ -35,7 +35,7 @@ export default function SwipeView({
   onSwipe,
   onUndo,
   undoStack,
-  swiping,
+  swiping = false,
   swipeError,
   loading,
   done,
@@ -68,6 +68,46 @@ export default function SwipeView({
     img.srcset = posterSrcSet(url) ?? '';
     img.src = url;
   }, [currentIndex, movies]);
+
+  const currentMovie = movies[currentIndex]?.movie;
+
+  // Desktop shortcuts. Ignored while typing, while the detail sheet is open,
+  // and when a modifier is held so browser shortcuts keep working.
+  useEffect(() => {
+    if (loading || done || !currentMovie || expanded) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+      switch (e.key) {
+        case 'ArrowRight':
+        case 'l':
+          e.preventDefault();
+          void cardRef.current?.swipe('right');
+          break;
+        case 'ArrowLeft':
+        case 'h':
+          e.preventDefault();
+          void cardRef.current?.swipe('left');
+          break;
+        case 'ArrowUp':
+        case 'i':
+          e.preventDefault();
+          setExpanded(true);
+          onExpand?.(currentMovie);
+          break;
+        case 'Backspace':
+        case 'z':
+          if (undoStack.length > 0) {
+            e.preventDefault();
+            void onUndo();
+          }
+          break;
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [loading, done, currentMovie, expanded, undoStack.length, onUndo, onExpand]);
 
   if (loading) {
     return (
@@ -105,7 +145,6 @@ export default function SwipeView({
   }
 
   const currentSession = movies[currentIndex];
-  const currentMovie = currentSession?.movie;
   if (!currentMovie) return null;
 
   const tierBadge = (() => {
@@ -328,6 +367,8 @@ export default function SwipeView({
           whileTap={{ scale: 0.95 }}
           onClick={() => cardRef.current?.swipe('left')}
           disabled={swiping}
+          aria-label="Pass"
+          title="Pass (←)"
           className="flex-1 py-4 glass rounded-xl text-danger text-lg font-semibold disabled:opacity-50"
         >
           &#10005;
@@ -337,11 +378,27 @@ export default function SwipeView({
           whileTap={{ scale: 0.95 }}
           onClick={() => cardRef.current?.swipe('right')}
           disabled={swiping}
+          aria-label="Like"
+          title="Like (→)"
           className="flex-1 py-4 bg-coral text-cream rounded-xl text-lg font-semibold hover:bg-coral-dark transition-colors disabled:opacity-50"
         >
           &#10003;
         </motion.button>
       </div>
+      <p className="hidden pointer-fine:flex justify-center gap-3 pb-3 -mt-1 text-[11px] text-cream-dim/60 select-none" aria-hidden="true">
+        <span><Kbd>←</Kbd> pass</span>
+        <span><Kbd>→</Kbd> like</span>
+        <span><Kbd>↑</Kbd> details</span>
+        <span><Kbd>Z</Kbd> undo</span>
+      </p>
     </div>
+  );
+}
+
+function Kbd({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 mr-1 rounded border border-cream/15 bg-cream/5 font-sans text-[10px] text-cream-dim">
+      {children}
+    </kbd>
   );
 }

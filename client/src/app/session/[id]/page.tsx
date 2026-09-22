@@ -7,7 +7,8 @@ import { useAuthGuard } from '@/hooks/useAuthGuard';
 import { sessionApi, swipeApi, movieApi } from '@/lib/api';
 import { getErrorMessage } from '@/lib/errors';
 import { connectSocket, getSocket } from '@/lib/socket';
-import { enqueueSwipe, flushQueue, hasQueuedSwipes } from '@/lib/swipeQueue';
+import { dequeueSwipe, enqueueSwipe, flushQueue, hasQueuedSwipes } from '@/lib/swipeQueue';
+import { createSerialQueue, isPermanentFailure } from '@/lib/serialQueue';
 import { clearSwipeFilters } from '@/lib/filters';
 import SwipeView from '@/components/SwipeView';
 import PresenceRow, { type PresenceParticipant } from '@/components/PresenceRow';
@@ -40,7 +41,7 @@ export default function SessionPage() {
   const [participants, setParticipants] = useState<PresenceParticipant[]>([]);
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [swiping, setSwiping] = useState(false);
+  const [runInOrder] = useState(createSerialQueue);
   const [swipeError, setSwipeError] = useState('');
   const [undoStack, setUndoStack] = useState<{ index: number; movieId: string; direction: string }[]>([]);
   const [isHost, setIsHost] = useState(false);
@@ -318,63 +319,69 @@ export default function SessionPage() {
     };
   }, [sessionId, addToast, removeToast, applySessionBatch, isHost, refreshParticipants]);
 
+  // Optimistic: advance immediately; requests go out in order behind any in flight.
   const handleSwipe = useCallback(async (direction: 'left' | 'right') => {
-    if (currentIndex >= movies.length || swiping) return;
+    if (currentIndex >= movies.length) return;
     const movie = movies[currentIndex];
-    setSwiping(true);
+    const isLast = currentIndex + 1 >= movies.length;
     setSwipeError('');
-    const socket = getSocket();
-    const advance = () => {
-      setUndoStack((prev) => [...prev.slice(-9), { index: currentIndex, movieId: movie.movieId, direction }]);
-      if (currentIndex + 1 >= movies.length) {
-        setDone(true);
-      } else {
-        setCurrentIndex((prev) => prev + 1);
-      }
-    };
-    if (!socket.connected) {
+    setUndoStack((prev) => [...prev.slice(-9), { index: currentIndex, movieId: movie.movieId, direction }]);
+    if (isLast) {
+      setDone(true);
+    } else {
+      setCurrentIndex((prev) => prev + 1);
+    }
+
+    if (!getSocket().connected) {
       enqueueSwipe({ sessionId, movieId: movie.movieId, direction });
-      advance();
-      setSwiping(false);
       return;
     }
     try {
-      await swipeApi.swipe(sessionId, movie.movieId, direction);
-      advance();
-      if (currentIndex + 1 >= movies.length) {
-        const res = await swipeApi.done(sessionId);
-        if (res.data.status === 'completed') {
-          setSessionComplete(true);
-          if (res.data.matches) {
-            setMatches(res.data.matches);
-            setMatchesFetched(true);
-          }
+      await runInOrder(() => swipeApi.swipe(sessionId, movie.movieId, direction));
+    } catch (err) {
+      if (isPermanentFailure(err)) {
+        setSwipeError(getErrorMessage(err, 'That swipe could not be saved'));
+      } else {
+        enqueueSwipe({ sessionId, movieId: movie.movieId, direction });
+      }
+      return;
+    }
+    if (!isLast) return;
+    try {
+      const res = await runInOrder(() => swipeApi.done(sessionId));
+      if (res.data.status === 'completed') {
+        setSessionComplete(true);
+        if (res.data.matches) {
+          setMatches(res.data.matches);
+          setMatchesFetched(true);
         }
       }
-    } catch {
-      enqueueSwipe({ sessionId, movieId: movie.movieId, direction });
-      advance();
-    } finally {
-      setSwiping(false);
-    }
-  }, [currentIndex, movies, sessionId, swiping]);
+    } catch { /* partner-done / session-complete socket events still arrive */ }
+  }, [currentIndex, movies, sessionId, runInOrder]);
 
   const handleUndo = useCallback(async () => {
     if (undoStack.length === 0) return;
     const last = undoStack[undoStack.length - 1];
-    try {
-      await swipeApi.undo(sessionId, last.movieId);
+    const revert = () => {
       setUndoStack((prev) => prev.slice(0, -1));
       if (done) setDone(false);
       setCurrentIndex(last.index);
+    };
+    if (dequeueSwipe(sessionId, last.movieId)) {
+      revert();
+      return;
+    }
+    try {
+      await runInOrder(() => swipeApi.undo(sessionId, last.movieId));
+      revert();
     } catch { /* swallow */ }
-  }, [undoStack, done, sessionId]);
+  }, [undoStack, done, sessionId, runInOrder]);
 
   const handleAnotherBatch = async () => {
     if (!isHost) return;
     setBatchLoading(true);
     try {
-      const res = await sessionApi.anotherBatch(sessionId);
+      const res = await runInOrder(() => sessionApi.anotherBatch(sessionId));
       if (res.data.added === 0) {
         setBatchExhausted(true);
         addToast('No more movies match your filters', { variant: 'info' });
@@ -548,7 +555,7 @@ export default function SessionPage() {
         onSwipe={handleSwipe}
         onUndo={handleUndo}
         undoStack={undoStack}
-        swiping={swiping}
+        swiping={false}
         swipeError={swipeError}
         loading={loading}
         done={done}

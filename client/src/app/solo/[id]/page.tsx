@@ -6,7 +6,8 @@ import { motion } from 'framer-motion';
 import { useAuthGuard } from '@/hooks/useAuthGuard';
 import { sessionApi, swipeApi, movieApi } from '@/lib/api';
 import { getErrorMessage } from '@/lib/errors';
-import { enqueueSwipe, flushQueue, hasQueuedSwipes } from '@/lib/swipeQueue';
+import { dequeueSwipe, enqueueSwipe, flushQueue, hasQueuedSwipes } from '@/lib/swipeQueue';
+import { createSerialQueue, isPermanentFailure } from '@/lib/serialQueue';
 import { clearSwipeFilters } from '@/lib/filters';
 import SwipeView from '@/components/SwipeView';
 import InCinemaBadge from '@/components/InCinemaBadge';
@@ -25,7 +26,6 @@ export default function SoloSessionPage() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [swiping, setSwiping] = useState(false);
   const [swipeError, setSwipeError] = useState('');
   const [undoStack, setUndoStack] = useState<{ index: number; movieId: string; direction: string }[]>([]);
   const [online, setOnline] = useState(true);
@@ -39,6 +39,7 @@ export default function SoloSessionPage() {
   const [previousPickIds, setPreviousPickIds] = useState<string[]>([]);
   const [spinsLeft, setSpinsLeft] = useState(3);
   const revealTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const [runInOrder] = useState(createSerialQueue);
   const { toasts, addToast, removeToast } = useToast();
 
   useEffect(() => {
@@ -109,57 +110,61 @@ export default function SoloSessionPage() {
     setRevealIndex(shortlist.length - 1);
   }, [shortlist.length]);
 
+  // Optimistic: the next card shows immediately and the request is sent in order
+  // behind any still in flight. Network failures fall back to the offline queue.
   const handleSwipe = useCallback(async (direction: 'left' | 'right') => {
-    if (currentIndex >= movies.length || swiping) return;
+    if (currentIndex >= movies.length) return;
     const movie = movies[currentIndex];
-    setSwiping(true);
     setSwipeError('');
-    const advance = () => {
-      setUndoStack((prev) => [...prev.slice(-9), { index: currentIndex, movieId: movie.movieId, direction }]);
-      if (direction === 'right') {
-        setShortlist((prev) => [...prev, movie]);
-      }
-      if (currentIndex + 1 >= movies.length) {
-        setDone(true);
-      } else {
-        setCurrentIndex((prev) => prev + 1);
-      }
-    };
+    setUndoStack((prev) => [...prev.slice(-9), { index: currentIndex, movieId: movie.movieId, direction }]);
+    if (direction === 'right') {
+      setShortlist((prev) => [...prev, movie]);
+    }
+    if (currentIndex + 1 >= movies.length) {
+      setDone(true);
+    } else {
+      setCurrentIndex((prev) => prev + 1);
+    }
+
     if (!online) {
       enqueueSwipe({ sessionId, movieId: movie.movieId, direction });
-      advance();
-      setSwiping(false);
       return;
     }
-    try {
-      await swipeApi.swipe(sessionId, movie.movieId, direction);
-      advance();
-    } catch {
-      enqueueSwipe({ sessionId, movieId: movie.movieId, direction });
-      advance();
-    } finally {
-      setSwiping(false);
-    }
-  }, [currentIndex, movies, sessionId, swiping, online]);
+    runInOrder(() => swipeApi.swipe(sessionId, movie.movieId, direction)).catch((err) => {
+      if (isPermanentFailure(err)) {
+        setSwipeError(getErrorMessage(err, 'That swipe could not be saved'));
+      } else {
+        enqueueSwipe({ sessionId, movieId: movie.movieId, direction });
+      }
+    });
+  }, [currentIndex, movies, sessionId, online, runInOrder]);
 
   const handleUndo = useCallback(async () => {
     if (undoStack.length === 0) return;
     const last = undoStack[undoStack.length - 1];
-    try {
-      await swipeApi.undo(sessionId, last.movieId);
+    const revert = () => {
       setUndoStack((prev) => prev.slice(0, -1));
       if (last.direction === 'right') {
         setShortlist((prev) => prev.filter((m) => m.movieId !== last.movieId));
       }
       if (done) setDone(false);
       setCurrentIndex(last.index);
+    };
+    // Still sitting in the offline queue: the server never saw it.
+    if (dequeueSwipe(sessionId, last.movieId)) {
+      revert();
+      return;
+    }
+    try {
+      await runInOrder(() => swipeApi.undo(sessionId, last.movieId));
+      revert();
     } catch { /* swallow */ }
-  }, [undoStack, done, sessionId]);
+  }, [undoStack, done, sessionId, runInOrder]);
 
   const handleAnotherBatch = async () => {
     setBatchLoading(true);
     try {
-      const res = await sessionApi.anotherBatch(sessionId);
+      const res = await runInOrder(() => sessionApi.anotherBatch(sessionId));
       if (res.data.added === 0) {
         setBatchExhausted(true);
         addToast('No more movies match your filters', { variant: 'info' });
@@ -223,7 +228,7 @@ export default function SoloSessionPage() {
   };
 
   const handleDoneExit = async () => {
-    try { await swipeApi.done(sessionId); } catch { /* best-effort */ }
+    try { await runInOrder(() => swipeApi.done(sessionId)); } catch { /* best-effort */ }
     clearSwipeFilters();
     router.push('/dashboard');
   };
@@ -318,7 +323,7 @@ export default function SoloSessionPage() {
         onSwipe={handleSwipe}
         onUndo={handleUndo}
         undoStack={undoStack}
-        swiping={swiping}
+        swiping={false}
         swipeError={swipeError}
         loading={loading}
         done={done}

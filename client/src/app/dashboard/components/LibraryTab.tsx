@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { movieApi, recommendationApi, importApi } from '@/lib/api';
-import { getErrorMessage } from '@/lib/errors';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import SkeletonList from '@/components/SkeletonList';
 import MoviePoster from '@/components/MoviePoster';
@@ -62,6 +61,7 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
   const [searching, setSearching] = useState(false);
   const [addingTmdbId, setAddingTmdbId] = useState<number | null>(null);
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestSearch = useRef(0);
 
   const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
   const [selectedUserMovie, setSelectedUserMovie] = useState<UserMovie | null>(null);
@@ -163,21 +163,25 @@ export default function LibraryTab({ addToast }: LibraryTabProps) {
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
 
     if (query.trim().length < 2) {
+      latestSearch.current++;
       setSearchResults([]);
+      setSearching(false);
       return;
     }
 
     searchTimeout.current = setTimeout(async () => {
+      const requestId = ++latestSearch.current;
       setSearching(true);
       try {
         const res = await movieApi.search(query);
-        setSearchResults(res.data.movies);
+        // A slower response for an older query must not overwrite newer results.
+        if (requestId === latestSearch.current) setSearchResults(res.data.movies);
       } catch {
-        setSearchResults([]);
+        if (requestId === latestSearch.current) setSearchResults([]);
       } finally {
-        setSearching(false);
+        if (requestId === latestSearch.current) setSearching(false);
       }
-    }, 400);
+    }, 300);
   }, []);
 
   const handleAddMovie = async (tmdbId: number) => {

@@ -34,7 +34,6 @@ function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toasts, addToast } = useToast();
-  const [tab, setTab] = useState<Tab>('discover');
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [inviteCount, setInviteCount] = useState(0);
   const [bellOpen, setBellOpen] = useState(false);
@@ -45,18 +44,22 @@ function DashboardContent() {
     }
   }, [user, authLoading, router]);
 
+  // The URL is the source of truth for the tab, so refresh, back/forward and
+  // shared links all land where you were.
+  const rawTab = searchParams.get('tab');
+  const requestedTab = rawTab === 'browse' ? 'discover' : rawTab;
+  const tab: Tab =
+    requestedTab && ALL_TABS.includes(requestedTab as Tab) && !(requestedTab === 'friends' && user?.isGuest)
+      ? (requestedTab as Tab)
+      : 'discover';
+
+  const selectTab = useCallback((t: Tab) => {
+    router.replace(t === 'discover' ? '/dashboard' : `/dashboard?tab=${t}`, { scroll: false });
+  }, [router]);
+
   useEffect(() => {
-    const raw = searchParams.get('tab');
-    if (raw === 'notifications') {
-      if (!user?.isGuest) setBellOpen(true);
-      return;
-    }
-    const t = raw === 'browse' ? 'discover' : raw;
-    if (t && ALL_TABS.includes(t as Tab)) {
-      if (t === 'friends' && user?.isGuest) return;
-      setTab(t as Tab);
-    }
-  }, [searchParams, user]);
+    if (rawTab === 'notifications' && user && !user.isGuest) setBellOpen(true);
+  }, [rawTab, user]);
 
   const refreshInvites = useCallback(async () => {
     try {
@@ -95,7 +98,7 @@ function DashboardContent() {
   const handleOnboardingPath = (path: 'together' | 'solo' | 'discover') => {
     dismissOnboarding();
     if (path === 'discover') router.push('/discover');
-    else setTab('swipe');
+    else selectTab('swipe');
   };
 
   if (authLoading) {
@@ -154,7 +157,8 @@ function DashboardContent() {
         {tabs.map((t) => (
           <button
             key={t}
-            onClick={() => setTab(t)}
+            onClick={() => selectTab(t)}
+            aria-current={tab === t ? 'page' : undefined}
             className={`shrink-0 py-2 px-4 sm:flex-1 sm:px-2 rounded-xl text-sm font-medium transition-colors ${
               tab === t ? 'bg-coral text-cream' : 'glass text-cream-dim'
             }`}

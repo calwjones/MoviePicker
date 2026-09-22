@@ -164,7 +164,7 @@ function DiscoverSwipePageInner() {
       }
     })();
     return () => { cancelled = true; };
-  }, [user, authLoading, fetchPage, queryFilters.batchSize, addToast]);
+  }, [user, authLoading, fetchPage, queryFilters.batchSize, queryFilters.minRating, addToast]);
 
   const handleSwipe = useCallback(async (direction: 'left' | 'right') => {
     if (currentIndex >= movies.length) return;

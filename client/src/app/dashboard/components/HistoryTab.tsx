@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { movieApi, sessionApi, swipeApi } from '@/lib/api';
-import LoadingSpinner from '@/components/LoadingSpinner';
 import MoviePoster from '@/components/MoviePoster';
 import StarRating from '@/components/StarRating';
 import type { HistorySession } from '@matchsticked/shared';
