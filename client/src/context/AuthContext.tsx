@@ -39,6 +39,20 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
   }
 }
 
+const USER_CACHE_KEY = 'user_cache';
+
+function readCachedUser(userId: unknown): User | null {
+  if (typeof userId !== 'string') return null;
+  try {
+    const raw = localStorage.getItem(USER_CACHE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as User) : null;
+    // Never show one account's profile under another account's token.
+    return parsed && parsed.id === userId ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -62,14 +76,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Render straight away from the last known profile, then confirm with the
+    // server in the background. Saves a full round trip on every app open.
+    const cached = readCachedUser(payload?.userId);
+    if (cached) {
+      setUser(cached);
+      setLoading(false);
+    }
+
     authApi.me()
       .then((res) => setUser(res.data.user))
-      .catch(() => {
-        localStorage.removeItem('token');
-        setUser(null);
+      .catch((err) => {
+        // Only a rejected token signs you out; a flaky connection shouldn't.
+        if ((err as { response?: { status?: number } })?.response?.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem(USER_CACHE_KEY);
+          setUser(null);
+        }
       })
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!user || user.isGuest) return;
+    try {
+      localStorage.setItem(USER_CACHE_KEY, JSON.stringify(user));
+    } catch { /* storage full or disabled */ }
+  }, [user]);
 
   const login = async (email: string, password: string) => {
     const res = await authApi.login(email, password);
@@ -89,6 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('token');
     localStorage.removeItem('guest_session_id');
     localStorage.removeItem('user_token_backup');
+    localStorage.removeItem(USER_CACHE_KEY);
     disconnectSocket();
     setUser(null);
   }, []);
