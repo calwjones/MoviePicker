@@ -1,9 +1,11 @@
 import { Router, Response } from 'express';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../app';
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { authenticateUser, AuthRequest } from '../middleware/auth';
 import { applyMovieFilters } from '../lib/filterMovies';
 import { getInCinemaIds, attachInCinema } from '../services/cinemaStatus';
 import { refreshStaleInBackground } from '../services/tmdb';
+import { parseBatchSize, sanitizeFilters } from '../lib/validate';
 
 const router = Router();
 
@@ -16,13 +18,7 @@ async function decorateSoloSession<T extends { movies?: { movie: { tmdbId: numbe
   } as T;
 }
 
-function parseBatchSize(value: unknown): number | null {
-  if (value === null) return null;
-  if (typeof value === 'number' && value > 0) return Math.floor(value);
-  return 50;
-}
-
-router.get('/active', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/active', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
     const session = await prisma.swipeSession.findFirst({
       where: {
@@ -49,9 +45,9 @@ router.get('/active', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.post('/create', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/create', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
-    const { filters } = req.body;
+    const filters = sanitizeFilters(req.body.filters);
     const batchSize = parseBatchSize(req.body.batchSize);
 
     const movieWhere = {
@@ -65,7 +61,7 @@ router.post('/create', authenticate, async (req: AuthRequest, res: Response) => 
 
     let watchlistMovies = applyMovieFilters(
       await prisma.movie.findMany({ where: movieWhere }),
-      filters || {}
+      filters,
     );
 
     for (let i = watchlistMovies.length - 1; i > 0; i--) {
@@ -95,7 +91,7 @@ router.post('/create', authenticate, async (req: AuthRequest, res: Response) => 
         type: 'solo',
         userId: req.userId,
         status: 'swiping',
-        filters: filters || {},
+        filters: filters as Prisma.InputJsonObject,
         batchSize,
         movies: {
           create: watchlistMovies.map((m) => ({
@@ -114,7 +110,7 @@ router.post('/create', authenticate, async (req: AuthRequest, res: Response) => 
     res.status(201).json({ session: await decorateSoloSession(session) });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

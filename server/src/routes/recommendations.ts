@@ -1,11 +1,12 @@
 import { Router, Response } from 'express';
 import { prisma } from '../app';
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { authenticate, authenticateUser, AuthRequest } from '../middleware/auth';
 import { findOrCreateMovieByTmdbId } from '../services/tmdb';
 import {
   buildForYouRecommendations,
   buildSimilarRecommendations,
 } from '../services/recommendations';
+import { parseTmdbId } from '../lib/validate';
 
 const router = Router();
 
@@ -21,8 +22,8 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
 
 router.get('/similar/:tmdbId', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const tmdbId = parseInt(req.params.tmdbId as string);
-    if (isNaN(tmdbId)) {
+    const tmdbId = parseTmdbId(Number(req.params.tmdbId));
+    if (!tmdbId) {
       res.status(400).json({ error: 'Invalid tmdbId' });
       return;
     }
@@ -35,10 +36,10 @@ router.get('/similar/:tmdbId', authenticate, async (req: AuthRequest, res: Respo
   }
 });
 
-router.delete('/dismiss/:tmdbId', authenticate, async (req: AuthRequest, res: Response) => {
+router.delete('/dismiss/:tmdbId', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
-    const tmdbId = parseInt(req.params.tmdbId as string);
-    if (isNaN(tmdbId)) {
+    const tmdbId = parseTmdbId(Number(req.params.tmdbId));
+    if (!tmdbId) {
       res.status(400).json({ error: 'Invalid tmdbId' });
       return;
     }
@@ -60,10 +61,10 @@ router.delete('/dismiss/:tmdbId', authenticate, async (req: AuthRequest, res: Re
   }
 });
 
-router.post('/dismiss', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/dismiss', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
-    const { tmdbId } = req.body;
-    if (!tmdbId || typeof tmdbId !== 'number') {
+    const tmdbId = parseTmdbId(req.body.tmdbId);
+    if (!tmdbId) {
       res.status(400).json({ error: 'tmdbId is required' });
       return;
     }

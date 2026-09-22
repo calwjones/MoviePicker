@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../app';
 import { JWT_SECRET, APPLE_BUNDLE_ID } from '../config';
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { authenticate, authenticateUser, AuthRequest } from '../middleware/auth';
 import { sendVerificationEmail, sendPasswordResetEmail, sendRegistrationAttemptEmail } from '../services/email';
 import { verifyAppleIdentityToken } from '../services/appleAuth';
 
@@ -58,8 +58,9 @@ interface RegistrationInput {
 }
 
 function parseRegistrationInput(body: unknown): { value: RegistrationInput } | { error: string } {
-  const { email, password, username } = (body ?? {}) as Partial<RegistrationInput>;
-  if (!email || !password || !username) {
+  const { email, password, username } = (body ?? {}) as Record<string, unknown>;
+  if (typeof email !== 'string' || typeof password !== 'string' || typeof username !== 'string'
+    || !email || !password || !username) {
     return { error: 'Email, password, and username are required' };
   }
   const trimmedEmail = email.trim().toLowerCase();
@@ -212,7 +213,7 @@ router.get('/verify', verifyLimiter, async (req: Request, res: Response) => {
 router.post('/resend-verification', resendVerificationLimiter, async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
-    if (!email) {
+    if (typeof email !== 'string' || !email) {
       res.status(400).json({ error: 'Email is required' });
       return;
     }
@@ -238,7 +239,7 @@ router.post('/resend-verification', resendVerificationLimiter, async (req: Reque
 router.post('/forgot-password', forgotLimiter, async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
-    if (!email) {
+    if (typeof email !== 'string' || !email) {
       res.status(400).json({ error: 'Email is required' });
       return;
     }
@@ -298,7 +299,7 @@ router.post('/login', loginLimiter, async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
 
-    if (!email || !password) {
+    if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
       res.status(400).json({ error: 'Email and password are required' });
       return;
     }
@@ -337,7 +338,7 @@ router.post('/login', loginLimiter, async (req: Request, res: Response) => {
   }
 });
 
-router.post('/change-password', changePasswordLimiter, authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/change-password', changePasswordLimiter, authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
     const { currentPassword, newPassword } = req.body;
     if (!currentPassword || !newPassword) {
@@ -388,7 +389,7 @@ const USER_SELECT = {
   notificationPreferences: true,
 } as const;
 
-router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/me', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.userId },
@@ -417,7 +418,7 @@ router.get('/username-available', async (req: Request, res: Response) => {
   res.json({ available: !clash, normalized });
 });
 
-router.patch('/me', authenticate, async (req: AuthRequest, res: Response) => {
+router.patch('/me', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
     const { username, preferredStreamingProviderIds, currentPassword } = req.body;
     const data: { username?: string; preferredStreamingProviderIds?: number[]; usernameChangedAt?: Date } = {};
@@ -498,7 +499,7 @@ router.patch('/me', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.post('/complete-onboarding', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/complete-onboarding', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
     const user = await prisma.user.update({
       where: { id: req.userId },
@@ -611,7 +612,7 @@ router.post('/apple', appleLimiter, async (req: Request, res: Response) => {
   }
 });
 
-router.delete('/me', authenticate, async (req: AuthRequest, res: Response) => {
+router.delete('/me', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
     const { currentPassword } = req.body;
     if (!currentPassword) {

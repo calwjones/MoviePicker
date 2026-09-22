@@ -38,7 +38,7 @@ router.post('/', feedbackLimiter, authenticate, async (req: AuthRequest, res: Re
     const userId = req.isGuest ? null : req.userId ?? null;
     const { body, page } = req.body as { body?: string; page?: string };
 
-    const trimmed = (body ?? '').trim();
+    const trimmed = typeof body === 'string' ? body.trim() : '';
     if (!trimmed) {
       res.status(400).json({ error: 'Feedback body is required' });
       return;

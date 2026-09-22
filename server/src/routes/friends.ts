@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { prisma } from '../app';
 import { emit } from '../services/emitter';
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { authenticateUser, AuthRequest } from '../middleware/auth';
 import { getInCinemaIds, attachInCinema } from '../services/cinemaStatus';
 import { sendPush } from '../services/pushSender';
 
@@ -43,7 +43,7 @@ interface InviteRow {
   short_code: string | null;
 }
 
-router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
     const rows = await prisma.$queryRaw<FriendRow[]>`
@@ -71,7 +71,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.get('/pending', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/pending', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
     const rows = await prisma.$queryRaw<PendingRow[]>`
@@ -107,11 +107,11 @@ router.get('/pending', authenticate, async (req: AuthRequest, res: Response) => 
   }
 });
 
-router.post('/request', friendRequestLimiter, authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/request', friendRequestLimiter, authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
     const { username } = req.body as { username?: string };
-    const query = (username ?? '').trim().toLowerCase();
+    const query = typeof username === 'string' ? username.trim().toLowerCase().slice(0, 64) : '';
     if (!query) {
       res.status(400).json({ error: 'Username is required' });
       return;
@@ -186,7 +186,7 @@ router.post('/request', friendRequestLimiter, authenticate, async (req: AuthRequ
   }
 });
 
-router.post('/:id/accept', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/:id/accept', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
     const id = req.params.id as string;
@@ -224,7 +224,7 @@ router.post('/:id/accept', authenticate, async (req: AuthRequest, res: Response)
   }
 });
 
-router.post('/:id/reject', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/:id/reject', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
     const id = req.params.id as string;
@@ -240,7 +240,7 @@ router.post('/:id/reject', authenticate, async (req: AuthRequest, res: Response)
   }
 });
 
-router.get('/:id/library', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/:id/library', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
     const friendId = req.params.id as string;
@@ -295,7 +295,7 @@ router.get('/:id/library', authenticate, async (req: AuthRequest, res: Response)
   }
 });
 
-router.get('/loved', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/loved', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
     const minRating = 4;
@@ -370,7 +370,7 @@ router.get('/loved', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+router.delete('/:id', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
     const id = req.params.id as string;
@@ -385,7 +385,7 @@ router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.get('/invites', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/invites', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
     const rows = await prisma.$queryRaw<InviteRow[]>`
@@ -416,7 +416,7 @@ router.get('/invites', authenticate, async (req: AuthRequest, res: Response) => 
   }
 });
 
-router.post('/invites/:inviteId/accept', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/invites/:inviteId/accept', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
     const inviteId = req.params.inviteId as string;
@@ -437,7 +437,7 @@ router.post('/invites/:inviteId/accept', authenticate, async (req: AuthRequest, 
   }
 });
 
-router.post('/invites/:inviteId/decline', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/invites/:inviteId/decline', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
     const inviteId = req.params.inviteId as string;

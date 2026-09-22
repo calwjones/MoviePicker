@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import multer from 'multer';
 import { parse } from 'csv-parse/sync';
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { authenticateUser, AuthRequest } from '../middleware/auth';
 import { findOrCreateMovie } from '../services/tmdb';
 import { prisma } from '../app';
 import { mapWithConcurrency } from '../lib/concurrency';
@@ -220,13 +220,13 @@ function csvImportRoute(kind: 'Watchlist' | 'Ratings' | 'Watched', watched: bool
   };
 }
 
-router.post('/watchlist', authenticate, upload.single('file'), csvImportRoute('Watchlist', false, applyWatchlistCsv));
-router.post('/ratings', authenticate, upload.single('file'), csvImportRoute('Ratings', true, applyRatingsCsv));
-router.post('/watched', authenticate, upload.single('file'), csvImportRoute('Watched', true, applyWatchedCsv));
+router.post('/watchlist', authenticateUser, upload.single('file'), csvImportRoute('Watchlist', false, applyWatchlistCsv));
+router.post('/ratings', authenticateUser, upload.single('file'), csvImportRoute('Ratings', true, applyRatingsCsv));
+router.post('/watched', authenticateUser, upload.single('file'), csvImportRoute('Watched', true, applyWatchedCsv));
 
 const USERNAME_RE = /^[A-Za-z0-9_-]{1,30}$/;
 
-router.post('/letterboxd', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/letterboxd', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
     const raw = typeof req.body?.username === 'string' ? req.body.username.trim() : '';
     const username = raw.replace(/^@/, '');

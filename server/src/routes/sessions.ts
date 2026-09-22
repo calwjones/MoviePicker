@@ -1,8 +1,9 @@
 import { Router, Response } from 'express';
+import type { Prisma } from '@prisma/client';
 import rateLimit from 'express-rate-limit';
 import { prisma } from '../app';
 import { emit } from '../services/emitter';
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { authenticate, authenticateUser, AuthRequest } from '../middleware/auth';
 import { CLIENT_URL } from '../config';
 import { applyMovieFilters, MovieFilters } from '../lib/filterMovies';
 import { buildGroupPool } from '../lib/groupCuration';
@@ -11,6 +12,7 @@ import { getInCinemaIds, attachInCinema } from '../services/cinemaStatus';
 import { sendPush } from '../services/pushSender';
 import { refreshStaleInBackground } from '../services/tmdb';
 import type { Movie } from '@prisma/client';
+import { parseBatchSize, sanitizeFilters } from '../lib/validate';
 
 const router = Router();
 
@@ -87,12 +89,6 @@ function shuffle<T>(arr: T[]): T[] {
   return arr;
 }
 
-function parseBatchSize(value: unknown): number | null {
-  if (value === null) return null;
-  if (typeof value === 'number' && value > 0) return Math.floor(value);
-  return 50;
-}
-
 async function sampleSoloBatch(
   userId: string,
   filters: MovieFilters,
@@ -114,9 +110,9 @@ async function sampleSoloBatch(
   return batchSize != null ? shuffled.slice(0, batchSize) : shuffled;
 }
 
-router.post('/group', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/group', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
-    const { filters } = req.body;
+    const filters = sanitizeFilters(req.body.filters);
     const batchSize = parseBatchSize(req.body.batchSize);
 
     await prisma.swipeSession.updateMany({
@@ -133,7 +129,7 @@ router.post('/group', authenticate, async (req: AuthRequest, res: Response) => {
         type: 'group',
         userId: req.userId,
         status: 'waiting',
-        filters: filters || {},
+        filters: filters as Prisma.InputJsonObject,
         batchSize,
       },
     });
@@ -161,7 +157,7 @@ router.post('/group', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.post('/:id/join', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/:id/join', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
     const sessionId = req.params.id as string;
 
@@ -195,7 +191,7 @@ router.post('/:id/join', authenticate, async (req: AuthRequest, res: Response) =
   }
 });
 
-router.post('/:id/invite', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/:id/invite', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
     const sessionId = req.params.id as string;
     const userId = req.userId!;
@@ -278,7 +274,7 @@ router.post('/:id/invite', authenticate, async (req: AuthRequest, res: Response)
   }
 });
 
-router.post('/:id/start', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/:id/start', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
     const sessionId = req.params.id as string;
 
@@ -334,7 +330,7 @@ router.post('/:id/start', authenticate, async (req: AuthRequest, res: Response) 
   }
 });
 
-router.post('/:id/another-batch', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/:id/another-batch', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
     const sessionId = req.params.id as string;
 
@@ -567,7 +563,7 @@ router.get('/history/all', authenticate, async (req: AuthRequest, res: Response)
   }
 });
 
-router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+router.delete('/:id', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
     const sessionId = req.params.id as string;
     const session = await prisma.swipeSession.findUnique({ where: { id: sessionId } });

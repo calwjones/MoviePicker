@@ -1,12 +1,12 @@
 import { Router, Response } from 'express';
 import { prisma } from '../app';
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { authenticateUser, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
 const EXPO_TOKEN_RE = /^Expo(nent)?PushToken\[[A-Za-z0-9_-]+\]$/;
 
-router.post('/register', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/register', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
     const { expoPushToken, platform } = req.body as {
@@ -36,11 +36,11 @@ router.post('/register', authenticate, async (req: AuthRequest, res: Response) =
   }
 });
 
-router.delete('/register', authenticate, async (req: AuthRequest, res: Response) => {
+router.delete('/register', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const { expoPushToken } = req.body as { expoPushToken?: string };
-    if (!expoPushToken) {
+    const { expoPushToken } = req.body as { expoPushToken?: unknown };
+    if (typeof expoPushToken !== 'string' || !expoPushToken) {
       res.status(400).json({ error: 'expoPushToken is required' });
       return;
     }
@@ -54,7 +54,7 @@ router.delete('/register', authenticate, async (req: AuthRequest, res: Response)
   }
 });
 
-router.patch('/preferences', authenticate, async (req: AuthRequest, res: Response) => {
+router.patch('/preferences', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
     const body = req.body as Record<string, unknown>;

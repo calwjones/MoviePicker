@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { NextFunction, Request, Response } from 'express';
 import cors from 'cors';
 import compression from 'compression';
 import helmet from 'helmet';
@@ -38,6 +38,12 @@ app.use(helmet());
 app.use(compression());
 app.use(cors({ origin: CLIENT_URL, maxAge: 86400 }));
 app.use(express.json());
+// Express 5 leaves req.body undefined when a request has no body; handlers
+// destructure it, so default to an empty object rather than 500 on a bare POST.
+app.use((req, _res, next) => {
+  if (req.body === undefined || req.body === null || typeof req.body !== 'object') req.body = {};
+  next();
+});
 
 const guestLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -66,6 +72,23 @@ app.use('/api/feedback', feedbackRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+app.use('/api', (_req, res) => {
+  res.status(404).json({ error: 'Not found' });
+});
+
+// Malformed JSON and anything a route didn't catch come back as JSON, never an
+// HTML stack page.
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  const status = (err as { status?: number; statusCode?: number })?.status
+    ?? (err as { statusCode?: number })?.statusCode;
+  if (status && status >= 400 && status < 500) {
+    res.status(status).json({ error: status === 413 ? 'Request too large' : 'Invalid request' });
+    return;
+  }
+  console.error('[api] unhandled error', err);
+  res.status(500).json({ error: 'Internal server error' });
 });
 
 export default app;

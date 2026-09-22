@@ -31,3 +31,14 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
     res.status(401).json({ error: 'Invalid token' });
   }
 }
+
+/** For account-only routes: guest tokens (from share links) get a clean 403. */
+export function requireUser(req: AuthRequest, res: Response, next: NextFunction): void {
+  if (req.isGuest || !req.userId) {
+    res.status(403).json({ error: 'Sign in to do that', code: 'account_required' });
+    return;
+  }
+  next();
+}
+
+export const authenticateUser = [authenticate, requireUser];

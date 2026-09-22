@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { prisma } from '../app';
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { authenticate, authenticateUser, AuthRequest } from '../middleware/auth';
 import {
   searchMovies,
   findOrCreateMovieByTmdbId,
@@ -9,6 +9,7 @@ import {
   TMDB_IMAGE_BASE,
 } from '../services/tmdb';
 import { getInCinemaIds, attachInCinema } from '../services/cinemaStatus';
+import { isNotFound, parseTmdbId } from '../lib/validate';
 
 
 const router = Router();
@@ -44,10 +45,10 @@ router.get('/search', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.post('/add', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/add', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
-    const { tmdbId } = req.body;
-    if (!tmdbId || typeof tmdbId !== 'number') {
+    const tmdbId = parseTmdbId(req.body.tmdbId);
+    if (!tmdbId) {
       res.status(400).json({ error: 'tmdbId is required and must be a number' });
       return;
     }
@@ -79,7 +80,7 @@ router.post('/add', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.delete('/:movieId/watchlist', authenticate, async (req: AuthRequest, res: Response) => {
+router.delete('/:movieId/watchlist', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
     const movieId = req.params.movieId as string;
 
@@ -152,7 +153,7 @@ router.get('/pool-size', authenticate, async (req: AuthRequest, res: Response) =
   }
 });
 
-router.patch('/:movieId/watched', authenticate, async (req: AuthRequest, res: Response) => {
+router.patch('/:movieId/watched', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
     const { watched } = req.body;
     const [userMovie, inCinemaSet] = await Promise.all([
@@ -167,14 +168,22 @@ router.patch('/:movieId/watched', authenticate, async (req: AuthRequest, res: Re
       getInCinemaIds(),
     ]);
     res.json({ userMovie: { ...userMovie, movie: attachInCinema(userMovie.movie, inCinemaSet) } });
-  } catch {
+  } catch (err) {
+    if (isNotFound(err)) {
+      res.status(404).json({ error: 'Movie not in your library' });
+      return;
+    }
     res.status(500).json({ error: 'Failed to update watched status' });
   }
 });
 
-router.post('/:movieId/rate', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/:movieId/rate', authenticateUser, async (req: AuthRequest, res: Response) => {
   try {
     const { rating } = req.body;
+    if (rating !== null && (typeof rating !== 'number' || !Number.isFinite(rating) || rating < 0 || rating > 10)) {
+      res.status(400).json({ error: 'Rating must be a number between 0 and 10, or null' });
+      return;
+    }
     const [userMovie, inCinemaSet] = await Promise.all([
       prisma.userMovie.update({
         where: { userId_movieId: { userId: req.userId!, movieId: req.params.movieId as string } },
@@ -187,15 +196,19 @@ router.post('/:movieId/rate', authenticate, async (req: AuthRequest, res: Respon
       getInCinemaIds(),
     ]);
     res.json({ userMovie: { ...userMovie, movie: attachInCinema(userMovie.movie, inCinemaSet) } });
-  } catch {
+  } catch (err) {
+    if (isNotFound(err)) {
+      res.status(404).json({ error: 'Movie not in your library' });
+      return;
+    }
     res.status(500).json({ error: 'Failed to rate movie' });
   }
 });
 
 router.get('/tmdb/:tmdbId', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const tmdbId = parseInt(req.params.tmdbId as string);
-    if (isNaN(tmdbId)) {
+    const tmdbId = parseTmdbId(Number(req.params.tmdbId));
+    if (!tmdbId) {
       res.status(400).json({ error: 'Invalid tmdbId' });
       return;
     }

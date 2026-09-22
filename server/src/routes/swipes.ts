@@ -6,6 +6,7 @@ import { resolveSessionRole } from '../lib/resolveSessionRole';
 import { getInCinemaIds, attachInCinema } from '../services/cinemaStatus';
 import { clearSessionState } from '../services/socket';
 import { sendPush } from '../services/pushSender';
+import { isNonEmptyString } from '../lib/validate';
 
 const router = Router();
 
@@ -50,10 +51,6 @@ async function getCompromises(sessionId: string) {
       };
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);
-}
-
-function isNonEmptyString(v: unknown): v is string {
-  return typeof v === 'string' && v.length > 0;
 }
 
 router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
@@ -204,7 +201,7 @@ router.post('/undo', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { sessionId, movieId } = req.body;
 
-    if (!sessionId || !movieId) {
+    if (!isNonEmptyString(sessionId) || !isNonEmptyString(movieId)) {
       res.status(400).json({ error: 'sessionId and movieId are required' });
       return;
     }
@@ -305,6 +302,10 @@ router.post('/undo', authenticate, async (req: AuthRequest, res: Response) => {
 router.post('/done', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { sessionId } = req.body;
+    if (!isNonEmptyString(sessionId)) {
+      res.status(400).json({ error: 'sessionId is required' });
+      return;
+    }
 
     const session = await prisma.swipeSession.findUnique({
       where: { id: sessionId },
