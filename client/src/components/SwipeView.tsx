@@ -254,7 +254,8 @@ export default function SwipeView({
           onSwipe={onSwipe}
           onTap={() => { setExpanded(true); onExpand?.(currentMovie); }}
           enableHaptics
-          className="relative w-full max-w-md lg:max-w-lg max-h-full shrink-0 rounded-3xl overflow-hidden shadow-2xl cursor-grab active:cursor-grabbing aspect-[2/3]"
+          className="relative w-full max-w-md lg:max-w-lg max-h-full shrink-0 aspect-[2/3]"
+          faceClassName="rounded-3xl overflow-hidden shadow-2xl cursor-grab active:cursor-grabbing bg-card"
         >
           {currentMovie.posterUrl ? (
             <img

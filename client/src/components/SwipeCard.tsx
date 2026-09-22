@@ -1,7 +1,7 @@
 'use client';
 
-import { forwardRef, ReactNode, useCallback, useImperativeHandle, useRef } from 'react';
-import { animate, AnimatePresence, motion, PanInfo, useMotionValue, useTransform } from 'framer-motion';
+import { forwardRef, ReactNode, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
+import { animate, AnimatePresence, motion, PanInfo, useIsPresent, useMotionValue, useTransform } from 'framer-motion';
 
 export interface SwipeCardHandle {
   swipe: (direction: 'left' | 'right') => Promise<void>;
@@ -12,102 +12,171 @@ interface SwipeCardProps {
   onSwipe: (direction: 'left' | 'right') => void | Promise<void>;
   onTap?: () => void;
   enableHaptics?: boolean;
+  /** Sizing/layout classes for the card slot. */
   className?: string;
+  /** Visual classes for the draggable face (rounding, shadow, cursor). */
+  faceClassName?: string;
   children: ReactNode;
 }
 
 const TAP_DISTANCE_THRESHOLD = 10;
+const DISTANCE_THRESHOLD = 110;
+// A quick flick counts even if it didn't travel far.
+const FLICK_VELOCITY = 600;
+const FLICK_MIN_DISTANCE = 30;
+
+// Matches the fanned "next card" pose in SwipeView, so a new card appears to
+// come forward from the deck rather than fading in from nowhere.
+const DECK_POSE = { x: '8%', y: '2%', rotate: 6, scale: 0.92 };
+
+function haptic(ms = 12) {
+  try { navigator?.vibrate?.(ms); } catch { /* unsupported */ }
+}
 
 const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function SwipeCard(
-  { cardKey, onSwipe, onTap, enableHaptics = false, className, children },
+  { cardKey, className, ...faceProps },
   ref,
 ) {
+  // Only the card on top of the deck answers imperative swipes (keys, buttons).
+  const activeFaceRef = useRef<SwipeCardHandle | null>(null);
+  useImperativeHandle(ref, () => ({
+    swipe: (direction) => activeFaceRef.current?.swipe(direction) ?? Promise.resolve(),
+  }), []);
+
+  return (
+    <div className={className}>
+      <AnimatePresence initial={false}>
+        <CardFace key={cardKey} activeFaceRef={activeFaceRef} {...faceProps} />
+      </AnimatePresence>
+    </div>
+  );
+});
+
+interface CardFaceProps extends Omit<SwipeCardProps, 'cardKey' | 'className'> {
+  activeFaceRef: React.MutableRefObject<SwipeCardHandle | null>;
+}
+
+function CardFace({ onSwipe, onTap, enableHaptics = false, faceClassName, children, activeFaceRef }: CardFaceProps) {
+  // Each card owns its motion values, so the outgoing card keeps flying while the
+  // next one settles. A shared value made the old card flash back to centre.
   const x = useMotionValue(0);
-  const rotate = useTransform(x, [-200, 200], [-15, 15]);
-  const leftOpacity = useTransform(x, [-120, -60, 0], [1, 0.3, 0]);
-  const rightOpacity = useTransform(x, [0, 60, 120], [0, 0.3, 1]);
-  const rightScale = useTransform(x, [0, 60, 120], [0.7, 0.85, 1]);
-  const leftScale = useTransform(x, [-120, -60, 0], [1, 0.85, 0.7]);
+  const rotate = useTransform(x, [-240, 240], [-14, 14]);
+  const likeOpacity = useTransform(x, [0, 50, 110], [0, 0.4, 1]);
+  const passOpacity = useTransform(x, [-110, -50, 0], [1, 0.4, 0]);
+  const likeScale = useTransform(x, [0, 110], [0.7, 1]);
+  const passScale = useTransform(x, [-110, 0], [1, 0.7]);
 
-  const cooldownRef = useRef(false);
-  const isDragging = useRef(false);
+  const isPresent = useIsPresent();
+  const presentRef = useRef(isPresent);
+  useEffect(() => { presentRef.current = isPresent; }, [isPresent]);
+  const leaving = useRef(false);
+  const dragged = useRef(false);
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
+  // Recent pointer samples, timed by the events themselves, for flick speed.
+  const samples = useRef<{ x: number; t: number }[]>([]);
 
-  const triggerSwipe = useCallback(async (direction: 'left' | 'right') => {
-    if (cooldownRef.current) return;
-    cooldownRef.current = true;
-    await animate(x, direction === 'right' ? 400 : -400, { duration: 0.25, ease: 'easeIn' });
-    try {
-      await onSwipe(direction);
-    } finally {
-      x.set(0);
-      setTimeout(() => { cooldownRef.current = false; }, 100);
+  const swipe = useCallback(async (direction: 'left' | 'right', velocity = 0) => {
+    if (leaving.current || !presentRef.current) return;
+    leaving.current = true;
+    if (enableHaptics) haptic();
+
+    const sign = direction === 'right' ? 1 : -1;
+    const target = sign * Math.max(window.innerWidth, 700);
+    const remaining = Math.abs(target - x.get());
+    // Carry the finger's momentum: faster flicks leave faster.
+    const speed = Math.max(Math.abs(velocity), 1600);
+    const duration = Math.min(0.34, Math.max(0.18, remaining / speed));
+    const flight = animate(x, target, { duration, ease: [0.25, 0.6, 0.4, 1] });
+
+    await onSwipe(direction);
+    await flight;
+    // If the parent didn't advance (e.g. the swipe was rejected), come back.
+    if (presentRef.current) {
+      leaving.current = false;
+      animate(x, 0, { type: 'spring', stiffness: 420, damping: 32 });
     }
-  }, [onSwipe, x]);
+  }, [enableHaptics, onSwipe, x]);
 
-  useImperativeHandle(ref, () => ({ swipe: triggerSwipe }), [triggerSwipe]);
+  useEffect(() => {
+    if (!isPresent) return;
+    const handle: SwipeCardHandle = { swipe: (d) => swipe(d) };
+    activeFaceRef.current = handle;
+    return () => {
+      if (activeFaceRef.current === handle) activeFaceRef.current = null;
+    };
+  }, [isPresent, swipe, activeFaceRef]);
 
-  const handleDragStart = () => {
-    isDragging.current = true;
+  const releaseVelocity = (frameSampled: number): number => {
+    const pts = samples.current;
+    samples.current = [];
+    if (pts.length < 2) return frameSampled;
+    const first = pts[0];
+    const last = pts[pts.length - 1];
+    const dt = (last.t - first.t) / 1000;
+    const measured = dt > 0 ? (last.x - first.x) / dt : 0;
+    // Framer samples on animation frames, which can under-read short flicks.
+    return Math.abs(measured) > Math.abs(frameSampled) ? measured : frameSampled;
   };
 
   const handleDragEnd = (_: unknown, info: PanInfo) => {
-    setTimeout(() => { isDragging.current = false; }, 50);
-    const threshold = 100;
-    if (info.offset.x > threshold) {
-      if (enableHaptics) {
-        try { navigator?.vibrate?.(50); } catch { /* unsupported */ }
-      }
-      triggerSwipe('right');
-    } else if (info.offset.x < -threshold) {
-      if (enableHaptics) {
-        try { navigator?.vibrate?.(50); } catch { /* unsupported */ }
-      }
-      triggerSwipe('left');
+    setTimeout(() => { dragged.current = false; }, 50);
+    const { offset } = info;
+    const vx = releaseVelocity(info.velocity.x);
+    const flick = Math.abs(vx) > FLICK_VELOCITY && Math.abs(offset.x) > FLICK_MIN_DISTANCE;
+    if (offset.x > DISTANCE_THRESHOLD || (flick && vx > 0)) {
+      void swipe('right', vx);
+    } else if (offset.x < -DISTANCE_THRESHOLD || (flick && vx < 0)) {
+      void swipe('left', vx);
     } else {
-      x.set(0);
+      animate(x, 0, { type: 'spring', stiffness: 500, damping: 30, velocity: vx });
     }
   };
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     pointerStart.current = { x: e.clientX, y: e.clientY };
+    samples.current = [{ x: e.clientX, t: e.timeStamp }];
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!pointerStart.current) return;
+    const pts = samples.current;
+    pts.push({ x: e.clientX, t: e.timeStamp });
+    // Keep only the last ~100ms: that's the motion at release.
+    while (pts.length > 2 && e.timeStamp - pts[0].t > 100) pts.shift();
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     const start = pointerStart.current;
     pointerStart.current = null;
-    if (!start || !onTap) return;
-    const dx = e.clientX - start.x;
-    const dy = e.clientY - start.y;
-    const distance = Math.hypot(dx, dy);
-    if (distance < TAP_DISTANCE_THRESHOLD && !isDragging.current) {
+    if (!start || !onTap || leaving.current) return;
+    if (Math.hypot(e.clientX - start.x, e.clientY - start.y) < TAP_DISTANCE_THRESHOLD && !dragged.current) {
       onTap();
     }
   };
 
-  const mergedClassName = className ? `swipe-card ${className}` : 'swipe-card';
-
   return (
-    <AnimatePresence mode="popLayout" initial={false}>
+    <motion.div
+      initial={DECK_POSE}
+      animate={{ x: 0, y: 0, rotate: 0, scale: 1, opacity: 1 }}
+      exit={{ opacity: 0, transition: { duration: 0.22, ease: 'easeIn' } }}
+      transition={{ type: 'spring', stiffness: 380, damping: 30, mass: 0.8 }}
+      style={{ transformOrigin: 'bottom center', zIndex: isPresent ? 10 : 11 }}
+      className="absolute inset-0"
+    >
       <motion.div
-        key={cardKey}
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, transition: { duration: 0.1 } }}
-        style={{ x, rotate, zIndex: 10 }}
-        drag="x"
-        dragConstraints={{ left: 0, right: 0 }}
-        dragElastic={0.8}
-        onDragStart={handleDragStart}
+        style={{ x, rotate }}
+        drag={isPresent ? 'x' : false}
+        dragMomentum={false}
+        onDragStart={() => { dragged.current = true; }}
         onDragEnd={handleDragEnd}
         onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        transition={{ type: 'spring', stiffness: 300, damping: 22 }}
-        className={mergedClassName}
+        className={`swipe-card absolute inset-0 ${isPresent ? '' : 'pointer-events-none'} ${faceClassName ?? ''}`}
       >
         {children}
         <motion.div
-          style={{ opacity: rightOpacity, scale: rightScale, rotate: -12 }}
+          style={{ opacity: likeOpacity, scale: likeScale, rotate: -12 }}
           className="absolute top-8 left-6 z-20 pointer-events-none flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-coral bg-charcoal/60 backdrop-blur-sm"
         >
           <svg className="w-7 h-7 text-coral" viewBox="0 0 24 24" fill="currentColor">
@@ -116,7 +185,7 @@ const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function SwipeCard
           <span className="text-coral text-xl font-bold tracking-wider">STRIKE</span>
         </motion.div>
         <motion.div
-          style={{ opacity: leftOpacity, scale: leftScale, rotate: 12 }}
+          style={{ opacity: passOpacity, scale: passScale, rotate: 12 }}
           className="absolute top-8 right-6 z-20 pointer-events-none flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-cream-dim/60 bg-charcoal/60 backdrop-blur-sm"
         >
           <svg className="w-7 h-7 text-cream-dim" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
@@ -126,8 +195,8 @@ const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function SwipeCard
           <span className="text-cream-dim text-xl font-bold tracking-wider">PASS</span>
         </motion.div>
       </motion.div>
-    </AnimatePresence>
+    </motion.div>
   );
-});
+}
 
 export default SwipeCard;
