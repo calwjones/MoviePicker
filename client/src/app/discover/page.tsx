@@ -468,7 +468,7 @@ function DiscoverSwipePageInner() {
           <button
             onClick={handleAddAll}
             disabled={allAdded}
-            className="w-full py-3 glass rounded-xl text-coral font-semibold text-sm hover:bg-card-hover transition-colors disabled:opacity-50"
+            className="w-full py-3 glass rounded-xl text-ember font-semibold text-sm hover:bg-card-hover transition-colors disabled:opacity-50"
           >
             {allAdded ? 'All saved to watchlist' : 'Save all to watchlist'}
           </button>
@@ -672,7 +672,7 @@ function DiscoverWinnerCard({
           <div className="flex items-center gap-3 text-cream-dim text-sm mb-3">
             <span>{movie.year}</span>
             {movie.runtime && <span>{movie.runtime} min</span>}
-            {movie.tmdbRating && <span className="text-danger">&#9733; {movie.tmdbRating.toFixed(1)}</span>}
+            {movie.tmdbRating && <span className="text-ember">&#9733; {movie.tmdbRating.toFixed(1)}</span>}
           </div>
           {movie.director && (
             <p className="text-cream-dim text-sm mb-3">Directed by {movie.director}</p>

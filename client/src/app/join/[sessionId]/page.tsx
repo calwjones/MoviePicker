@@ -206,7 +206,7 @@ export default function JoinPage() {
                     <button
                       type="button"
                       onClick={() => router.push(`/auth?mode=login&redirect=/join/${sessionId}`)}
-                      className="text-coral hover:underline"
+                      className="text-ember hover:underline"
                     >
                       Sign in
                     </button>

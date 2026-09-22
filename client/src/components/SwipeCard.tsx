@@ -179,10 +179,10 @@ function CardFace({ onSwipe, onTap, enableHaptics = false, faceClassName, childr
           style={{ opacity: likeOpacity, scale: likeScale, rotate: -12 }}
           className="absolute top-8 left-6 z-20 pointer-events-none flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-coral bg-charcoal/60 backdrop-blur-sm"
         >
-          <svg className="w-7 h-7 text-coral" viewBox="0 0 24 24" fill="currentColor">
+          <svg className="w-7 h-7 text-ember" viewBox="0 0 24 24" fill="currentColor">
             <path d="M13.5 0.5c0.3 2.5-0.8 4.2-2.1 5.6C10.1 7.4 8.5 8.8 8.5 11.2c0 2 1.2 3.6 3 3.8-0.9-0.6-1.4-1.6-1.4-2.6 0-1.7 1.3-3 2.8-4.1 1.8-1.3 2.5-3 2.6-5.3 2.6 1.8 4.5 4.8 4.5 8.3 0 4.8-3.9 8.7-8.7 8.7S3 15.9 3 11.1c0-1.9 0.6-3.7 1.8-5.1-0.1 0.6-0.1 1.2-0.1 1.8 0 2.5 1.5 4.3 3.5 4.3-0.2-0.3-0.3-0.7-0.3-1.1 0-1.3 0.6-2.5 1.8-3.8C11.1 5.9 12.6 4.3 13.5 0.5z" />
           </svg>
-          <span className="text-coral text-xl font-bold tracking-wider">STRIKE</span>
+          <span className="text-ember text-xl font-bold tracking-wider">STRIKE</span>
         </motion.div>
         <motion.div
           style={{ opacity: passOpacity, scale: passScale, rotate: 12 }}

@@ -132,7 +132,7 @@ export default function OnboardingModal({ open, onClose, onPickPath }: Onboardin
                 <>
                   <div className="text-center">
                     <h2 className="text-2xl font-bold text-cream mb-1" style={{ fontFamily: 'var(--font-playfair)' }}>
-                      Welcome to MatchSticked
+                      Welcome to Matchsticked
                     </h2>
                     <p className="text-cream-dim text-sm">
                       Your movie decision engine — together or solo.

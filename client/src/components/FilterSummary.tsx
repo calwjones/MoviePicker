@@ -65,7 +65,7 @@ export default function FilterSummary({ filters, onEdit, onClear, open }: Filter
               {chips.map((c) => (
                 <span
                   key={c}
-                  className="px-2 py-0.5 rounded-full bg-coral/15 text-coral text-[11px]"
+                  className="px-2 py-0.5 rounded-full bg-coral/15 text-ember text-[11px]"
                 >
                   {c}
                 </span>
@@ -77,7 +77,7 @@ export default function FilterSummary({ filters, onEdit, onClear, open }: Filter
           {count > 0 && onClear && (
             <button
               onClick={onClear}
-              className="text-danger text-xs hover:underline"
+              className="text-ember text-xs hover:underline"
             >
               Clear
             </button>

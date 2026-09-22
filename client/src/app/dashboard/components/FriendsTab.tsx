@@ -167,7 +167,7 @@ export default function FriendsTab({ addToast, active }: FriendsTabProps) {
                 className="glass rounded-xl p-3 flex items-center justify-between gap-3"
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-full bg-coral/20 flex items-center justify-center text-coral font-semibold text-sm shrink-0">
+                  <div className="w-9 h-9 rounded-full bg-coral/20 flex items-center justify-center text-ember font-semibold text-sm shrink-0">
                     {f.username.charAt(0).toUpperCase()}
                   </div>
                   <span className="text-cream font-medium truncate">{f.username}</span>
@@ -175,7 +175,7 @@ export default function FriendsTab({ addToast, active }: FriendsTabProps) {
                 <div className="flex gap-2 items-center shrink-0">
                   <button
                     onClick={() => setOpenFriend(f)}
-                    className="text-coral text-xs hover:text-coral-dark transition-colors"
+                    className="text-ember text-xs hover:text-coral-dark transition-colors"
                   >
                     View library
                   </button>

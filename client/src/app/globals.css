@@ -6,6 +6,9 @@
   --color-card-hover: #262626;
   --color-coral: #A12F0A;
   --color-coral-dark: #7A2308;
+  /* Ember: the lit match-head highlight. The readable accent for text and
+     icons on dark (~5.3:1); coral stays the fill colour. */
+  --color-ember: #E25A2E;
   --color-cream: #F0E6D3;
   --color-cream-dim: #B8AFA3;
   --color-glass: #1C1C1C;

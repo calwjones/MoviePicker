@@ -17,6 +17,7 @@ import NotificationsTab from './components/NotificationsTab';
 import OnboardingModal from '@/components/OnboardingModal';
 import FeedbackButton from '@/components/FeedbackButton';
 import { FullPageSpinner } from '@/components/LoadingSpinner';
+import Wordmark from '@/components/Wordmark';
 
 type Tab = 'discover' | 'library' | 'swipe' | 'friends' | 'history';
 const ALL_TABS: readonly Tab[] = ['discover', 'library', 'swipe', 'friends', 'history'];
@@ -143,14 +144,14 @@ function DashboardContent() {
   return (
     <div className="min-h-dvh px-6 py-8 w-full max-w-5xl mx-auto lg:px-12 flex flex-col items-stretch">
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold font-display">
-          Match<span className="text-coral">Sticked</span>
+        <h1>
+          <Wordmark size="md" />
         </h1>
         <div className="flex items-center gap-3">
           {user && !user.isGuest && (
             <button
               onClick={() => setBellOpen(true)}
-              className="relative text-cream-dim hover:text-coral transition-colors p-1"
+              className="relative text-cream-dim hover:text-ember transition-colors p-1"
               aria-label={`Notifications${inviteCount > 0 ? `, ${inviteCount} unread` : ''}`}
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -167,7 +168,7 @@ function DashboardContent() {
           {user && !user.isGuest && (
             <button
               onClick={() => router.push('/profile')}
-              className="text-cream-dim text-sm hover:text-coral transition-colors"
+              className="text-cream-dim text-sm hover:text-ember transition-colors"
             >
               {user.username}
             </button>

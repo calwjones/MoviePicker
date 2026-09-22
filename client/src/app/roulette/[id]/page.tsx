@@ -395,7 +395,7 @@ export default function RoulettePage() {
                   <div className="flex items-center gap-3 text-cream-dim text-sm mb-3">
                     <span>{winner.year}</span>
                     {winner.runtime && <span>{winner.runtime} min</span>}
-                    {winner.tmdbRating && <span className="text-danger">&#9733; {winner.tmdbRating.toFixed(1)}</span>}
+                    {winner.tmdbRating && <span className="text-ember">&#9733; {winner.tmdbRating.toFixed(1)}</span>}
                   </div>
                   {winner.director && (
                     <p className="text-cream-dim text-sm mb-3">Directed by {winner.director}</p>

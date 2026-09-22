@@ -365,7 +365,7 @@ export default function SwipeTab({ addToast, active }: SwipeTabProps) {
       <div className="glass rounded-2xl p-4">
         <p className="text-cream-dim text-sm">
           Your movie pool has{' '}
-          <span className="text-danger font-semibold">{poolSizeLoading ? '...' : poolSize}</span> movies.
+          <span className="text-ember font-semibold">{poolSizeLoading ? '...' : poolSize}</span> movies.
           {poolSize === 0 && !poolSizeLoading && ' Add some movies first from the Library tab.'}
         </p>
       </div>
@@ -453,10 +453,10 @@ export default function SwipeTab({ addToast, active }: SwipeTabProps) {
                     whileTap={{ scale: 0.95 }}
                     onClick={async () => {
                       const result = await shareOrCopy({
-                        title: 'MatchSticked',
+                        title: 'Matchsticked',
                         text: shortCode
-                          ? `Help me pick a movie on MatchSticked. Join with code ${shortCode}:`
-                          : 'Help me pick a movie on MatchSticked:',
+                          ? `Help me pick a movie on Matchsticked. Join with code ${shortCode}:`
+                          : 'Help me pick a movie on Matchsticked:',
                         url: shareLink,
                       });
                       if (result === 'copied') addToast('Link copied!');
@@ -477,7 +477,7 @@ export default function SwipeTab({ addToast, active }: SwipeTabProps) {
                   Or enter this code on the Join screen:
                 </p>
                 <div className="flex gap-2 items-center">
-                  <p className="flex-1 text-center text-2xl font-bold tracking-[0.3em] text-coral font-mono bg-charcoal rounded-lg px-3 py-3">
+                  <p className="flex-1 text-center text-2xl font-bold tracking-[0.3em] text-ember font-mono bg-charcoal rounded-lg px-3 py-3">
                     {shortCode}
                   </p>
                   <motion.button
@@ -614,7 +614,7 @@ export default function SwipeTab({ addToast, active }: SwipeTabProps) {
               whileTap={{ scale: 0.98 }}
               onClick={handleCreateGroup}
               disabled={anyLoading || poolSize === 0 || poolSizeLoading}
-              className="flex-1 py-4 glass text-danger font-semibold rounded-xl text-base outline outline-1 outline-coral hover:bg-card-hover transition-all btn-glow disabled:opacity-50"
+              className="flex-1 py-4 glass text-ember font-semibold rounded-xl text-base outline outline-1 outline-coral hover:bg-card-hover transition-all btn-glow disabled:opacity-50"
             >
               {sessionLoading ? (
                 <span className="flex items-center justify-center gap-2">

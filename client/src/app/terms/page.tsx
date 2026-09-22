@@ -64,7 +64,7 @@ export default function TermsPage() {
         </section>
       ))}
       <p className="text-cream-dim text-sm mt-12">
-        Questions? <a className="text-coral underline" href="mailto:hello@matchsticked.com">hello@matchsticked.com</a>
+        Questions? <a className="text-ember underline" href="mailto:hello@matchsticked.com">hello@matchsticked.com</a>
       </p>
     </main>
   );

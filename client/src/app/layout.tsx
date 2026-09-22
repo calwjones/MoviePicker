@@ -17,17 +17,17 @@ const DESCRIPTION = "Pick a movie together. No more scrolling debates.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: { default: "MatchSticked", template: "%s · MatchSticked" },
+  title: { default: "Matchsticked", template: "%s · Matchsticked" },
   description: DESCRIPTION,
-  applicationName: "MatchSticked",
+  applicationName: "Matchsticked",
   openGraph: {
     type: "website",
-    siteName: "MatchSticked",
-    title: "MatchSticked",
+    siteName: "Matchsticked",
+    title: "Matchsticked",
     description: DESCRIPTION,
   },
-  twitter: { card: "summary_large_image", title: "MatchSticked", description: DESCRIPTION },
-  appleWebApp: { capable: true, title: "MatchSticked", statusBarStyle: "black-translucent" },
+  twitter: { card: "summary_large_image", title: "Matchsticked", description: DESCRIPTION },
+  appleWebApp: { capable: true, title: "Matchsticked", statusBarStyle: "black-translucent" },
   formatDetection: { telephone: false },
 };
 

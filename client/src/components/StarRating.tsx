@@ -18,7 +18,7 @@ export default function StarRating({ value, onChange, readonly }: StarRatingProp
           <div key={starIndex} className="relative w-4 h-4 text-sm leading-none flex items-center justify-center">
             <div className="text-cream-dim/30">&#9733;</div>
             <div
-              className="absolute left-0 top-0 overflow-hidden text-coral pointer-events-none flex items-center justify-start h-full"
+              className="absolute left-0 top-0 overflow-hidden text-ember pointer-events-none flex items-center justify-start h-full"
               style={{ width: isFull ? '100%' : isHalf ? '50%' : '0%' }}
             >
               &#9733;

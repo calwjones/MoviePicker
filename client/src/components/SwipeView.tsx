@@ -210,7 +210,7 @@ export default function SwipeView({
                   className={`w-16 h-16 rounded-full flex items-center justify-center ${
                     previousSwipe.direction === 'right'
                       ? 'bg-success/30 ring-2 ring-success/60'
-                      : 'bg-danger/30 ring-2 ring-danger/60'
+                      : 'bg-charcoal/50 ring-2 ring-cream/40'
                   }`}
                   style={{ backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
                 >
@@ -219,7 +219,7 @@ export default function SwipeView({
                       <polyline points="20 6 9 17 4 12" />
                     </svg>
                   ) : (
-                    <svg className="w-8 h-8 text-danger" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                    <svg className="w-8 h-8 text-cream" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
                       <line x1="18" y1="6" x2="6" y2="18" />
                       <line x1="6" y1="6" x2="18" y2="18" />
                     </svg>
@@ -314,7 +314,7 @@ export default function SwipeView({
               <span>{currentMovie.year}</span>
               {currentMovie.runtime && <span>{currentMovie.runtime} min</span>}
               {currentMovie.tmdbRating && (
-                <span className="text-danger">&#9733; {currentMovie.tmdbRating.toFixed(1)}</span>
+                <span className="text-ember">&#9733; {currentMovie.tmdbRating.toFixed(1)}</span>
               )}
             </div>
             <div className="flex flex-wrap gap-2 mb-3">
@@ -370,25 +370,31 @@ export default function SwipeView({
           disabled={swiping}
           aria-label="Pass"
           title="Pass (←)"
-          className="flex-1 py-4 glass rounded-xl text-danger text-lg font-semibold disabled:opacity-50"
+          className="flex-1 py-4 glass rounded-xl text-cream-dim hover:text-cream text-lg font-semibold disabled:opacity-50 flex items-center justify-center"
         >
-          &#10005;
+          <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" aria-hidden="true">
+            <line x1="6" y1="6" x2="18" y2="18" />
+            <line x1="18" y1="6" x2="6" y2="18" />
+          </svg>
         </motion.button>
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => cardRef.current?.swipe('right')}
           disabled={swiping}
-          aria-label="Like"
-          title="Like (→)"
-          className="flex-1 py-4 bg-coral text-cream rounded-xl text-lg font-semibold hover:bg-coral-dark transition-colors disabled:opacity-50"
+          aria-label="Strike (like)"
+          title="Strike (→)"
+          className="flex-1 py-4 bg-coral text-cream rounded-xl text-lg font-semibold hover:bg-coral-dark transition-colors disabled:opacity-50 flex items-center justify-center"
         >
-          &#10003;
+          {/* Same flame as the STRIKE stamp on the card. */}
+          <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M13.5 0.5c0.3 2.5-0.8 4.2-2.1 5.6C10.1 7.4 8.5 8.8 8.5 11.2c0 2 1.2 3.6 3 3.8-0.9-0.6-1.4-1.6-1.4-2.6 0-1.7 1.3-3 2.8-4.1 1.8-1.3 2.5-3 2.6-5.3 2.6 1.8 4.5 4.8 4.5 8.3 0 4.8-3.9 8.7-8.7 8.7S3 15.9 3 11.1c0-1.9 0.6-3.7 1.8-5.1-0.1 0.6-0.1 1.2-0.1 1.8 0 2.5 1.5 4.3 3.5 4.3-0.2-0.3-0.3-0.7-0.3-1.1 0-1.3 0.6-2.5 1.8-3.8C11.1 5.9 12.6 4.3 13.5 0.5z" />
+          </svg>
         </motion.button>
       </div>
       <p className="hidden pointer-fine:flex justify-center gap-3 pb-3 -mt-1 text-[11px] text-cream-dim/60 select-none" aria-hidden="true">
         <span><Kbd>←</Kbd> pass</span>
-        <span><Kbd>→</Kbd> like</span>
+        <span><Kbd>→</Kbd> strike</span>
         <span><Kbd>↑</Kbd> details</span>
         <span><Kbd>Z</Kbd> undo</span>
       </p>

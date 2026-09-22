@@ -26,7 +26,7 @@ export default function PresenceRow({ participants, max = 4 }: PresenceRowProps)
         return (
           <div key={p.id} className="relative" title={`${p.displayName}${p.isHost ? ' (host)' : ''}`}>
             <div
-              className={`w-7 h-7 rounded-full bg-coral/20 ring-2 flex items-center justify-center text-coral text-[11px] font-semibold ${
+              className={`w-7 h-7 rounded-full bg-coral/20 ring-2 flex items-center justify-center text-ember text-[11px] font-semibold ${
                 p.online ? 'ring-coral' : 'ring-charcoal/60'
               }`}
             >

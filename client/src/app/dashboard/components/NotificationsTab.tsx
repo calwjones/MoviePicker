@@ -145,7 +145,7 @@ export default function NotificationsTab({ addToast }: NotificationsTabProps) {
                 className="glass rounded-xl p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-full bg-coral/20 flex items-center justify-center text-coral font-semibold text-sm shrink-0">
+                  <div className="w-9 h-9 rounded-full bg-coral/20 flex items-center justify-center text-ember font-semibold text-sm shrink-0">
                     {inv.from.username.charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0">

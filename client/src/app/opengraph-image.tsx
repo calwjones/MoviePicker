@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ImageResponse } from 'next/og';
 
-export const alt = 'MatchSticked: pick a movie together';
+export const alt = 'Matchsticked: pick a movie together';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -31,7 +31,7 @@ export default async function OpengraphImage() {
         <img src={iconSrc} alt="" width={300} height={300} style={{ borderRadius: 48 }} />
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', fontFamily: 'Playfair Display', fontSize: 104, fontWeight: 800, letterSpacing: -1 }}>
-            Match<span style={{ color: '#E25A2E' }}>Sticked</span>
+            Match<span style={{ color: '#E25A2E' }}>sticked</span>
           </div>
           <div style={{ fontSize: 40, color: '#B8AFA3', marginTop: 16 }}>
             Pick a movie together.

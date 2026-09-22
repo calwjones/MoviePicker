@@ -437,7 +437,7 @@ export default function DiscoverTab({ addToast }: DiscoverTabProps) {
           {activeSections.length > 0 && (
             <button
               onClick={clearSections}
-              className="text-danger text-xs hover:underline"
+              className="text-ember text-xs hover:underline"
             >
               Clear
             </button>
@@ -544,7 +544,7 @@ function BrowseRowView({
   return (
     <div className="glass rounded-2xl p-4">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-danger uppercase tracking-wider">{row.title}</h3>
+        <h3 className="text-sm font-semibold text-ember uppercase tracking-wider">{row.title}</h3>
         <button
           onClick={handleRefresh}
           disabled={refreshing}

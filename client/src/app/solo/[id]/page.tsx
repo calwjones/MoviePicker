@@ -478,7 +478,7 @@ function WinnerCard({
           <div className="flex items-center gap-3 text-cream-dim text-sm mb-3">
             <span>{movie.year}</span>
             {movie.runtime && <span>{movie.runtime} min</span>}
-            {movie.tmdbRating && <span className="text-danger">&#9733; {movie.tmdbRating.toFixed(1)}</span>}
+            {movie.tmdbRating && <span className="text-ember">&#9733; {movie.tmdbRating.toFixed(1)}</span>}
           </div>
           {movie.director && (
             <p className="text-cream-dim text-sm mb-3">Directed by {movie.director}</p>

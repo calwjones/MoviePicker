@@ -133,7 +133,7 @@ export default function MatchesPage() {
                       <div className="flex items-center gap-2 text-cream-dim text-xs mt-0.5">
                         <span>{c.movie.year}</span>
                         {c.movie.tmdbRating && (
-                          <span className="text-danger/70">&#9733; {c.movie.tmdbRating.toFixed(1)}</span>
+                          <span className="text-ember/70">&#9733; {c.movie.tmdbRating.toFixed(1)}</span>
                         )}
                         <span className="px-1.5 py-0.5 rounded-full border border-cream-dim/30 text-cream-dim/60">
                           Almost
@@ -181,7 +181,7 @@ export default function MatchesPage() {
               Swiping complete!
             </h2>
             <p className="text-cream-dim text-lg mb-8">
-              You have <span className="text-danger font-bold">1</span> match
+              You have <span className="text-ember font-bold">1</span> match
             </p>
             <motion.button
               whileHover={{ scale: 1.05 }}
@@ -242,7 +242,7 @@ export default function MatchesPage() {
               <div className="flex items-center gap-3 text-cream-dim text-sm mb-3">
                 <span>{movie.year}</span>
                 {movie.runtime && <span>{movie.runtime} min</span>}
-                {movie.tmdbRating && <span className="text-danger">&#9733; {movie.tmdbRating.toFixed(1)}</span>}
+                {movie.tmdbRating && <span className="text-ember">&#9733; {movie.tmdbRating.toFixed(1)}</span>}
               </div>
               {movie.director && (
                 <p className="text-cream-dim text-sm mb-3">Directed by {movie.director}</p>
@@ -285,7 +285,7 @@ export default function MatchesPage() {
           </h2>
           <p className="text-cream-dim text-lg mb-8">
             You have{' '}
-            <span className="text-danger font-bold">{matches.length}</span>{' '}
+            <span className="text-ember font-bold">{matches.length}</span>{' '}
             matches
           </p>
           <motion.button

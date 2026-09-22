@@ -2,8 +2,8 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'MatchSticked',
-    short_name: 'MatchSticked',
+    name: 'Matchsticked',
+    short_name: 'Matchsticked',
     description: 'Pick a movie together. No more scrolling debates.',
     start_url: '/dashboard',
     scope: '/',

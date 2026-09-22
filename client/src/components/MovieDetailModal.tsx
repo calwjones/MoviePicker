@@ -287,7 +287,7 @@ export default function MovieDetailModal({
               {isRecContext && onDismiss ? (
                 <button
                   onClick={async () => { await onDismiss(shown); close(); }}
-                  className="flex-1 py-3 glass rounded-xl text-cream-dim hover:text-coral transition-colors text-sm font-medium"
+                  className="flex-1 py-3 glass rounded-xl text-cream-dim hover:text-ember transition-colors text-sm font-medium"
                 >
                   Not interested
                 </button>

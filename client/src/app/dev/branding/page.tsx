@@ -31,7 +31,7 @@ export default function BrandingPreview() {
                   key={b}
                   onClick={() => setBg(b)}
                   className={`px-3 py-1 rounded-lg border ${
-                    bg === b ? 'border-coral text-coral' : 'border-cream-dim/30 opacity-70'
+                    bg === b ? 'border-coral text-ember' : 'border-cream-dim/30 opacity-70'
                   }`}
                 >
                   {b}
@@ -52,7 +52,7 @@ export default function BrandingPreview() {
             </label>
             <button
               onClick={() => setTick((t) => t + 1)}
-              className="px-3 py-1 rounded-lg border border-coral text-coral"
+              className="px-3 py-1 rounded-lg border border-coral text-ember"
             >
               restart
             </button>
@@ -78,7 +78,7 @@ export default function BrandingPreview() {
           <div className="flex items-center gap-3 flex-wrap">
             <MatchstickLogo size={40} />
             <span className="text-3xl font-bold" style={{ fontFamily: 'var(--font-playfair)' }}>
-              Match<span className="text-coral">Sticked</span>
+              Match<span className="text-ember">sticked</span>
             </span>
           </div>
         </section>

@@ -456,7 +456,7 @@ export default function LibraryTab({ addToast, active }: LibraryTabProps) {
       {/* For You Recommendations */}
       <div className="glass rounded-2xl p-4">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-danger uppercase tracking-wider">For You</h3>
+          <h3 className="text-sm font-semibold text-ember uppercase tracking-wider">For You</h3>
           <button
             onClick={loadRecommendations}
             disabled={recsLoading}
@@ -478,7 +478,7 @@ export default function LibraryTab({ addToast, active }: LibraryTabProps) {
                 </div>
                 <button
                   onClick={(e) => { e.stopPropagation(); handleDismissRec(rec); }}
-                  className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-charcoal/85 backdrop-blur-sm text-cream-dim hover:text-coral hover:bg-charcoal flex items-center justify-center transition-colors text-sm leading-none shadow-md"
+                  className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-charcoal/85 backdrop-blur-sm text-cream-dim hover:text-ember hover:bg-charcoal flex items-center justify-center transition-colors text-sm leading-none shadow-md"
                   title="Not interested"
                   aria-label="Not interested"
                 >
@@ -528,7 +528,7 @@ export default function LibraryTab({ addToast, active }: LibraryTabProps) {
                     </div>
                     <button
                       onClick={() => handleUndismiss(um)}
-                      className="text-xs text-coral hover:text-coral/80 transition-colors flex-shrink-0"
+                      className="text-xs text-ember hover:text-ember/80 transition-colors flex-shrink-0"
                     >
                       Undo
                     </button>
@@ -550,7 +550,7 @@ export default function LibraryTab({ addToast, active }: LibraryTabProps) {
             className="glass rounded-2xl p-4"
           >
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-danger uppercase tracking-wider">
+              <h3 className="text-sm font-semibold text-ember uppercase tracking-wider">
                 Movies Like{moviesLikeSeed ? ` ${moviesLikeSeed.title}` : ''}
               </h3>
               <button
@@ -577,7 +577,7 @@ export default function LibraryTab({ addToast, active }: LibraryTabProps) {
                     </div>
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDismissRec(rec); }}
-                      className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-charcoal/85 backdrop-blur-sm text-cream-dim hover:text-coral hover:bg-charcoal flex items-center justify-center transition-colors text-sm leading-none shadow-md"
+                      className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-charcoal/85 backdrop-blur-sm text-cream-dim hover:text-ember hover:bg-charcoal flex items-center justify-center transition-colors text-sm leading-none shadow-md"
                       title="Not interested"
                       aria-label="Not interested"
                     >
@@ -699,7 +699,7 @@ export default function LibraryTab({ addToast, active }: LibraryTabProps) {
                         href="https://letterboxd.com/settings/data/"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-coral hover:underline"
+                        className="text-ember hover:underline"
                       >
                         letterboxd.com/settings/data
                       </a>{' '}
@@ -713,7 +713,7 @@ export default function LibraryTab({ addToast, active }: LibraryTabProps) {
                       importing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-coral/50 hover:bg-card-hover'
                     }`}
                   >
-                    <svg className="w-5 h-5 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-ember" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                     </svg>
                     <span className="text-cream text-sm">
@@ -756,7 +756,7 @@ export default function LibraryTab({ addToast, active }: LibraryTabProps) {
             {showSortFilter && hasActiveFilters && (
               <button
                 onClick={(e) => { e.stopPropagation(); clearAllFilters(); }}
-                className="text-danger text-xs hover:underline"
+                className="text-ember text-xs hover:underline"
               >
                 Clear all
               </button>

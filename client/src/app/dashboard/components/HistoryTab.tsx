@@ -135,7 +135,7 @@ export default function HistoryTab({ addToast, active }: HistoryTabProps) {
                 className={`text-xs px-2 py-1 rounded-full ${
                   session.status === 'completed'
                     ? 'bg-green-500/20 text-green-400'
-                    : 'bg-coral/20 text-danger'
+                    : 'bg-coral/20 text-ember'
                 }`}
               >
                 {session.status}
@@ -164,7 +164,7 @@ export default function HistoryTab({ addToast, active }: HistoryTabProps) {
                             <button
                               onClick={() => handleRewatch(match.id, match.movie.tmdbId, match.movie.title)}
                               disabled={rewatched.has(match.id)}
-                              className="w-5 h-5 rounded-full bg-coral/20 text-coral flex items-center justify-center hover:bg-coral/40 disabled:opacity-50 disabled:cursor-default transition-colors"
+                              className="w-5 h-5 rounded-full bg-coral/20 text-ember flex items-center justify-center hover:bg-coral/40 disabled:opacity-50 disabled:cursor-default transition-colors"
                               aria-label="Add back to watchlist"
                               title={rewatched.has(match.id) ? 'Added back' : 'Watch again'}
                             >
@@ -188,7 +188,7 @@ export default function HistoryTab({ addToast, active }: HistoryTabProps) {
                       ) : (
                         <button
                           onClick={() => handleMarkWatched(match.id)}
-                          className="text-danger text-xs hover:underline"
+                          className="text-ember text-xs hover:underline"
                         >
                           Mark watched
                         </button>
@@ -202,7 +202,7 @@ export default function HistoryTab({ addToast, active }: HistoryTabProps) {
             {session.status !== 'completed' ? (
               <button
                 onClick={() => router.push(`/session/${session.id}`)}
-                className="w-full mt-3 py-2 glass rounded-xl text-danger text-sm hover:bg-card-hover transition-all btn-glow shadow-sm"
+                className="w-full mt-3 py-2 glass rounded-xl text-ember text-sm hover:bg-card-hover transition-all btn-glow shadow-sm"
               >
                 Continue swiping
               </button>

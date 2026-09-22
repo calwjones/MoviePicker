@@ -52,10 +52,10 @@ export async function sendEmail(payload: EmailPayload, devUrl?: string): Promise
 
 function wrap(inner: string): string {
   return `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; background: #1a1a1a; color: #e8e2d5; border-radius: 16px;">
-      <h1 style="font-size: 24px; color: #e8e2d5; margin: 0 0 16px;">Matchsticked</h1>
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 28px; background: #1C1C1C; color: #F0E6D3; border-radius: 16px; line-height: 1.5;">
+      <h1 style="font-family: 'Playfair Display', Georgia, serif; font-size: 26px; font-weight: 700; color: #F0E6D3; margin: 0 0 18px; letter-spacing: -0.3px;">Match<span style="color: #E25A2E;">sticked</span></h1>
       ${inner}
-      <p style="margin-top: 32px; font-size: 12px; color: #9a9284;">If you didn't expect this email, you can safely ignore it.</p>
+      <p style="margin-top: 32px; font-size: 12px; color: #B8AFA3;">If you didn't expect this email, you can safely ignore it.</p>
     </div>
   `;
 }
@@ -69,9 +69,9 @@ export function sendVerificationEmail(to: string, token: string): Promise<void> 
       html: wrap(`
         <p>Welcome! Confirm your email to start picking movies.</p>
         <p style="margin: 24px 0;">
-          <a href="${link}" style="display: inline-block; background: #FF6B3D; color: #1a1a1a; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: 600;">Verify email</a>
+          <a href="${link}" style="display: inline-block; background: #A12F0A; color: #F0E6D3; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: 600;">Verify email</a>
         </p>
-        <p style="font-size: 12px; color: #9a9284;">Or copy this link: ${link}</p>
+        <p style="font-size: 12px; color: #B8AFA3;">Or copy this link: ${link}</p>
       `),
     },
     link,
@@ -87,9 +87,9 @@ export function sendRegistrationAttemptEmail(to: string): Promise<void> {
       <p>Someone just tried to create a new Matchsticked account using this email address.</p>
       <p>If that was you and you forgot you already have an account, you can sign in or reset your password.</p>
       <p style="margin: 24px 0;">
-        <a href="${link}" style="display: inline-block; background: #FF6B3D; color: #1a1a1a; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: 600;">Sign in</a>
+        <a href="${link}" style="display: inline-block; background: #A12F0A; color: #F0E6D3; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: 600;">Sign in</a>
       </p>
-      <p style="font-size: 12px; color: #9a9284;">If it wasn't you, you can safely ignore this email. No changes were made.</p>
+      <p style="font-size: 12px; color: #B8AFA3;">If it wasn't you, you can safely ignore this email. No changes were made.</p>
     `),
   });
 }
@@ -104,9 +104,9 @@ export function sendPasswordResetEmail(to: string, token: string): Promise<void>
         <p>Someone asked to reset the password for this account.</p>
         <p>The reset link is valid for 15 minutes.</p>
         <p style="margin: 24px 0;">
-          <a href="${link}" style="display: inline-block; background: #FF6B3D; color: #1a1a1a; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: 600;">Reset password</a>
+          <a href="${link}" style="display: inline-block; background: #A12F0A; color: #F0E6D3; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: 600;">Reset password</a>
         </p>
-        <p style="font-size: 12px; color: #9a9284;">Or copy this link: ${link}</p>
+        <p style="font-size: 12px; color: #B8AFA3;">Or copy this link: ${link}</p>
       `),
     },
     link,

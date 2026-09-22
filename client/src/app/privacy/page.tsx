@@ -70,7 +70,7 @@ export default function PrivacyPage() {
         </section>
       ))}
       <p className="text-cream-dim text-sm mt-12">
-        Questions? <a className="text-coral underline" href="mailto:privacy@matchsticked.com">privacy@matchsticked.com</a>
+        Questions? <a className="text-ember underline" href="mailto:privacy@matchsticked.com">privacy@matchsticked.com</a>
       </p>
     </main>
   );

@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { authApi } from '@/lib/api';
 import { FullPageSpinner } from '@/components/LoadingSpinner';
+import Wordmark from '@/components/Wordmark';
 
 function AuthForm() {
   const searchParams = useSearchParams();
@@ -95,6 +96,9 @@ function AuthForm() {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-sm"
       >
+        <div className="flex justify-center mb-8">
+          <Wordmark size="md" />
+        </div>
         <h1
           className="text-3xl font-bold mb-2 text-center"
           style={{ fontFamily: 'var(--font-playfair)' }}
@@ -102,7 +106,7 @@ function AuthForm() {
           {mode === 'login' ? 'Welcome back' : 'Create account'}
         </h1>
         <p className="text-cream-dim text-center mb-8">
-          {mode === 'login' ? 'Sign in to continue' : 'Join MatchSticked'}
+          {mode === 'login' ? 'Sign in to continue' : 'Join Matchsticked'}
         </p>
 
         {expired && (
@@ -180,7 +184,7 @@ function AuthForm() {
           {mode === 'login' ? "Don't have an account?" : 'Already have an account?'}{' '}
           <button
             onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
-            className="text-danger hover:underline"
+            className="text-ember hover:underline"
           >
             {mode === 'login' ? 'Sign up' : 'Sign in'}
           </button>

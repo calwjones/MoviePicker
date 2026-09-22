@@ -122,7 +122,7 @@ export default function FilterEditor({
             Streaming Service
             {confirmedProviderNames && confirmedProviderNames.size > 0 && (
               <span className="ml-2 text-[10px] text-cream-dim/70">
-                <span className="text-coral">★</span> = from your profile
+                <span className="text-ember">★</span> = from your profile
               </span>
             )}
           </label>
@@ -151,7 +151,7 @@ export default function FilterEditor({
                     <span
                       aria-label="From your profile"
                       className={`absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] leading-none ${
-                        selected ? 'bg-charcoal text-coral' : 'bg-coral text-cream'
+                        selected ? 'bg-charcoal text-ember' : 'bg-coral text-cream'
                       }`}
                     >
                       ★

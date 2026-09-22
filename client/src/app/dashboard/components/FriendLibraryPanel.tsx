@@ -186,7 +186,7 @@ export default function FriendLibraryPanel({ friend, onClose, addToast }: Props)
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-full bg-coral/20 flex items-center justify-center text-coral font-semibold shrink-0">
+              <div className="w-10 h-10 rounded-full bg-coral/20 flex items-center justify-center text-ember font-semibold shrink-0">
                 {friend.username.charAt(0).toUpperCase()}
               </div>
               <h2 className="text-lg font-semibold truncate">{friend.username}</h2>
@@ -215,7 +215,7 @@ export default function FriendLibraryPanel({ friend, onClose, addToast }: Props)
                 {showSortFilter && hasActiveFilters && (
                   <button
                     onClick={(e) => { e.stopPropagation(); clearAllFilters(); }}
-                    className="text-danger text-xs hover:underline"
+                    className="text-ember text-xs hover:underline"
                   >
                     Clear all
                   </button>
