@@ -3,6 +3,7 @@ import { prisma } from '../app';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { applyMovieFilters } from '../lib/filterMovies';
 import { getInCinemaIds, attachInCinema } from '../services/cinemaStatus';
+import { refreshStaleInBackground } from '../services/tmdb';
 
 const router = Router();
 
@@ -109,6 +110,7 @@ router.post('/create', authenticate, async (req: AuthRequest, res: Response) => 
       },
     });
 
+    refreshStaleInBackground(watchlistMovies);
     res.status(201).json({ session: await decorateSoloSession(session) });
   } catch (error) {
     console.error(error);

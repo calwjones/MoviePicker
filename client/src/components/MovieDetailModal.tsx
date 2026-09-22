@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Movie, UserMovie } from '@matchsticked/shared';
+import { movieApi } from '@/lib/api';
 import MoviePoster from './MoviePoster';
 import InCinemaBadge from './InCinemaBadge';
 import StreamingProvidersList from './StreamingProviders';
@@ -25,6 +26,16 @@ interface MovieDetailModalProps {
   onDismiss?: (movie: Movie) => void | Promise<void>;
 }
 
+const STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
+
+// Rows created before trailers/sync tracking, or synced over a week ago, get
+// re-fetched so "Available on" and the trailer reflect today's catalogue.
+function needsRefresh(movie: Movie): boolean {
+  if (!movie.id) return false;
+  if (!movie.tmdbSyncedAt) return true;
+  return Date.now() - Date.parse(movie.tmdbSyncedAt) > STALE_AFTER_MS;
+}
+
 export default function MovieDetailModal({
   movie,
   open,
@@ -39,14 +50,42 @@ export default function MovieDetailModal({
   onAdd,
   onDismiss,
 }: MovieDetailModalProps) {
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const [fresh, setFresh] = useState<Movie | null>(null);
+  const [trailerFor, setTrailerFor] = useState<string | null>(null);
+
+  const movieId = movie?.id;
+  const stale = !!movie && needsRefresh(movie);
+  useEffect(() => {
+    if (!open || !movieId || !stale) return;
+    let cancelled = false;
+    movieApi.get(movieId)
+      .then((res) => { if (!cancelled) setFresh(res.data.movie); })
+      .catch(() => { /* keep showing what we have */ });
+    return () => { cancelled = true; };
+  }, [open, movieId, stale]);
+
+  useEffect(() => {
+    if (open) dialogRef.current?.focus();
+  }, [open, movieId]);
+
+  const shown: Movie | null = movie && fresh && fresh.id === movie.id ? { ...movie, ...fresh } : movie;
+  const playing = !!shown?.trailerKey && trailerFor === shown.id + shown.trailerKey;
+
+  const close = useCallback(() => {
+    setTrailerFor(null);
+    onClose();
+  }, [onClose]);
+
   useEffect(() => {
     if (!open) return;
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') close();
     };
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [open, onClose]);
+  }, [open, close]);
 
   useEffect(() => {
     if (!open) return;
@@ -61,21 +100,37 @@ export default function MovieDetailModal({
 
   return (
     <AnimatePresence>
-      {open && movie && (
+      {open && shown && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 bg-charcoal/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center"
-          onClick={onClose}
+          onClick={close}
         >
           <motion.div
             initial={{ y: 100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 100, opacity: 0 }}
-            className="glass rounded-t-2xl sm:rounded-2xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto"
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            tabIndex={-1}
+            className="glass rounded-t-2xl sm:rounded-2xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto focus:outline-none"
             onClick={(e) => e.stopPropagation()}
           >
+            {playing && shown.trailerKey && (
+              <div className="relative aspect-video -mx-2 -mt-2 mb-4 rounded-xl overflow-hidden bg-black">
+                <iframe
+                  src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(shown.trailerKey)}?autoplay=1&rel=0&playsinline=1`}
+                  title={`${shown.title} trailer`}
+                  allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                  allowFullScreen
+                  className="absolute inset-0 w-full h-full"
+                />
+              </div>
+            )}
             {seedTitles && seedTitles.length > 0 && (
               <p className="text-xs text-cream-dim mb-3">
                 Because you liked{' '}
@@ -90,31 +145,42 @@ export default function MovieDetailModal({
 
             <div className="flex gap-4 mb-4">
               <div className="relative w-24 h-36 rounded-xl overflow-hidden flex-shrink-0">
-                <MoviePoster posterUrl={movie.posterUrl} title={movie.title} />
-                {movie.inCinema && (
+                <MoviePoster posterUrl={shown.posterUrl} title={shown.title} />
+                {shown.inCinema && (
                   <div className="absolute top-1.5 left-1.5">
                     <InCinemaBadge size="sm" />
                   </div>
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <h2 className="text-xl font-semibold font-display">{movie.title}</h2>
+                <h2 id={titleId} className="text-xl font-semibold font-display">{shown.title}</h2>
                 <p className="text-cream-dim text-sm mt-1">
-                  {movie.year}
-                  {movie.runtime ? ` · ${movie.runtime} min` : ''}
-                  {movie.tmdbRating ? ` · ${movie.tmdbRating.toFixed(1)}★` : ''}
+                  {shown.year}
+                  {shown.runtime ? ` · ${shown.runtime} min` : ''}
+                  {shown.tmdbRating ? ` · ${shown.tmdbRating.toFixed(1)}★` : ''}
                 </p>
-                {movie.director && (
-                  <p className="text-cream-dim text-xs mt-1">Dir. {movie.director}</p>
+                {shown.director && (
+                  <p className="text-cream-dim text-xs mt-1">Dir. {shown.director}</p>
                 )}
-                {movie.genres && movie.genres.length > 0 && (
+                {shown.genres && shown.genres.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-2">
-                    {movie.genres.map((g) => (
+                    {shown.genres.map((g) => (
                       <span key={g} className="text-xs px-2 py-0.5 glass rounded-full text-cream-dim">
                         {g}
                       </span>
                     ))}
                   </div>
+                )}
+                {shown.trailerKey && !playing && (
+                  <button
+                    onClick={() => setTrailerFor(shown.id + shown.trailerKey)}
+                    className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cream/10 hover:bg-cream/20 text-cream text-xs font-medium transition-colors"
+                  >
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                    Watch trailer
+                  </button>
                 )}
                 {loading && (
                   <p className="text-cream-dim text-xs mt-2 animate-pulse">Loading details…</p>
@@ -122,21 +188,21 @@ export default function MovieDetailModal({
               </div>
             </div>
 
-            {movie.overview && (
-              <p className="text-cream-dim text-sm mb-4">{movie.overview}</p>
+            {shown.overview && (
+              <p className="text-cream-dim text-sm mb-4">{shown.overview}</p>
             )}
 
-            {movie.cast && movie.cast.length > 0 && (
+            {shown.cast && shown.cast.length > 0 && (
               <div className="mb-4">
                 <p className="text-xs text-cream-dim mb-1">Cast</p>
-                <p className="text-sm">{movie.cast.slice(0, 5).join(', ')}</p>
+                <p className="text-sm">{shown.cast.slice(0, 5).join(', ')}</p>
               </div>
             )}
 
-            {movie.streamingProviders && movie.streamingProviders.length > 0 && (
+            {shown.streamingProviders && shown.streamingProviders.length > 0 && (
               <div className="mb-4">
                 <p className="text-xs text-cream-dim mb-2">Available on</p>
-                <StreamingProvidersList providers={movie.streamingProviders} />
+                <StreamingProvidersList providers={shown.streamingProviders} />
               </div>
             )}
 
@@ -166,9 +232,9 @@ export default function MovieDetailModal({
               </div>
             )}
 
-            {onMoviesLike && movie.tmdbId && (
+            {onMoviesLike && shown.tmdbId && (
               <button
-                onClick={() => onMoviesLike(movie)}
+                onClick={() => onMoviesLike(shown)}
                 className="w-full py-2.5 mb-3 glass rounded-xl text-sm text-cream-dim hover:text-cream transition-colors"
               >
                 Movies Like This
@@ -178,14 +244,14 @@ export default function MovieDetailModal({
             <div className="flex gap-3">
               {isRecContext && onDismiss ? (
                 <button
-                  onClick={async () => { await onDismiss(movie); onClose(); }}
+                  onClick={async () => { await onDismiss(shown); close(); }}
                   className="flex-1 py-3 glass rounded-xl text-cream-dim hover:text-coral transition-colors text-sm font-medium"
                 >
                   Not interested
                 </button>
               ) : (
                 <button
-                  onClick={onClose}
+                  onClick={close}
                   className="flex-1 py-3 glass rounded-xl text-cream-dim hover:text-cream transition-colors"
                 >
                   Close
@@ -193,7 +259,7 @@ export default function MovieDetailModal({
               )}
               {isRecContext && onAdd && (
                 <button
-                  onClick={() => onAdd(movie)}
+                  onClick={() => onAdd(shown)}
                   className="flex-1 py-3 bg-coral text-charcoal rounded-xl font-medium text-sm hover:bg-coral/90 transition-colors"
                 >
                   Add to Watchlist

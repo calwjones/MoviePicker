@@ -8,6 +8,7 @@ import { buildGroupPool } from '../lib/groupCuration';
 import { resolveSessionRole } from '../lib/resolveSessionRole';
 import { getInCinemaIds, attachInCinema } from '../services/cinemaStatus';
 import { sendPush } from '../services/pushSender';
+import { refreshStaleInBackground } from '../services/tmdb';
 import type { Movie } from '@prisma/client';
 
 const router = Router();
@@ -313,6 +314,7 @@ router.post('/:id/start', authenticate, async (req: AuthRequest, res: Response) 
     ]);
 
     emit(`session:${sessionId}`, 'session-started', { sessionId });
+    refreshStaleInBackground(moviePool.map((p) => p.movie));
 
     res.json({ sessionId });
   } catch (error) {

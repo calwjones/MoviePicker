@@ -27,6 +27,8 @@ const CSP_DIRECTIVES: Record<string, string[]> = {
   'img-src': ["'self'", 'data:', 'blob:', 'https://image.tmdb.org', 'https://*.ltrbxd.com'],
   'font-src': ["'self'", 'data:'],
   'connect-src': ["'self'", API_ORIGIN, SOCKET_ORIGIN, WS_ORIGIN, 'https://va.vercel-scripts.com'],
+  // Trailers embed from YouTube's privacy-enhanced domain only.
+  'frame-src': ['https://www.youtube-nocookie.com'],
   'frame-ancestors': ["'none'"],
   'form-action': ["'self'"],
   'base-uri': ["'self'"],

@@ -18,6 +18,10 @@ export interface Movie {
   tmdbRating: number | null;
   streamingProviders: StreamingProvider[];
   inCinema?: boolean;
+  /** YouTube video key for the best available trailer. */
+  trailerKey?: string | null;
+  /** When providers/rating/trailer were last synced from TMDB (ISO string). */
+  tmdbSyncedAt?: string | null;
 }
 
 export interface UserMovie {

@@ -1,7 +1,13 @@
 import { Router, Response } from 'express';
 import { prisma } from '../app';
 import { authenticate, AuthRequest } from '../middleware/auth';
-import { searchMovies, findOrCreateMovieByTmdbId, TMDB_IMAGE_BASE } from '../services/tmdb';
+import {
+  searchMovies,
+  findOrCreateMovieByTmdbId,
+  refreshIfStale,
+  refreshStaleInBackground,
+  TMDB_IMAGE_BASE,
+} from '../services/tmdb';
 import { getInCinemaIds, attachInCinema } from '../services/cinemaStatus';
 
 
@@ -126,6 +132,9 @@ router.get('/mine', authenticate, async (req: AuthRequest, res: Response) => {
       movie: attachInCinema(um.movie, inCinemaSet),
     }));
 
+    // Keep streaming availability current without making the library wait on TMDB.
+    refreshStaleInBackground(userMovies.map((um) => um.movie));
+
     res.json({ movies: decorated });
   } catch {
     res.status(500).json({ error: 'Internal server error' });
@@ -190,12 +199,12 @@ router.get('/tmdb/:tmdbId', authenticate, async (req: AuthRequest, res: Response
       res.status(400).json({ error: 'Invalid tmdbId' });
       return;
     }
-    const movie = await findOrCreateMovieByTmdbId(tmdbId);
-    if (!movie) {
+    const found = await findOrCreateMovieByTmdbId(tmdbId);
+    if (!found) {
       res.status(404).json({ error: 'Movie not found' });
       return;
     }
-    const inCinemaSet = await getInCinemaIds();
+    const [movie, inCinemaSet] = await Promise.all([refreshIfStale(found), getInCinemaIds()]);
     res.json({ movie: attachInCinema(movie, inCinemaSet) });
   } catch {
     res.status(500).json({ error: 'Internal server error' });
@@ -205,16 +214,17 @@ router.get('/tmdb/:tmdbId', authenticate, async (req: AuthRequest, res: Response
 router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const movieId = req.params.id as string;
-    const [movie, inCinemaSet] = await Promise.all([
+    const [found, inCinemaSet] = await Promise.all([
       prisma.movie.findUnique({ where: { id: movieId } }),
       getInCinemaIds(),
     ]);
 
-    if (!movie) {
+    if (!found) {
       res.status(404).json({ error: 'Movie not found' });
       return;
     }
 
+    const movie = await refreshIfStale(found);
     res.json({ movie: attachInCinema(movie, inCinemaSet) });
   } catch {
     res.status(500).json({ error: 'Internal server error' });
