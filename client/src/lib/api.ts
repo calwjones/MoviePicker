@@ -27,11 +27,11 @@ api.interceptors.response.use(
           localStorage.setItem('token', backup);
           localStorage.removeItem('user_token_backup');
           localStorage.removeItem('guest_session_id');
-          window.location.href = '/dashboard';
+          window.location.replace('/dashboard');
           return Promise.reject(error);
         }
         localStorage.removeItem('token');
-        window.location.href = '/auth?mode=login&expired=1';
+        window.location.replace('/auth?mode=login&expired=1');
       }
     }
     return Promise.reject(error);

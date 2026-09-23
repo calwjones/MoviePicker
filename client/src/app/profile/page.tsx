@@ -26,6 +26,14 @@ const PREFERRED_PROVIDERS = [
   'Channel 4', 'Crunchyroll', 'Hulu', 'Peacock', 'Shudder', 'BritBox',
 ];
 
+// Day-granular, so reading the clock at render time is fine: it can't drift
+// visibly between renders.
+function usernameCooldownDaysLeft(changedAt: string | null | undefined): number {
+  if (!changedAt) return 0;
+  const elapsedDays = (Date.now() - new Date(changedAt).getTime()) / (24 * 60 * 60 * 1000);
+  return Math.max(0, Math.ceil(USERNAME_COOLDOWN_DAYS - elapsedDays));
+}
+
 export default function ProfilePage() {
   const { user, loading, logout, updateUsername, updatePreferredProviders } = useAuth();
   const router = useRouter();
@@ -158,12 +166,7 @@ export default function ProfilePage() {
   const nameChanged = normalizedName !== user.username && normalizedName.length > 0;
   const nameFormatValid = USERNAME_RE.test(normalizedName);
 
-  const cooldownDaysLeft = (() => {
-    if (!user.usernameChangedAt) return 0;
-    const last = new Date(user.usernameChangedAt).getTime();
-    const elapsedDays = (Date.now() - last) / (24 * 60 * 60 * 1000);
-    return Math.max(0, Math.ceil(USERNAME_COOLDOWN_DAYS - elapsedDays));
-  })();
+  const cooldownDaysLeft = usernameCooldownDaysLeft(user.usernameChangedAt);
   const onCooldown = cooldownDaysLeft > 0;
 
   const canSaveName =
